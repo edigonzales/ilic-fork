@@ -172,13 +172,28 @@ antlrcpp::Any Ili2Input::visitExistenceConstraint(parser::Ili2Parser::ExistenceC
 
    ExistenceConstraint *c = new ExistenceConstraint();
    init_constraint(c,get_line(ctx));
-
-   /* to do !!!
-   c->Attr = visitAttributePath(ctx->attributePath());
-   for (auto p : ctx->attributepath()) {
-      ExistenceDef *d = new ExistenceDef();
+   auto attributes = ctx->attributePath();
+   auto viewables = ctx->path();
+   if (!attributes.empty()) {
+      antlrcpp::Any attribute = visitAttributePath(attributes.front());
+      c->Attr = attribute.as<PathOrInspFactor *>();
    }
-   */
+   for (size_t i = 0; i < viewables.size() && i + 1 < attributes.size(); ++i) {
+      ExistenceDef *definition = new ExistenceDef();
+      init_factor(definition,get_line(viewables[i]));
+      definition->Viewable = find_class_or_view(visitPath(viewables[i]),get_line(viewables[i]));
+      if (definition->Viewable != nullptr) {
+         push_context(definition->Viewable);
+         antlrcpp::Any requiredFactor = visitAttributePath(attributes[i + 1]);
+         PathOrInspFactor *required = requiredFactor.as<PathOrInspFactor *>();
+         pop_context();
+         if (required != nullptr) {
+            definition->PathEls = required->PathEls;
+            definition->_path = required->_path;
+         }
+      }
+      c->ExistsIn.push_back(definition);
+   }
 
    Log.decNestLevel();
    debug(ctx,"<<< visitExistenceConstraint()");
@@ -209,8 +224,7 @@ antlrcpp::Any Ili2Input::visitUniquenessConstraint(parser::Ili2Parser::Uniquenes
    init_constraint(c,get_line(ctx));
    
    if (ctx->WHERE() != nullptr) {
-      //c->Where = visitExpression(ctx->expression());
-      // to do !!!
+      c->Where.push_back(visitExpression(ctx->expression()));
    }
    
    if (ctx->globalUniqueness() != nullptr) {
@@ -219,8 +233,7 @@ antlrcpp::Any Ili2Input::visitUniquenessConstraint(parser::Ili2Parser::Uniquenes
       */
       c->Kind = UniqueConstraint::GlobalU;
       for (auto p: ctx->globalUniqueness()->uniqueEl()->objectOrAttributePath()) {
-         PathOrInspFactor * pf = new PathOrInspFactor;
-         pf->_path = p->getText();
+         PathOrInspFactor *pf = visitObjectOrAttributePath(p);
          c->UniqueDef.push_back(pf);
       }
    }
@@ -353,7 +366,13 @@ antlrcpp::Any Ili2Input::visitSetConstraint(parser::Ili2Parser::SetConstraintCon
    
    SetConstraint *c = new SetConstraint();
    init_constraint(c,get_line(ctx));
-   // to do !!!
+   auto expressions = ctx->expression();
+   if (ctx->logical != nullptr) {
+      c->Where.push_back(visitExpression(ctx->logical));
+   }
+   if (!expressions.empty()) {
+      c->Constraint = visitExpression(expressions.back());
+   }
 
    Log.decNestLevel();
    debug(ctx,"<<< visitSetConstraint()");

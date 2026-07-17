@@ -9,8 +9,6 @@ using namespace input;
 using namespace parser;
 using namespace metamodel;
 
-static Class* viewbase = nullptr;
-
 antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
 {
 
@@ -76,7 +74,24 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
    }
    
    if (properties[EXTENDED]) {
-      // to do !!!
+      v->Extended = true;
+      SubModel *topic = dynamic_cast<SubModel *>(get_package_context());
+      Package *baseTopic = topic == nullptr ? nullptr : topic->_super;
+      if (baseTopic == nullptr) {
+         Log.error("EXTENDED can only be used in an extended topic",get_line(ctx));
+      }
+      else {
+         for (MetaElement *element : baseTopic->Element) {
+            if (element->Name == name1 && element->getClass() == "View") {
+               v->Super = static_cast<View *>(element);
+               v->Super->Sub.push_back(v);
+               break;
+            }
+         }
+         if (v->Super == nullptr) {
+            Log.error("base view " + name1 + " not found",get_line(ctx));
+         }
+      }
    }
 
    if (ctx->EXTENDS() != nullptr) {
@@ -106,6 +121,7 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
          /* PROJECTION OF renamedViewableRef
          */
          v->FormationKind = View::Projection;
+         v->_formationPaths.push_back(fctx->projection()->renamedViewableRef()->path()->getText());
          visitRenamedViewableRef(fctx->projection()->renamedViewableRef());
       }
       else if (fctx->join() != nullptr) {
@@ -114,16 +130,18 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
          */
          v->FormationKind = View::Join;
          for (auto vr: fctx->join()->renamedViewableRef()) {
+            v->_formationPaths.push_back(vr->path()->getText());
             visitRenamedViewableRef(vr);
          }
-         // ILINULL ???
+         v->_orNullCount = static_cast<int>(fctx->join()->ILINULL().size());
       }
       else if (fctx->iliunion() != nullptr) {
          /* UNION OF renamedViewableRef
             (COMMA renamedViewableRef)*
          */
          v->FormationKind = View::Union;
-         for (auto vr: fctx->join()->renamedViewableRef()) {
+         for (auto vr: fctx->iliunion()->renamedViewableRef()) {
+            v->_formationPaths.push_back(vr->path()->getText());
             visitRenamedViewableRef(vr);
          }
       }
@@ -131,7 +149,14 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
          /* AGGREGATION OF renamedViewableRef
             (ALL | EQUAL LPAREN uniqueEl RPAREN)
          */
-         v->FormationKind = View::Aggregation_All; // ???, to do !!!
+         v->FormationKind = fctx->aggregation()->ALL() != nullptr
+            ? View::Aggregation_All : View::Aggregation_Equal;
+         v->_formationPaths.push_back(fctx->aggregation()->renamedViewableRef()->path()->getText());
+         if (fctx->aggregation()->uniqueEl() != nullptr) {
+            for (auto path : fctx->aggregation()->uniqueEl()->objectOrAttributePath()) {
+               v->_formationPaths.push_back(path->getText());
+            }
+         }
          visitRenamedViewableRef(fctx->aggregation()->renamedViewableRef());
       }
       else if (fctx->inspection() != nullptr) {
@@ -145,42 +170,62 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
          else {
             v->FormationKind = View::Inspection_Normal;
          }
-         visitRenamedViewableRef(fctx->inspection()->renamedViewableRef());
-         if (viewbase != nullptr) {
-            string attrname = fctx->inspection()->NAME(0)->getText();
-            int line = get_line(fctx->inspection()->NAME(0));
-            AttrOrParam *attr = find_attribute(viewbase,attrname);
-            if (attr == nullptr) {
+         AttrOrParam *baseAlias = visitRenamedViewableRef(fctx->inspection()->renamedViewableRef());
+         v->_formationPaths.push_back(fctx->inspection()->renamedViewableRef()->path()->getText());
+         ObjectType *baseAliasType = baseAlias == nullptr
+            ? nullptr : dynamic_cast<ObjectType *>(baseAlias->Type);
+         Class *inspectionRoot = baseAliasType == nullptr ? nullptr : baseAliasType->_baseclass;
+         v->_inspectionParent = inspectionRoot;
+
+         Class *current = inspectionRoot;
+         AttrOrParam *inspectedAttribute = nullptr;
+         int line = get_line(fctx->inspection());
+         for (auto nameToken : fctx->inspection()->NAME()) {
+            string attrname = nameToken->getText();
+            v->_formationPaths.push_back(attrname);
+            line = get_line(nameToken);
+            inspectedAttribute = find_attribute(current,attrname);
+            if (inspectedAttribute == nullptr) {
                Log.error("inspection attribute " + attrname + " not found",line);
+               current = nullptr;
+               break;
             }
-            else if (attr->Type != nullptr) {
-               Class *basestructure = nullptr;
-               if (attr->Type->getClass() == "LineType") {
-                  basestructure = find_structure("INTERLIS.SurfaceBoundary",line);
-               }
-               else if (attr->Type->getClass() == "MultiValue") {
-                  MultiValue *mv = static_cast<MultiValue*>(attr->Type);
-                  basestructure = static_cast<Class *>(mv->BaseType);
-               }
-               else {
-                  Log.error("attribute " + attrname + " can not be instpected",line);
-               }
-               if (basestructure != nullptr) {
-                  for (auto aa : basestructure->ClassAttribute) {
-                     AttrOrParam *aac = static_cast<AttrOrParam *>(aa->clone());
-                     aac->_visible = true; // to do !!!
-                     PathEl *pe = new PathEl;
-                     pe->Kind = PathEl::Attribute;
-                     pe->Ref = aa;
-                     PathOrInspFactor *pi = new PathOrInspFactor;
-                     pi->PathEls.push_back(pe);
-                     aac->Derivates.push_back(pi);
-                     viewbase->ClassAttribute.push_back(aac);
-                  }
-               }
+            if (inspectedAttribute->Type != nullptr && inspectedAttribute->Type->getClass() == "MultiValue") {
+               MultiValue *mv = static_cast<MultiValue *>(inspectedAttribute->Type);
+               current = mv->BaseType != nullptr && mv->BaseType->getClass() == "Class"
+                  ? static_cast<Class *>(mv->BaseType) : nullptr;
             }
          }
+
+         Class *decomposedStructure = nullptr;
+         if (inspectedAttribute != nullptr && inspectedAttribute->Type != nullptr) {
+            if (inspectedAttribute->Type->getClass() == "LineType") {
+               LineType *lineType = static_cast<LineType *>(inspectedAttribute->Type);
+               if (lineType->Kind == LineType::Polyline || lineType->Kind == LineType::DirectedPolyline) {
+                  decomposedStructure = find_structure("INTERLIS.LineGeometry",line);
+               }
+               else {
+                  decomposedStructure = find_structure("INTERLIS.SurfaceBoundary",line);
+               }
+            }
+            else if (inspectedAttribute->Type->getClass() == "MultiValue") {
+               MultiValue *mv = static_cast<MultiValue *>(inspectedAttribute->Type);
+               if (mv->BaseType != nullptr && mv->BaseType->getClass() == "Class") {
+                  decomposedStructure = static_cast<Class *>(mv->BaseType);
+               }
+            }
+            else {
+               Log.error("attribute " + inspectedAttribute->Name + " can not be inspected",line);
+            }
+         }
+         if (baseAliasType != nullptr && decomposedStructure != nullptr) {
+            baseAliasType->_baseclass = decomposedStructure;
+         }
       }
+   }
+
+   for (auto baseExtension : ctx->baseExtensionDef()) {
+      visitBaseExtensionDef(baseExtension);
    }
    
    if (ctx->selection().size() == 1) {
@@ -232,19 +277,19 @@ antlrcpp::Any Ili2Input::visitRenamedViewableRef(parser::Ili2Parser::RenamedView
    Log.debug(">>> visitRenamedViewableRef()");
    Log.incNestLevel();
 
-   viewbase = find_class_or_view(ctx->path()->getText(),get_line(ctx));
+   Class *referencedViewable = find_class_or_view(ctx->path()->getText(),get_line(ctx));
    string name = "";
    if (ctx->basename != nullptr) {
       name = ctx->basename->getText();
    }
-   else if (viewbase != nullptr) {
-      name = viewbase->Name;
+   else if (referencedViewable != nullptr) {
+      name = referencedViewable->Name;
    }
 
    ObjectType *o = new ObjectType;
    o->ElementInPackage = nullptr;
    o->Name = "TYPE";
-   o->_baseclass = viewbase;
+   o->_baseclass = referencedViewable;
 
    AttrOrParam *a = new AttrOrParam;
    a->_visible = false;
@@ -289,7 +334,38 @@ antlrcpp::Any Ili2Input::visitBaseExtensionDef(parser::Ili2Parser::BaseExtension
    */
 
    debug(ctx,">>> visitBaseExtensionDef()");
-   // to do !!!
+   Log.incNestLevel();
+
+   string baseName = ctx->basename->getText();
+   Class *baseClass = nullptr;
+   AttrOrParam *baseAlias = find_attribute(get_class_context(),baseName);
+   if (baseAlias != nullptr && baseAlias->Type != nullptr && baseAlias->Type->getClass() == "ObjectType") {
+      baseClass = static_cast<ObjectType *>(baseAlias->Type)->_baseclass;
+   }
+   if (baseClass == nullptr) {
+      Log.error("view base " + baseName + " not found",get_line(ctx->basename));
+   }
+
+   for (auto refContext : ctx->renamedViewableRef()) {
+      AttrOrParam *extensionAlias = visitRenamedViewableRef(refContext);
+      ObjectType *extensionType = extensionAlias == nullptr
+         ? nullptr : dynamic_cast<ObjectType *>(extensionAlias->Type);
+      Class *extension = extensionType == nullptr ? nullptr : extensionType->_baseclass;
+      bool extendsBase = extension != nullptr && baseClass != nullptr;
+      Class *candidate = extension;
+      while (extendsBase && candidate != baseClass) {
+         if (candidate->Super == nullptr || candidate->Super->getClass() != "Class") {
+            extendsBase = false;
+            break;
+         }
+         candidate = static_cast<Class *>(candidate->Super);
+      }
+      if (extension != nullptr && baseClass != nullptr && !extendsBase) {
+         Log.error(get_path(extension) + " does not extend " + get_path(baseClass),get_line(refContext));
+      }
+   }
+
+   Log.decNestLevel();
    debug(ctx,"<<< visitBaseExtensionDef()");
    return nullptr;
    
@@ -355,7 +431,15 @@ antlrcpp::Any Ili2Input::visitViewAttribute(parser::Ili2Parser::ViewAttributeCon
       Factor *f = visitFactor(ctx->factor());
       
       AttrOrParam *a = new AttrOrParam;
-      //init_attr(a,get_line(ctx->attributename));
+      init_extendableme(a,get_line(ctx->attributename));
+      a->Name = name;
+      a->Abstract = properties[ABSTRACT];
+      a->Final = properties[FINAL];
+      a->Extended = properties[EXTENDED];
+      a->Transient = properties[TRANSIENT];
+      if (f != nullptr) {
+         a->Derivates.push_back(f);
+      }
       
       Type *t = new TextType; // to do !!!
       if (properties[ABSTRACT]) {
@@ -364,10 +448,6 @@ antlrcpp::Any Ili2Input::visitViewAttribute(parser::Ili2Parser::ViewAttributeCon
       if (properties[FINAL]) {
          t->Final = true;
       }
-      if (properties[TRANSIENT]) {
-         //t->Transient = true;
-      }
-      
       a->Type = t;
 
       a->AttrParent = get_class_context();

@@ -129,12 +129,11 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    }
    
    if (properties[OID]) {
-      // to do !!!
+      c->OidProperty = true;
    }
    
    if (ctx->DERIVED() != nullptr) {
-      // from view
-      // to do !!!
+      c->View = find_view(visitPath(ctx->renamedViewableRef()->path()),get_line(ctx->renamedViewableRef()));
    }
 
    // role from ASSOCIATION LocalType
@@ -144,6 +143,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
       DomainType *t = find_domaintype(ctx->assocoid->getText(),get_line(ctx->assocoid));
       c->Oid = t;
    }
+   c->NoOid = ctx->NO() != nullptr;
 
    // role from ASSOCIATION DerivedAssoc
    // View *View;
@@ -176,7 +176,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    }
    
    if (ctx->CARDINALITY() != nullptr) {
-      // to do !!!
+      c->Multiplicity = visitCardinality(ctx->cardinality());
    }
 
    for (auto *actx : ctx->attributeDef()) {
@@ -293,7 +293,7 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
    r->Ordered = properties[ORDERED];
    r->Extended = properties[EXTENDED];
    r->External = properties[EXTERNAL];
-   // HIDING ???
+   r->Hiding = properties[HIDING];
 
    if (r->Extended) {
       Class* c = get_class_context();

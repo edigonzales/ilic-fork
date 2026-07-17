@@ -463,7 +463,12 @@ void Ili2Output::preVisitModel(Model *m)
    ili2.writeln(0,"MODEL " + m->Name + " (" + m->Language + ")");
    ili2.incNestLevel();
    ili2.writeln("AT \"" + m->At + "\"");
-   ili2.writeln("VERSION \"" + m->Version + "\" =");
+   ili2.write("VERSION \"" + m->Version + "\"");
+   if (!m->_translationOfName.empty()) {
+      ili2.write(" TRANSLATION OF " + m->_translationOfName
+         + " [\"" + m->_translationOfVersion + "\"]");
+   }
+   ili2.writeln(" =");
    
    Model *act_model = m;
 

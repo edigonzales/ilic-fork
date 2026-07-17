@@ -90,9 +90,10 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
       m->VersionExplanation = ctx->modelversion_expl->getText();
    }
 
-   // Topic ModelTranslation, to do !!!
-   // ctx->translationOf->getText();
-   // ctx->translationOfVersion->getText();
+   if (ctx->translationOf != nullptr) {
+      m->_translationOfName = ctx->translationOf->getText();
+      m->_translationOfVersion = visitString(ctx->translationOfVersion);
+   }
 
    if (ili24) {
       if (ctx->NOINCREMENTALTRANSFER() != nullptr) {
@@ -288,8 +289,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
       d->Oid = find_domaintype(ctx->basketOid->getText(),get_line(ctx->basketOid));
    }
    if (ctx->topicOid != nullptr) {
-      // topicOid where???, to do !!!
-      // s->Oid = find_domaintype(ctx->topicOid->getText());
+      d->TopicOid = find_domaintype(ctx->topicOid->getText(),get_line(ctx->topicOid));
    }
 
    if (ctx->DEPENDS().size() > 0) {

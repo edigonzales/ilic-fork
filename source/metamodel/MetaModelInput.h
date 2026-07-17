@@ -20,6 +20,7 @@ namespace metamodel {
    
    // metaelement helpers
    void init_metaelement(MetaElement *e, int line);
+   void prepare_meta_attributes(const string &source);
    void init_extendableme(ExtendableME *e, int line);
 
    // package helpers

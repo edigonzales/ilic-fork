@@ -20,29 +20,29 @@ VERSION "2005-06-16" = !! Roads graphics
 
       Building OF StandardSymbology.StandardSigns.SurfaceSign:
         WHERE Type == #building (
-          Sign := {Building},
-          Geometry := Geometry,
+          Sign := {Building};
+          Geometry := Geometry;
           Priority := 100
         );
 
       Street OF StandardSymbology.StandardSigns.SurfaceSign:
         WHERE Type == #street (
-          Sign := {Street},
-          Geometry := Geometry,
+          Sign := {Street};
+          Geometry := Geometry;
           Priority := 100
         );
 
       Water OF StandardSymbology.StandardSigns.SurfaceSign:
         WHERE Type == #water (
-          Sign := {Water},
-          Geometry := Geometry,
+          Sign := {Water};
+          Geometry := Geometry;
           Priority := 100
         );
 
       Other OF StandardSymbology.StandardSigns.SurfaceSign:
         WHERE Type == #other (
-          Sign := {Other},
-          Geometry := Geometry,
+          Sign := {Other};
+          Geometry := Geometry;
           Priority := 100
         );
 
@@ -67,8 +67,8 @@ VERSION "2005-06-16" = !! Roads graphics
       BASED ON Surface_Boundary2 =
 
       Boundary OF StandardSymbology.StandardSigns.PolylineSign: (
-        Sign := {continuous},
-        Geometry := Geometry,
+        Sign := {continuous};
+        Geometry := Geometry;
         Priority := 101
       );
 
@@ -79,15 +79,15 @@ VERSION "2005-06-16" = !! Roads graphics
 
       Street_precise OF StandardSymbology.StandardSigns.PolylineSign:
         WHERE Precision == #precise (
-          Sign := {continuous},
-          Geometry := Geometry,
+          Sign := {continuous};
+          Geometry := Geometry;
           Priority := 110
         );
 
       Street_unprecise OF StandardSymbology.StandardSigns.PolylineSign:
         WHERE Precision == #unprecise (
-          Sign := {dotted},
-          Geometry := Geometry,
+          Sign := {dotted};
+          Geometry := Geometry;
           Priority := 110
         );
 
@@ -97,10 +97,10 @@ VERSION "2005-06-16" = !! Roads graphics
       BASED ON RoadsExdm2ien.RoadsExtended.StreetNamePosition =
 
       StreetName OF StandardSymbology.StandardSigns.TextSign: (
-          Sign := {Linefont_18},
-          Txt := Street -> Name,
-          Geometry := NamPos,
-          Rotation := NamOri,
+          Sign := {Linefont_18};
+          Txt := Street -> Name;
+          Geometry := NamPos;
+          Rotation := NamOri;
           Priority := 120
         );
 
@@ -111,15 +111,15 @@ VERSION "2005-06-16" = !! Roads graphics
 
       Tree OF StandardSymbology.StandardSigns.SymbolSign:
         WHERE Type == #prohibition.noparking (
-          Sign := {NoParking},
-          Geometry := Position,
+          Sign := {NoParking};
+          Geometry := Position;
           Priority := 130
         );
 
       GP OF StandardSymbology.StandardSigns.SymbolSign:
         WHERE Type == #danger (
-          Sign := {GP},
-          Geometry := Position,
+          Sign := {GP};
+          Geometry := Position;
           Priority := 130
         );
 

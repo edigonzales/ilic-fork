@@ -1,0 +1,20 @@
+INTERLIS 2.3;
+
+MODEL ParentPathRegression AT "https://example.invalid/ilic/tests" VERSION "1" =
+  DOMAIN
+    Coord2 = COORD 0.000 .. 100.000, 0.000 .. 100.000;
+
+  TOPIC Topic =
+    CLASS Geometry =
+      Start : Coord2;
+      Line : POLYLINE WITH (STRAIGHTS) VERTEX Coord2;
+    END Geometry;
+
+    VIEW Segments
+      INSPECTION OF Parts~Geometry->Line;
+    =
+      MANDATORY CONSTRAINT
+        Parts->Segments[FIRST]->SegmentEndPoint == PARENT->Start;
+    END Segments;
+  END Topic;
+END ParentPathRegression.

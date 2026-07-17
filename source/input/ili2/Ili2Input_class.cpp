@@ -137,7 +137,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
       // DomainType *Oid; // RESTRICTION(TextType; NumType; AnyOIDType), to do !!!
    }
    else if (ctx->NO()) {
-      // to do !!!
+      c->NoOid = true;
    }
 
    // role from ASSOCIATION DerivedAssoc
@@ -264,7 +264,8 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
    }
 
    for (auto cctx : ctx->classOrStructureDef()->constraintDef()) {
-      visitConstraintDef(cctx);
+      Constraint *constraint = visitConstraintDef(cctx);
+      c->Constraints.push_back(constraint);
    }
 
    for (auto pctx : ctx->classOrStructureDef()->parameterDef()) {
@@ -476,7 +477,7 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
       a->SubdivisionKind = AttrOrParam::NoSubDiv;
    }
 
-   a->Transient = false; // to do !!!
+   a->Transient = properties[TRANSIENT];
 
    // ASSOCIATION ClassAttr
    a->AttrParent = get_class_context();
@@ -659,7 +660,7 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
             mv->Multiplicity.Min = 0;
             mv->Multiplicity.Max = 1;
             mv->BaseType = tt;
-            mv->Super == nullptr;
+            mv->Super = nullptr;
             t = mv;
          }
          else {
@@ -686,7 +687,7 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
       for (auto r : r->_classrestriction) {
          mv->TypeRestriction.push_back(r);
       }
-      mv->Super == nullptr;
+      mv->Super = nullptr;
       t = mv;
    }
 
@@ -766,5 +767,3 @@ antlrcpp::Any Ili2Input::visitReferenceAttr(parser::Ili2Parser::ReferenceAttrCon
    return t;
 
 }
-
-

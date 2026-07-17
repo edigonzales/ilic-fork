@@ -85,6 +85,10 @@ namespace metamodel {
       list <MetaAttribute *> MetaAttribute;
       // ROLE from ASSOCIATION PackageElements
       Package *ElementInPackage = nullptr;
+      // Corresponding element in the directly preceding language version.
+      // This is intentionally not part of the IlisMeta16 transfer model.
+      MetaElement *_translationOf = nullptr;
+      MetaElement *getTranslationOfRoot();
       virtual string getClass() { return "MetaElement"; }
       virtual string getBaseClass() { return "MMObject"; };
       virtual bool isAbstract() { return true; }
@@ -149,6 +153,8 @@ namespace metamodel {
       string At = "";
       string Version = "";
       string VersionExplanation = "";
+      string _translationOfName = "";
+      string _translationOfVersion = "";
       bool NoIncrementalTransfer = true; // 2.4
       string CharSetIANAName = ""; // 2.4
       string xmlns = ""; // 2.4
@@ -228,6 +234,8 @@ namespace metamodel {
       bool ili1OptionalTable = false;
       bool Mandatory = false;
       bool isDomainType = false;
+      bool OidProperty = false;
+      bool NoOid = false;
       // role from ASSOCIATION ClassAttr
       list<metamodel::AttrOrParam *> ClassAttribute;
       // role from ASSOCIATION ClassParam
@@ -345,6 +353,7 @@ namespace metamodel {
       Multiplicity Multiplicity;
       list<Expression *> Derivates; // LIST
       bool EmbeddedTransfer = false;
+      bool Hiding = false;
       // role from ASSOCIATION AssocRole
       Class *Association = nullptr;
       // role from ASSOCIATION AssocAccOrign
@@ -406,6 +415,7 @@ namespace metamodel {
       list <MetaBasketDef *> MetaBasketDef;
       // role from ASSOCIATION BasketOID
       DomainType *Oid = nullptr; // RESTRICTION(TextType; NumType; AnyOIDType);
+      DomainType *TopicOid = nullptr;
       virtual string getClass() { return "DataUnit"; }
       virtual string getBaseClass() { return "ExtendableME"; };
    };
@@ -469,6 +479,7 @@ namespace metamodel {
       DataUnit *MetaDataTopic = nullptr;
       // role from ASSOCIATION MetaBasketMembers
       MetaObjectDef *Member = nullptr;
+      list<MetaObjectDef *> Members;
       virtual string getClass() { return "MetaBasketDef"; }
       virtual string getBaseClass() { return "ExtendableME"; };
    };
@@ -520,9 +531,13 @@ namespace metamodel {
       string Max = "";
       bool Circular = false; // undefined, to do !!!
       bool Clockwise = false; // undefined, to do !!!
+      enum { NoDirection, ClockwiseDirection, CounterclockwiseDirection } Direction = NoDirection;
       // frole from ASSOCIATION NumUnit
       Unit *Unit = nullptr;
       bool OIDType = false;
+      MetaElement *RefSys = nullptr;
+      string RefSysName = "";
+      int RefSysAxis = -1;
       virtual string getClass() { return "NumType"; }
       virtual string getBaseClass() { return "DomainType"; };
    };
@@ -549,7 +564,7 @@ namespace metamodel {
    class NumsRefSys : public MMObject { // ASSOCIATION
    public:
       NumType *NumType = nullptr;
-      MetaObjectDef *RefSys = nullptr; // MetaObjectDef OR CoordType, to do !!!
+      MetaElement *RefSys = nullptr; // MetaObjectDef OR CoordType
       int AxisInd = -1;
       virtual string getClass() { return "NumsRefSys"; }
       virtual string getBaseClass() { return "MMObject"; };
@@ -621,6 +636,7 @@ namespace metamodel {
    public:
       // role from ASSOCIATION ARefOf
       Class *Of = nullptr; // Class OR AttrOrParam OR Argument, to do !!!
+      list<Type *> TypeRestriction;
       virtual string getClass() { return "AttributeRefType"; }
       virtual string getBaseClass() { return "DomainType"; };
    };
@@ -716,6 +732,12 @@ namespace metamodel {
                           // Inspection: Attributepath
       Expression *Where = nullptr;
       bool Transient = false;
+      int _orNullCount = 0;
+      list<string> _formationPaths;
+      // Root viewable of a normal/area inspection. PARENT resolves to this
+      // viewable, while the generated base alias points to the decomposed
+      // structure.
+      Class *_inspectionParent = nullptr;
       // role from ASSOCIATION BaseViewDef
       // list<RenamedBaseView *> RenamedBaseView;
       // role from ASSOCIATION DerivedAssoc

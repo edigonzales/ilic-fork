@@ -168,7 +168,211 @@ antlrcpp::Any Ili2Input::visitMetaObjectRef(parser::Ili2Parser::MetaObjectRefCon
 
 }
 
-static Class* pathel_context;
+namespace {
+
+struct PathResolutionState {
+   Class *current = nullptr;
+   View *enclosingView = nullptr;
+};
+
+Class *path_target(Type *type)
+{
+   if (type == nullptr) {
+      return nullptr;
+   }
+   if (type->getClass() == "Class") {
+      return static_cast<Class *>(type);
+   }
+   if (type->isSubClassOf("ClassRelatedType")) {
+      return static_cast<ClassRelatedType *>(type)->_baseclass;
+   }
+   if (type->isSubClassOf("TypeRelatedType")) {
+      Type *base = static_cast<TypeRelatedType *>(type)->BaseType;
+      return base != type ? path_target(base) : nullptr;
+   }
+   return nullptr;
+}
+
+AttrOrParam *view_alias(View *view,string name = "")
+{
+   if (view == nullptr) {
+      return nullptr;
+   }
+   for (auto attribute : view->ClassAttribute) {
+      if (attribute == nullptr || attribute->Type == nullptr ||
+          attribute->Type->getClass() != "ObjectType") {
+         continue;
+      }
+      if (name.empty() || attribute->Name == name) {
+         return attribute;
+      }
+   }
+   return nullptr;
+}
+
+MetaElement *resolve_through_view_bases(View *view,string name,Class *&target,int line)
+{
+   MetaElement *found = nullptr;
+   target = nullptr;
+   for (auto alias : view->ClassAttribute) {
+      if (alias == nullptr || alias->Type == nullptr || alias->Type->getClass() != "ObjectType") {
+         continue;
+      }
+      Class *base = path_target(alias->Type);
+      if (base == nullptr) {
+         continue;
+      }
+
+      MetaElement *candidate = find_role(base,name);
+      if (candidate == nullptr) {
+         candidate = find_attribute(base,name);
+      }
+      if (candidate == nullptr) {
+         continue;
+      }
+      if (found != nullptr && found != candidate) {
+         Log.error("ambiguous path element " + name + " in view " + get_path(view),line);
+         return nullptr;
+      }
+      found = candidate;
+      if (candidate->getClass() == "Role") {
+         target = static_cast<Role *>(candidate)->_baseclass;
+      }
+      else {
+         target = path_target(static_cast<AttrOrParam *>(candidate)->Type);
+      }
+   }
+   return found;
+}
+
+PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResolutionState &state)
+{
+   PathEl *element = new PathEl();
+   init_mmobject(element,ctx->start->getLine());
+
+   if (ctx->THIS() != nullptr) {
+      element->Kind = PathEl::This;
+      element->Ref = state.current;
+      return element;
+   }
+
+   if (ctx->PARENT() != nullptr) {
+      element->Kind = PathEl::Parent;
+      element->Ref = state.enclosingView;
+      if (state.enclosingView == nullptr ||
+          state.enclosingView->FormationKind != View::Inspection_Normal ||
+          state.enclosingView->_inspectionParent == nullptr) {
+         Log.error("PARENT is only valid in a normal inspection view",get_line(ctx));
+         state.current = nullptr;
+      }
+      else {
+         state.current = state.enclosingView->_inspectionParent;
+      }
+      return element;
+   }
+
+   if (ctx->THISAREA() != nullptr || ctx->THATAREA() != nullptr) {
+      bool thatArea = ctx->THATAREA() != nullptr;
+      element->Kind = thatArea ? PathEl::ThatArea : PathEl::ThisArea;
+      element->Ref = state.enclosingView;
+      if (state.enclosingView == nullptr ||
+          state.enclosingView->FormationKind != View::Inspection_Area ||
+          state.enclosingView->_inspectionParent == nullptr) {
+         Log.error(string(thatArea ? "THATAREA" : "THISAREA") +
+                   " is only valid in an area inspection view",get_line(ctx));
+         state.current = nullptr;
+      }
+      else {
+         state.current = state.enclosingView->_inspectionParent;
+      }
+      return element;
+   }
+
+   auto object = ctx->objectRef();
+   if (object == nullptr) {
+      state.current = nullptr;
+      return element;
+   }
+
+   if (object->FIRST() != nullptr) {
+      element->SpecIndex = PathEl::First;
+   }
+   else if (object->LAST() != nullptr) {
+      element->SpecIndex = PathEl::Last;
+   }
+   else if (object->axislistindex != nullptr) {
+      element->NumIndex = atoi(object->axislistindex->getText().c_str());
+   }
+
+   if (object->AGGREGATES() != nullptr) {
+      element->Kind = PathEl::ViewBase;
+      View *view = dynamic_cast<View *>(state.current);
+      AttrOrParam *alias = view_alias(view);
+      element->Ref = alias;
+      state.current = alias == nullptr ? nullptr : path_target(alias->Type);
+      if (alias == nullptr) {
+         Log.error("AGGREGATES has no aggregation base",get_line(ctx));
+      }
+      return element;
+   }
+
+   if (object->name == nullptr) {
+      Log.error("path element has no name",get_line(ctx));
+      state.current = nullptr;
+      return element;
+   }
+
+   string name = object->name->getText();
+   if (state.current == nullptr) {
+      Log.error("path element " + name + " has no viewable context",get_line(ctx));
+      return element;
+   }
+
+   View *currentView = dynamic_cast<View *>(state.current);
+   AttrOrParam *attribute = find_attribute(state.current,name);
+   Role *role = find_role(state.current,name);
+
+   if (currentView != nullptr && attribute != nullptr &&
+       attribute->Type != nullptr && attribute->Type->getClass() == "ObjectType") {
+      element->Kind = PathEl::ViewBase;
+      element->Ref = attribute;
+      state.current = path_target(attribute->Type);
+      return element;
+   }
+
+   if (role != nullptr) {
+      bool associationPath = object->BACKSLASH() != nullptr;
+      element->Kind = associationPath ? PathEl::AssocPath : PathEl::Role;
+      element->Ref = role;
+      state.current = associationPath ? role->Association : role->_baseclass;
+      return element;
+   }
+
+   if (attribute != nullptr) {
+      element->Kind = attribute->Type != nullptr && attribute->Type->getClass() == "ReferenceType"
+         ? PathEl::ReferenceAttr : PathEl::Attribute;
+      element->Ref = attribute;
+      state.current = path_target(attribute->Type);
+      return element;
+   }
+
+   if (currentView != nullptr) {
+      Class *target = nullptr;
+      MetaElement *throughBase = resolve_through_view_bases(currentView,name,target,get_line(ctx));
+      if (throughBase != nullptr) {
+         element->Ref = throughBase;
+         element->Kind = throughBase->getClass() == "Role" ? PathEl::Role : PathEl::Attribute;
+         state.current = target;
+         return element;
+      }
+   }
+
+   Log.error("path element " + name + " not found in " + get_path(state.current),get_line(ctx));
+   state.current = nullptr;
+   return element;
+}
+
+}
 
 antlrcpp::Any Ili2Input::visitObjectOrAttributePath(parser::Ili2Parser::ObjectOrAttributePathContext *ctx)
 {
@@ -201,16 +405,18 @@ antlrcpp::Any Ili2Input::visitObjectOrAttributePath(parser::Ili2Parser::ObjectOr
    PathOrInspFactor *f = new PathOrInspFactor();
    init_factor(f,ctx->start->getLine());
 
-   if (get_context()->getClass() == "Graphic") {
+   PathResolutionState state;
+   if (get_context() != nullptr && get_context()->getClass() == "Graphic") {
       Graphic *g = static_cast<Graphic *>(get_context());
-      pathel_context = g->Base;
+      state.current = g->Base;
    }
    else {
-      pathel_context = get_class_context();
+      state.current = get_class_context();
    }
+   state.enclosingView = dynamic_cast<View *>(state.current);
 
    for (auto p : ctx->pathEl()) {
-      f->PathEls.push_back(visitPathEl(p));
+      f->PathEls.push_back(resolve_path_element(p,state));
       if (f->_path != "") {
          f->_path += "->";
       }
@@ -218,7 +424,7 @@ antlrcpp::Any Ili2Input::visitObjectOrAttributePath(parser::Ili2Parser::ObjectOr
    }
 
    f->_type = "???";
-   if (f->PathEls.back()->Ref != nullptr) {
+   if (!f->PathEls.empty() && f->PathEls.back()->Ref != nullptr) {
       if (f->PathEls.back()->Ref->getClass() == "AttrOrParam") {
          AttrOrParam *a = static_cast<AttrOrParam*>(f->PathEls.back()->Ref);
          if (a->Type != nullptr) {
@@ -236,7 +442,7 @@ antlrcpp::Any Ili2Input::visitObjectOrAttributePath(parser::Ili2Parser::ObjectOr
 antlrcpp::Any Ili2Input::visitAttributePath(parser::Ili2Parser::AttributePathContext *ctx)
 {
    debug(ctx, ">>> visitAttributePath()");
-   Factor *f = visitObjectOrAttributePath(ctx->objectOrAttributePath());
+   PathOrInspFactor *f = visitObjectOrAttributePath(ctx->objectOrAttributePath());
    debug(ctx, "<<< visitAttributePath()");
    return f;
 }
@@ -268,68 +474,9 @@ antlrcpp::Any Ili2Input::visitPathEl(parser::Ili2Parser::PathElContext *ctx)
       enum { First, Last } SpecIndex;
    */
 
-   debug(ctx, ">>> visitPathEl()");
-   Log.incNestLevel();
-
-   PathEl *e = new PathEl();
-   init_mmobject(e,ctx->start->getLine());
-   string kind = "";
-   e->Ref = nullptr; // ???
-   e->NumIndex = -1; // ???
-   e->SpecIndex = PathEl::First; // ???
-   
-   if (ctx->THIS() != nullptr) {
-      e->Kind = PathEl::This;
-      kind = "This";
-   }
-   else if (ctx->THISAREA() != nullptr) {
-      e->Kind = PathEl::ThisArea;
-      kind = "ThisArea";
-   }
-   else if (ctx->PARENT() != nullptr) {
-      e->Kind = PathEl::Parent;
-      kind = "Parent";
-   }
-   else if (ctx->objectRef() != nullptr) {
-
-      e->Kind = PathEl::Attribute;
-      kind = "Attribute";
-      string name = ctx->objectRef()->name->getText();
-
-      // role
-      Role *r = find_role(pathel_context,name);
-      if (r != nullptr) {
-         pathel_context = r->_baseclass;
-         e->Ref = r;
-         goto end;
-      }
-
-      // attribute
-      AttrOrParam *a = find_attribute(pathel_context,name);
-      e->Ref = a;
-      if (a == nullptr) {
-         Log.error("attribute " + name + " not found",get_line(ctx->objectRef()));
-         pathel_context = nullptr;
-      }
-      else if (a != nullptr && a->Type != nullptr) {
-         if (a->Type->isSubClassOf("ClassRelatedType")) {
-            ClassRelatedType *t = static_cast<ClassRelatedType *>(a->Type);
-            pathel_context = t->_baseclass;
-         }
-         else if (a->Type->isSubClassOf("TypeRelatedType")) {
-            TypeRelatedType *t = static_cast<TypeRelatedType *>(a->Type);
-            if (t->BaseType != nullptr && t->BaseType->getClass() == "Class") {
-               pathel_context = static_cast<Class *>(t->BaseType);
-            }
-         }
-      }
-
-   }
-
-   end:
-   Log.decNestLevel();
-   debug(ctx, "<<< visitPathEl() " + kind);
-
-   return e;
+   PathResolutionState state;
+   state.current = get_class_context();
+   state.enclosingView = dynamic_cast<View *>(state.current);
+   return resolve_path_element(ctx,state);
 
 }

@@ -25,6 +25,8 @@ namespace util {
       string getFilePath();
       string getIliVersion();
       list<string> getImports();
+      list<string> getTranslationModels();
+      list<string> getRequiredModels();
       list<string> getModels();
       void setAutoSearch(bool autosearch);
       bool getAutoSearch();
@@ -33,7 +35,7 @@ namespace util {
 
       string filepath = "";
       string iliversion = "2.3";
-      string translation_of = "";
+      list<string> translation_of;
       list<string> imports;
       list<string> models;      
       bool auto_search = false;

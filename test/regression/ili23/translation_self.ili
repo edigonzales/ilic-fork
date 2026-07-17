@@ -1,0 +1,5 @@
+INTERLIS 2.3;
+
+MODEL SelfTranslation (de) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF SelfTranslation ["1"] =
+END SelfTranslation.

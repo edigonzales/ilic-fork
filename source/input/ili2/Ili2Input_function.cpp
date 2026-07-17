@@ -152,20 +152,22 @@ antlrcpp::Any Ili2Input::visitFunctionCall(parser::Ili2Parser::FunctionCallConte
       else {
          auto argp = c->Function->Argument.begin();
          for (auto a: c->Arguments) {
-            if ((*argp)->Type == nullptr) {
+            Argument *formal = *argp;
+            ++argp;
+            a->FormalArgument = formal;
+            if (formal->Type == nullptr || a->Kind == ActualArgument::AllOf || a->Expression == nullptr) {
                continue;
             }
             if (a->Expression->_type == "???") {
                continue;
             }
-            if (!check_type_compatibility((*argp)->Type->getClass(),a->Expression->_type)) {
+            if (!check_type_compatibility(formal->Type->getClass(),a->Expression->_type)) {
                Log.error(
-                  "incompatible type for " + name + "() argument " + (*argp)->Name +
-                  " (" + a->Expression->_type + "<>" + (*argp)->Type->getClass() + ")",
+                  "incompatible type for " + name + "() argument " + formal->Name +
+                  " (" + a->Expression->_type + "<>" + formal->Type->getClass() + ")",
                   get_line(ctx)
                );
             }
-            argp++;
          }
       }
    }

@@ -5,6 +5,15 @@ using namespace util;
 
 namespace metamodel {
 
+   MetaElement *MetaElement::getTranslationOfRoot()
+   {
+      MetaElement *element = this;
+      while (element->_translationOf != nullptr) {
+         element = element->_translationOf;
+      }
+      return element;
+   }
+
    // global variables
 
    static list <DataUnit*> AllDataUnits;
@@ -99,6 +108,11 @@ namespace metamodel {
    
    bool depends_on(Package *p)
    {
+      // Predefined universal types such as ANYCLASS and model-level elements do
+      // not belong to a topic and therefore require no topic dependency.
+      if (p == nullptr) {
+         return true;
+      }
       if (p->getClass() != "SubModel") {
          return true;
       }

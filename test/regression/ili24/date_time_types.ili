@@ -1,0 +1,16 @@
+INTERLIS 2.4;
+
+MODEL DateTimeRegression AT "https://example.invalid/ilic/tests" VERSION "1" =
+  DOMAIN
+    DateDomain = DATE;
+    TimeDomain = TIMEOFDAY;
+    DateTimeDomain = DATETIME;
+
+  TOPIC Topic =
+    CLASS Item =
+      DateValue : DATE;
+      TimeValue : TIMEOFDAY;
+      DateTimeValue : DATETIME;
+    END Item;
+  END Topic;
+END DateTimeRegression.

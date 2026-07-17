@@ -73,10 +73,10 @@ namespace util {
    antlrcpp::Any IliFile::visitTranslationOf(IliFileParser::TranslationOfContext *context)
    {
       Log.debug(">>> vistTranslationOf()");
-      Log.incNestLevel();
+      string modelname = context->modelname->getText();
+      translation_of.push_back(modelname);
       antlrcpp::Any result = visitChildren(context);
-      Log.decNestLevel();
-      Log.debug("<<< vistTranslationOf()");
+      Log.debug("<<< vistTranslationOf(" + modelname + ")");
       return result;
    }
 
@@ -105,6 +105,18 @@ namespace util {
    list<string> IliFile::getImports()
    {
       return imports;
+   }
+
+   list<string> IliFile::getTranslationModels()
+   {
+      return translation_of;
+   }
+
+   list<string> IliFile::getRequiredModels()
+   {
+      list<string> required = imports;
+      required.insert(required.end(), translation_of.begin(), translation_of.end());
+      return required;
    }
 
    list<string> IliFile::getModels()

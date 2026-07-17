@@ -13,6 +13,7 @@
 #include "../input/ili2/InterlisModel.h"
 
 #include "../metamodel/MetaModelInput.h"
+#include "../metamodel/TranslationChecker.h"
 
 #include "../output/Ili1Output.h"
 #include "../output/Ili2Output.h"
@@ -356,7 +357,7 @@ static bool compile(IliFile *f)
    }
    
    // verify if all imported models are in the same file or already compiled
-   for (auto import : f->getImports()) {
+   for (auto import : f->getRequiredModels()) {
       bool found = false;
       // search in same file
       for (auto model : f->getModels()) {
@@ -711,7 +712,7 @@ int main(int argc, char* argv[])
    while (true) {
       int fcount = all_ilifiles.size();
       for (IliFile *f : all_ilifiles) {
-         for (string modelname : f->getImports()) {
+         for (string modelname : f->getRequiredModels()) {
             if (loaded_models[modelname]) {
                continue;
             }
@@ -792,6 +793,8 @@ int main(int argc, char* argv[])
          Log.internal_error("endless compile loop");
       }
    }
+
+   check_model_translations();
    
    // list all models
    Log.info("");

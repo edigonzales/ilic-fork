@@ -50,6 +50,7 @@ add_executable(ilic
     source/metamodel/MetaModelInput.cpp
     source/metamodel/MetaModelOutput.cpp
     source/metamodel/MetaModelTreeVisitor.cpp
+    source/metamodel/TranslationChecker.cpp
 
     source/output/GmlOutput.cpp
     source/output/Ili1Output.cpp
@@ -71,6 +72,24 @@ add_executable(ilic
 target_link_libraries(ilic PRIVATE antlr4-runtime)
 
 if(BUILD_TESTING)
+    function(add_ilic_regression_test name expected_success)
+        set(options)
+        set(one_value_args OUTPUT_REGEX ILIDIRS)
+        set(multi_value_args INPUTS)
+        cmake_parse_arguments(TEST "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
+
+        add_test(
+            NAME "${name}"
+            COMMAND "${CMAKE_COMMAND}"
+                "-DILIC=$<TARGET_FILE:ilic>"
+                "-DEXPECT_SUCCESS=${expected_success}"
+                "-DINPUTS=${TEST_INPUTS}"
+                "-DILIDIRS=${TEST_ILIDIRS}"
+                "-DOUTPUT_REGEX=${TEST_OUTPUT_REGEX}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_regression.cmake"
+        )
+    endfunction()
+
     add_test(
         NAME ilic_version
         COMMAND ilic -v
@@ -104,6 +123,58 @@ if(BUILD_TESTING)
             "-DILIDIR=${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads"
             "-DMODEL=${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads/RoadsExdm2ien.ili"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_xsd_smoke.cmake"
+    )
+
+    add_ilic_regression_test(ilic_regression_reference_to_anyclass TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/reference_to_anyclass.ili"
+    )
+    add_ilic_regression_test(ilic_regression_unknown_domain FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/unknown_domain.ili"
+    )
+    add_ilic_regression_test(ilic_regression_union_view TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/union_view.ili"
+    )
+    add_ilic_regression_test(ilic_regression_parent_path TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/parent_path.ili"
+    )
+    add_ilic_regression_test(ilic_regression_date_time_types TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/date_time_types.ili"
+    )
+    add_ilic_regression_test(ilic_regression_list_of_text TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/list_of_text.ili"
+    )
+    add_ilic_regression_test(ilic_regression_roads_graphic TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads/RoadsExgm2ien.ili"
+        ILIDIRS "${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads"
+    )
+
+    add_ilic_regression_test(ilic_regression_translation_complete TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"
+    )
+    add_ilic_regression_test(ilic_regression_translation_mismatch FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_mismatch.ili"
+        OUTPUT_REGEX "translation mismatch"
+    )
+    add_ilic_regression_test(ilic_regression_translation_dependency_loading TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_loading/TranslatedModel.ili"
+        ILIDIRS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_loading"
+    )
+    add_ilic_regression_test(ilic_regression_translation_missing_base FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_missing_base.ili"
+    )
+    add_ilic_regression_test(ilic_regression_translation_self FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_self.ili"
+    )
+    add_ilic_regression_test(ilic_regression_translation_cycle FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_cycle.ili"
+    )
+    add_test(
+        NAME ilic_regression_translation_roundtrip
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC=$<TARGET_FILE:ilic>"
+            "-DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"
+            "-DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/translation-roundtrip.ili"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_translation_roundtrip.cmake"
     )
 endif()
 

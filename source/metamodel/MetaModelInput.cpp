@@ -2,6 +2,8 @@
 #include "../util/StringUtil.h"
 #include "../util/Logger.h"
 
+#include <sstream>
+
 using namespace util;
 using namespace metamodel;
 
@@ -20,6 +22,45 @@ namespace metamodel {
    static list <FunctionDef*> AllFunctions;
    static list <LineForm*> AllLineForms;
    static list <Graphic*> AllGraphics;
+   static Class AnyClass;
+   static Class AnyStructure;
+   static bool UniversalClassesInitialized = false;
+   static map<int,list<pair<string,string>>> PendingMetaAttributes;
+
+   void prepare_meta_attributes(const string &source)
+   {
+      PendingMetaAttributes.clear();
+      list<pair<string,string>> pending;
+      istringstream lines(source);
+      string line;
+      int lineNumber = 0;
+      while (getline(lines,line)) {
+         ++lineNumber;
+         size_t first = line.find_first_not_of(" \t\r");
+         string trimmed = first == string::npos ? "" : line.substr(first);
+         if (trimmed.rfind("!!@",0) == 0) {
+            string option = trimmed.substr(3);
+            size_t equals = option.find('=');
+            pending.push_back({option.substr(0,equals),equals == string::npos ? "" : option.substr(equals + 1)});
+         }
+         else if (!trimmed.empty() && trimmed.rfind("!!",0) != 0 && !pending.empty()) {
+            PendingMetaAttributes[lineNumber] = pending;
+            pending.clear();
+         }
+      }
+   }
+
+   static void initialize_universal_classes()
+   {
+      if (UniversalClassesInitialized) {
+         return;
+      }
+      AnyClass.Name = "ANYCLASS";
+      AnyClass.Kind = Class::ClassVal;
+      AnyStructure.Name = "ANYSTRUCTURE";
+      AnyStructure.Kind = Class::Structure;
+      UniversalClassesInitialized = true;
+   }
 
    // mmobject helpers
 
@@ -38,6 +79,16 @@ namespace metamodel {
       // list <MetaAttribute *> MetaAttribute;
 
       init_mmobject(e, line);
+      auto metadata = PendingMetaAttributes.find(line);
+      if (metadata != PendingMetaAttributes.end()) {
+         for (const auto &entry : metadata->second) {
+            MetaAttribute *attribute = new MetaAttribute();
+            attribute->Name = entry.first;
+            attribute->Value = entry.second;
+            attribute->MetaElement = e;
+            e->MetaAttribute.push_back(attribute);
+         }
+      }
       MMObject *ctx = get_context();
       if (ctx == nullptr) {
          return;
@@ -282,11 +333,39 @@ namespace metamodel {
       string package_path = get_path(get_package_context());
       Log.debug(">>> find_type <" + search + "> in context " + package_path);
 
+      // A class inherited through an extended topic may be addressed through
+      // the extending topic's qualified path. The element itself remains
+      // owned by the base topic, so include the corresponding base path in
+      // the lookup candidates.
+      vector<string> searches({search});
+      for (size_t index = 0; index < searches.size(); ++index) {
+         string candidate = searches[index];
+         for (Package *package : AllPackages) {
+            if (package->getClass() != "SubModel") {
+               continue;
+            }
+            SubModel *topic = static_cast<SubModel *>(package);
+            if (topic->_super == nullptr) {
+               continue;
+            }
+            string prefix = get_path(topic) + ".";
+            if (util::starts_with(candidate,prefix)) {
+               string inherited = get_path(topic->_super) + "." + candidate.substr(prefix.length());
+               if (find(searches.begin(),searches.end(),inherited) == searches.end()) {
+                  searches.push_back(inherited);
+               }
+            }
+         }
+      }
+
       Type *found = nullptr;
       for (Type* t : AllTypes) {
          string path = get_path(t);
-         if (search == path) {
-            found = t;
+         for (auto candidate : searches) {
+            if (candidate == path) {
+               found = t;
+               break;
+            }
          }
          if (path == package_path + "." + search) {
             found = t;
@@ -461,16 +540,12 @@ namespace metamodel {
       Log.debug("find_class " + name);
       Class* c;
       if (name == "ANYCLASS" || name == "INTERLIS.ANYCLASS" || name == "CLASS" || name == "INTERLIS.CLASS") {
-         // singelton, to do !!!
-         c = new Class();
-         c->Name = name;
-         c->Kind = Class::ClassVal;
+         initialize_universal_classes();
+         c = &AnyClass;
       }
       else if (name == "ANYSTRUCTURE" || name == "INTERLIS.ANYSTRUCTURE" || name == "STRUCTURE" || name == "INTERLIS.STRUCTURE") {
-         // singelton, to do !!!
-         c = new Class();
-         c->Name = name;
-         c->Kind = Class::Structure;
+         initialize_universal_classes();
+         c = &AnyStructure;
       }
       else {
          Type* t = find_type(name, line, false);
@@ -599,10 +674,10 @@ namespace metamodel {
 
    AttrOrParam* find_attribute(Class* c,string name)
    {
-      Log.debug("find_attribute " + name + " in context " + get_path(c));
       if (c == nullptr) {
          return nullptr;
       }
+      Log.debug("find_attribute " + name + " in context " + get_path(c));
       for (auto a : c->ClassAttribute) {
          if (a->Name == name) {
             return a;
@@ -619,10 +694,10 @@ namespace metamodel {
 
    Role* find_role(Class* c,string name)
    {
-      Log.debug("find_role " + name + " in context " + get_path(c) + " " + to_string(c->_roleaccess.size()));
       if (c == nullptr) {
          return nullptr;
       }
+      Log.debug("find_role " + name + " in context " + get_path(c) + " " + to_string(c->_roleaccess.size()));
       for (auto r : c->Role) {
          if (r->Name == name) {
             return r;

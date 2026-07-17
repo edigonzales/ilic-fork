@@ -1,0 +1,7 @@
+INTERLIS 2.3;
+
+MODEL TranslatedModel (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF BaseModel ["documentary-only"] =
+  TOPIC TranslatedTopic =
+  END TranslatedTopic;
+END TranslatedModel.
