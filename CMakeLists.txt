@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(CTest)
+
 file(GLOB_RECURSE ANTLR_RUNTIME_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/include/*.cpp"
 )
@@ -67,3 +69,50 @@ add_executable(ilic
 )
 
 target_link_libraries(ilic PRIVATE antlr4-runtime)
+
+if(BUILD_TESTING)
+    add_test(
+        NAME ilic_version
+        COMMAND ilic -v
+    )
+    set_tests_properties(ilic_version PROPERTIES
+        PASS_REGULAR_EXPRESSION "platform=macos64"
+    )
+
+    add_test(
+        NAME ilic_validate_dataset_idx16
+        COMMAND ilic
+            -silent
+            "${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/core/DatasetIdx16.ili"
+    )
+
+    add_test(
+        NAME ilic_import_search
+        COMMAND ilic
+            -silent
+            -ilidirs
+            "${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads"
+            "${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads/RoadsExdm2ien.ili"
+    )
+
+    set(ILIC_SMOKE_XSD_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ilic-smoke.xsd")
+    add_test(
+        NAME ilic_xsd_output
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC=$<TARGET_FILE:ilic>"
+            "-DOUTPUT_FILE=${ILIC_SMOKE_XSD_OUTPUT}"
+            "-DILIDIR=${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads"
+            "-DMODEL=${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads/RoadsExdm2ien.ili"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_xsd_smoke.cmake"
+    )
+endif()
+
+add_custom_target(check-parser-regeneration
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTLR_ARCHIVE=${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/bin.zip"
+        "-DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DWORK_ROOT=${CMAKE_CURRENT_BINARY_DIR}/parser-regeneration"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_parser_regeneration.cmake"
+    USES_TERMINAL
+    COMMENT "Checking generated parsers against ANTLR 4.7.1"
+)

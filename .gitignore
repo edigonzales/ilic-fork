@@ -1,4 +1,11 @@
 .vs/*
+
+# macOS
+.DS_Store
+
+# CMake build output
+build/macos/
+
 build/bin/*
 build/vc2019/.vs/*
 build/vc2019/Debug/*
