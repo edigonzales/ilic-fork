@@ -44,9 +44,9 @@ build/macos/ilic -v
 ```
 
 The CTest suite checks startup/version reporting, validation of a simple model,
-model lookup through `-ilidirs`, and XSD output generation. The last command
-should report the detected platform, for example
-`platform=macos64` on Apple Silicon.
+model lookup through `-ilidirs`, XSD output generation, semantic crash
+regressions, and `TRANSLATION OF` validation. The last command should report the
+detected platform, for example `platform=macos64` on Apple Silicon.
 
 The static library `libantlr4-runtime.a` is a link-time build artifact. It is
 embedded into the `ilic` executable and is not required at runtime. The normal
@@ -73,9 +73,8 @@ The check extracts only `java/antlr-4.7.1-complete.jar` from
 tree. A difference is reported with the affected files; use the exact bundled
 ANTLR version when a grammar change requires an intentional regeneration.
 
-`test/ili23/Roads/RoadsExgm2ien.ili` is not part of the required smoke suite
-because it currently exposes existing grammar/parser errors unrelated to the
-macOS build.
+`test/ili23/Roads/RoadsExgm2ien.ili` is included as a regular regression test
+for object-path resolution in graphics and views.
 
 ## Documentation
 

@@ -30,3 +30,4 @@ a Java based utility a Java Runtime or JDK must be present on the development ma
 + [general api](./general_api.md)
 + [input module api](./input_api.md)
 + [output module api](./output_api.md)
++ [semantic conformance and translation validation](./conformance.md)
