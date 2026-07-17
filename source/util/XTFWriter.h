@@ -5,7 +5,7 @@
 
 #include "StringMap.h"
 #include "XMLWriter.h"
-#include "..\metamodel\MetaModel.h"
+#include "../metamodel/MetaModel.h"
 
 using namespace std;
 

@@ -1,5 +1,5 @@
 
-// Generated from ..\..\..\..\source\c\ilic\input\parser\generated\IliFileParser.g4 by ANTLR 4.7.1
+// Generated from IliFileParser.g4 by ANTLR 4.7.1
 
 
 #include "IliFileParserVisitor.h"
@@ -514,7 +514,7 @@ std::vector<std::string> IliFileParser::_literalNames = {
 std::vector<std::string> IliFileParser::_symbolicNames = {
   "", "INTERLIS", "DOT", "COMMA", "SEMI", "TRANSFER", "MODEL", "TRANSLATION", 
   "OF", "IMPORTS", "UNQUALIFIED", "NAME", "DIGIT", "LETTER", "WS", "SL_COMMENT", 
-  "ILI_DOC", "ILI_BLOCKCOMMENT", "ERRORCHAR"
+  "ILI_DOC", "ILI_BLOCKCOMMENT", "ANYCHAR"
 };
 
 dfa::Vocabulary IliFileParser::_vocabulary(_literalNames, _symbolicNames);

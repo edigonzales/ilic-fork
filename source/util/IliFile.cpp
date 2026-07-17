@@ -254,7 +254,7 @@ namespace util {
       for (string ilidir : ilidirs) {
          string filepath = "";
          if (ilidir != "") {
-            filepath = ilidir + "\\" + modelname + ".ili";
+            filepath = (filesystem::path(ilidir) / (modelname + ".ili")).string();
          }
          else {
             filepath = modelname + ".ili";

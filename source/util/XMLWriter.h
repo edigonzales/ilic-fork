@@ -29,7 +29,7 @@ namespace util {
       list<string> tags;
       void ident();
       void writeAttributes(StringMap attributes);
-      void XMLWriter::writeContent(string content);
+      void writeContent(string content);
    };
 
 };
