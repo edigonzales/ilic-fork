@@ -1,0 +1,13 @@
+INTERLIS 2.3;
+
+MODEL InheritedAbstractClassInvalid AT "https://example.invalid" VERSION "1" =
+
+  TOPIC BaseTopic (ABSTRACT) =
+    CLASS Base (ABSTRACT) =
+    END Base;
+  END BaseTopic;
+
+  TOPIC ConcreteTopic EXTENDS BaseTopic =
+  END ConcreteTopic;
+
+END InheritedAbstractClassInvalid.

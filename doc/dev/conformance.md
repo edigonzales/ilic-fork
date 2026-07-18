@@ -335,6 +335,46 @@ same extension invariant. The recorded result was produced by the cause commit
 containing this section (the report's candidate commit is verified after the
 commit is created).
 
+### Abstract classes and views in concrete topics
+
+This cause covers the invalid model
+`ili23.topics.extended-abstract-topic-abstract-class-fail` and the valid model
+`ili23.view.abstract-view-accept-abstract-base-in-abstract-join-def`. The old
+parser-time check inspected every local `ExtendableME`, so it rejected an
+abstract view in a concrete topic. Conversely, its inherited-element branch was
+disabled and it accepted a concrete topic that inherited an abstract class
+without providing any concrete extension.
+
+Reference-manual section 3.5 requires an abstract definition left
+unconcretized in a topic to make that topic abstract. For transfer-relevant
+viewables, the corresponding ili2c implementation in
+`Topic.checkIntegrityAbstract` applies this rule specifically to identifiable
+tables, i.e. classes, and searches the topic's effective inherited viewables
+for a concrete extension. Section 3.15 separately permits abstract views and
+even concrete views on abstract bases, subject to the attributes actually used.
+An abstract view therefore does not by itself make its topic abstract.
+
+The check now runs in the semantic post-pass, after every topic declaration is
+available. It constructs the effective class set from the complete topic
+inheritance chain, hides base classes replaced with `EXTENDED`, and accepts an
+abstract class only when a concrete same-name or differently named extension is
+effective in that topic. Structures, associations, and views are not treated as
+identifiable classes. This follows ili2c's `AbstractPatternDef.getViewables` and
+`Topic.containsConcreteExtensionOfTable` behaviour without copying its Java
+container implementation.
+
+Both LSP grammars accept the same topic, class, and view properties but do not
+encode the effective-inheritance check. No grammar or generated parser file
+changed. Three local fixtures cover an abstract view in a concrete topic, a
+missing inherited concretization, and valid concretization under both naming
+forms. All 62 local CTests and both unchanged upstream cases pass.
+
+The complete frozen corpus improves from 540 to 542 conformant cases: 27 invalid
+models remain accepted, two valid models remain rejected, and no previously
+conformant case regresses. The recorded result was produced by the cause commit
+containing this section (the report's candidate commit is verified after the
+commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -404,12 +444,12 @@ ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| conformant | 268 | 468 | 470 | 476 | 517 | 526 |
-| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 |
-| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 |
-| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 |
+| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 |
+| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 |
+| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The

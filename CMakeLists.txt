@@ -276,6 +276,15 @@ if(BUILD_TESTING)
     add_ilic_regression_test(ilic_regression_class_extended_with_inherited_specialization_invalid FALSE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/class_extended_with_inherited_specialization_invalid.ili"
     )
+    add_ilic_regression_test(ilic_regression_abstract_view_in_concrete_topic_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/abstract_view_in_concrete_topic_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_inherited_abstract_class_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/inherited_abstract_class_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_inherited_abstract_class_concretized_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/inherited_abstract_class_concretized_valid.ili"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"

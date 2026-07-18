@@ -553,6 +553,9 @@ public:
       if (package == nullptr || !checkedPackages.insert(package).second) {
          return;
       }
+      if (auto topic = dynamic_cast<SubModel *>(package)) {
+         check_topic_abstract_classes(topic);
+      }
       for (MetaElement *element : package->Element) {
          if (auto child = dynamic_cast<Package *>(element)) {
             check_package(child);
@@ -854,6 +857,55 @@ private:
                          " specializes the same base",viewable->_line);
                return;
             }
+         }
+      }
+   }
+
+   void check_topic_abstract_classes(SubModel *topic)
+   {
+      if (topic == nullptr || topic->_dataunit == nullptr || topic->_dataunit->Abstract) {
+         return;
+      }
+
+      vector<Class *> effectiveClasses;
+      unordered_set<Class *> hiddenClasses;
+      for (SubModel *scope = topic; scope != nullptr; scope =
+           dynamic_cast<SubModel *>(scope->_super)) {
+         for (MetaElement *element : scope->Element) {
+            auto viewable = dynamic_cast<Class *>(element);
+            if (viewable == nullptr || viewable->Kind != Class::ClassVal) {
+               continue;
+            }
+            if (viewable->Extended) {
+               if (auto base = dynamic_cast<Class *>(viewable->Super)) {
+                  hiddenClasses.insert(base);
+               }
+            }
+            if (hiddenClasses.find(viewable) == hiddenClasses.end()) {
+               effectiveClasses.push_back(viewable);
+            }
+         }
+      }
+
+      // RefHB 3.5 requires concrete topics to concretize their effectively
+      // inherited abstract identifiable classes. Structures and views do not
+      // create independently transferable class instances and are excluded.
+      for (Class *abstractClass : effectiveClasses) {
+         if (!abstractClass->Abstract) {
+            continue;
+         }
+         bool concretized = false;
+         for (Class *candidate : effectiveClasses) {
+            if (!candidate->Abstract && candidate != abstractClass &&
+                class_is_same_or_extension(candidate,abstractClass)) {
+               concretized = true;
+               break;
+            }
+         }
+         if (!concretized) {
+            Log.error("concrete topic " + topic->Name +
+                      " contains abstract class " + abstractClass->Name +
+                      " without a concrete extension",topic->_line);
          }
       }
    }

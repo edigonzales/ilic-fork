@@ -324,28 +324,6 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    visitChildren(ctx);
    pop_context();
    
-   if (!d->Abstract) {
-      for (auto e : s->Element) {
-         if (e->isSubClassOf("ExtendableME") && e->getClass() != "DataUnit") {
-            ExtendableME *ee = static_cast<ExtendableME *>(e);
-            if (ee->Abstract && ee->Sub.size() == 0) {
-               Log.error("concrete topic " + s->Name + " can not contain abstract element " + e->Name + " without concrete extension (1)",e->_line);
-            }
-         }
-      }
-      if (s->_super != nullptr) {
-         for (auto e : s->_super->Element) {
-            if (e->isSubClassOf("ExtendableME") && e->getClass() != "DataUnit") {
-               ExtendableME* ee = static_cast<ExtendableME*>(e);
-               if (ee->Abstract && ee->Sub.size() == 0) {
-// to do !!!
-//                  Log.error("concrete topic " + s->Name + " can not contain abstract element " + e->Name + " without concrete extension (2)", s->_line);
-               }
-            }
-         }
-      }
-   }
-   
    Log.decNestLevel();
    debug(ctx,"<<< visitTopicDef(" + name1 + ")");
 
