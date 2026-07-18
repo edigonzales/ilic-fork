@@ -231,6 +231,23 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
       Log.warning("multiple declarations of " + EXTERNAL,line);
       properties[EXTERNAL] = true;
    }
+
+   // GENERIC
+   if (ctx == nullptr || ctx->GENERIC().empty()) {
+      properties[GENERIC] = false;
+   }
+   else if (ctx->GENERIC().size() == 1) {
+      if (find_string(allowed_properties,GENERIC)) {
+         properties[GENERIC] = true;
+      }
+      else {
+         Log.error("property " + GENERIC + " not allowed",line);
+      }
+   }
+   else {
+      Log.warning("multiple declarations of " + GENERIC,line);
+      properties[GENERIC] = true;
+   }
    
    if (properties[ABSTRACT] && properties[FINAL]) {
       Log.error(ABSTRACT + " and " + FINAL + " can not be used at the same time",line);

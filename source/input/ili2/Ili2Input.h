@@ -27,6 +27,9 @@ namespace input {
       antlrcpp::Any visitFormattedType(parser::Ili2Parser::FormattedTypeContext *ctx) override;
       antlrcpp::Any visitDateTimeType(parser::Ili2Parser::DateTimeTypeContext *ctx) override;
       antlrcpp::Any visitCoordinateType(parser::Ili2Parser::CoordinateTypeContext *ctx) override;
+      antlrcpp::Any visitContextDef(parser::Ili2Parser::ContextDefContext *ctx) override;
+      antlrcpp::Any visitContextBlock(parser::Ili2Parser::ContextBlockContext *ctx) override;
+      antlrcpp::Any visitContextDecl(parser::Ili2Parser::ContextDeclContext *ctx) override;
       antlrcpp::Any visitTopicDef(parser::Ili2Parser::TopicDefContext *ctx) override;
       antlrcpp::Any visitClassDef(parser::Ili2Parser::ClassDefContext *ctx) override;
       antlrcpp::Any visitStructureDef(parser::Ili2Parser::StructureDefContext *ctx) override;

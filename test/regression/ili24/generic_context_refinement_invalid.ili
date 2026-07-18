@@ -1,0 +1,18 @@
+INTERLIS 2.4;
+
+MODEL GenericContextBase AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Position (GENERIC) = COORD NUMERIC, NUMERIC;
+    PositionA = COORD 0 .. 100, 0 .. 100;
+    PositionB = COORD 200 .. 300, 200 .. 300;
+  CONTEXT default =
+    Position = PositionA OR PositionB;
+END GenericContextBase.
+
+MODEL GenericContextRefinementInvalid AT "https://example.invalid" VERSION "1" =
+  IMPORTS GenericContextBase;
+  DOMAIN
+    Wrong EXTENDS GenericContextBase.Position = COORD 10 .. 20, 10 .. 20;
+  CONTEXT default =
+    GenericContextBase.Position = Wrong;
+END GenericContextRefinementInvalid.

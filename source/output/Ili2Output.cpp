@@ -14,7 +14,7 @@ static string ili_file;
 static string model_version;
 static TextWriter ili2;
 
-static string get_properties(metamodel::Type* t)
+static string get_properties(metamodel::ExtendableME* t)
 {
    string properties = "";
    if (t->Abstract) {
@@ -624,6 +624,19 @@ void Ili2Output::preVisitSubModel(SubModel *s)
 
    ili2.incNestLevel();
 
+   if (!s->DeferredGenerics.empty()) {
+      ili2.write("DEFERRED GENERICS ");
+      bool comma = false;
+      for (const SubModel::DeferredGenericRef &reference : s->DeferredGenerics) {
+         if (comma) {
+            ili2.write(0,", ");
+         }
+         ili2.write(0,reference.Domain == nullptr ? reference.Name : get_path(reference.Domain));
+         comma = true;
+      }
+      ili2.writeln(0,";");
+   }
+
 }
 
 void Ili2Output::visitSubModel(SubModel *s)
@@ -981,7 +994,7 @@ void Ili2Output::visitAttrOrParam(AttrOrParam *a)
             ili2.write(a->Name + " (EXTENDED): ");
          }
          else {
-            ili2.write(a->Name + " " + get_properties(t) + ": ");
+            ili2.write(a->Name + " " + get_properties(a) + ": ");
          }
          if (t->Mandatory) {
             ili2.write(0,"MANDATORY ");
@@ -1131,11 +1144,12 @@ void Ili2Output::visitDomainType(metamodel::DomainType* t)
       return;
    }
 
+   string declaration = t->Name + get_properties(t);
    if (t->Super != nullptr) {
-      ili2.write(t->Name + " EXTENDS " + get_path(t->Super) + " = ");
+      ili2.write(declaration + " EXTENDS " + get_path(t->Super) + " = ");
    }
    else {
-      ili2.write(t->Name + " = ");
+      ili2.write(declaration + " = ");
    }
 
    write_type(t);
@@ -1157,6 +1171,30 @@ void Ili2Output::visitDomainType(metamodel::DomainType* t)
    }
    ili2.writeln(0,";");
 
+}
+
+void Ili2Output::visitContext(metamodel::Context *context)
+{
+   ili2.writeln("");
+   ili2.writeln("CONTEXT " + context->Name + " =");
+   ili2.incNestLevel();
+   for (GenericDef *definition : context->GenericDefinitions) {
+      if (definition == nullptr || definition->GenericDomain.empty()) {
+         continue;
+      }
+      ili2.write(get_path(definition->GenericDomain.front()) + " = ");
+      bool separator = false;
+      for (DomainType *concrete : definition->ConcreteDomain) {
+         if (separator) {
+            ili2.write(0," OR ");
+         }
+         ili2.write(0,get_path(concrete));
+         separator = true;
+      }
+      ili2.writeln(0,";");
+   }
+   ili2.decNestLevel();
+   ignoreVisit();
 }
 
 void Ili2Output::visitFunctionDef(metamodel::FunctionDef* f)

@@ -55,38 +55,39 @@ public:
   enum {
     RuleDecimal = 0, RulePath = 1, RuleInterlis2Def = 2, RuleModelDef = 3, 
     RuleImportDef = 4, RuleImporting = 5, RuleTopicDef = 6, RuleTopicPath = 7, 
-    RuleClassDef = 8, RuleStructureDef = 9, RuleClassOrStructureDef = 10, 
-    RuleAttributeDef = 11, RuleAttrTypeDef = 12, RuleBagOrListType = 13, 
-    RuleAttrType = 14, RuleReferenceAttr = 15, RuleRestrictedRef = 16, RuleRestriction = 17, 
-    RuleAssociationDef = 18, RuleAssociationRef = 19, RuleRoleDef = 20, 
-    RuleCardinality = 21, RuleDomainDef = 22, RuleDomainType = 23, RuleType = 24, 
-    RuleBaseType = 25, RuleConstant = 26, RuleTextType = 27, RuleTextConst = 28, 
-    RuleEnumerationType = 29, RuleEnumTreeValueType = 30, RuleAlignmentType = 31, 
-    RuleBooleanType = 32, RuleEnumeration = 33, RuleEnumElement = 34, RuleEnumConst = 35, 
-    RuleNumericType = 36, RuleDateTimeType = 37, RuleRefSys = 38, RuleDecConst = 39, 
-    RuleNumericConst = 40, RuleFormattedType = 41, RuleFormatDef = 42, RuleBaseAttrRef = 43, 
-    RuleFormattedConst = 44, RuleContextDef = 45, RuleContextDecl = 46, 
-    RuleCoordinateType = 47, RuleRotationDef = 48, RuleOIDType = 49, RuleBlackboxType = 50, 
-    RuleClassRefType = 51, RuleAttributePathType = 52, RuleClassConst = 53, 
-    RuleAttributePathConst = 54, RuleLineType = 55, RuleLineForm = 56, RuleLineFormType = 57, 
-    RuleLineFormTypeDef = 58, RuleLineFormTypeDecl = 59, RuleUnitDecl = 60, 
-    RuleUnitDef = 61, RuleDerivedUnit = 62, RuleComposedUnit = 63, RuleComposedUnitExpr = 64, 
-    RuleMetaDataBasketDef = 65, RuleMetaDataBasketRef = 66, RuleMetaObjectRef = 67, 
-    RuleParameterDef = 68, RuleProperties = 69, RuleRunTimeParameterDef = 70, 
-    RuleRunTimeParameter = 71, RuleConstraintDef = 72, RuleMandatoryConstraint = 73, 
-    RulePlausibilityConstraint = 74, RuleExistenceConstraint = 75, RuleUniquenessConstraint = 76, 
-    RuleGlobalUniqueness = 77, RuleUniqueEl = 78, RuleLocalUniqueness = 79, 
-    RuleLocalUniqueEl = 80, RuleSetConstraint = 81, RuleConstraintsDef = 82, 
-    RuleExpression = 83, RuleTerm1 = 84, RuleOperator1 = 85, RuleTerm2 = 86, 
-    RuleOperator2 = 87, RuleTerm3 = 88, RuleTerm = 89, RuleRelation = 90, 
-    RuleFactor = 91, RuleObjectOrAttributePath = 92, RuleAttributePath = 93, 
-    RulePathEl = 94, RuleObjectRef = 95, RuleFunctionCall = 96, RuleFunctionCallArgument = 97, 
-    RuleFunctionDef = 98, RuleFunctionDefParam = 99, RuleArgumentType = 100, 
-    RuleViewDef = 101, RuleFormationDef = 102, RuleProjection = 103, RuleJoin = 104, 
-    RuleIliunion = 105, RuleAggregation = 106, RuleInspection = 107, RuleRenamedViewableRef = 108, 
-    RuleBaseExtensionDef = 109, RuleSelection = 110, RuleViewAttribute = 111, 
-    RuleGraphicDef = 112, RuleDrawingRule = 113, RuleCondSignParamAssignment = 114, 
-    RuleSignParamAssignment = 115, RuleEnumAssignment = 116, RuleEnumRange = 117
+    RuleDeferredGenerics = 8, RuleClassDef = 9, RuleStructureDef = 10, RuleClassOrStructureDef = 11, 
+    RuleAttributeDef = 12, RuleAttrTypeDef = 13, RuleBagOrListType = 14, 
+    RuleAttrType = 15, RuleReferenceAttr = 16, RuleRestrictedRef = 17, RuleRestriction = 18, 
+    RuleAssociationDef = 19, RuleAssociationRef = 20, RuleRoleDef = 21, 
+    RuleCardinality = 22, RuleDomainDef = 23, RuleDomainType = 24, RuleType = 25, 
+    RuleBaseType = 26, RuleConstant = 27, RuleTextType = 28, RuleTextConst = 29, 
+    RuleEnumerationType = 30, RuleEnumTreeValueType = 31, RuleAlignmentType = 32, 
+    RuleBooleanType = 33, RuleEnumeration = 34, RuleEnumElement = 35, RuleEnumConst = 36, 
+    RuleNumericType = 37, RuleDateTimeType = 38, RuleRefSys = 39, RuleDecConst = 40, 
+    RuleNumericConst = 41, RuleFormattedType = 42, RuleFormatDef = 43, RuleBaseAttrRef = 44, 
+    RuleFormattedConst = 45, RuleContextDef = 46, RuleContextBlock = 47, 
+    RuleContextDecl = 48, RuleCoordinateType = 49, RuleRotationDef = 50, 
+    RuleOIDType = 51, RuleBlackboxType = 52, RuleClassRefType = 53, RuleAttributePathType = 54, 
+    RuleClassConst = 55, RuleAttributePathConst = 56, RuleLineType = 57, 
+    RuleLineForm = 58, RuleLineFormType = 59, RuleLineFormTypeDef = 60, 
+    RuleLineFormTypeDecl = 61, RuleUnitDecl = 62, RuleUnitDef = 63, RuleDerivedUnit = 64, 
+    RuleComposedUnit = 65, RuleComposedUnitExpr = 66, RuleMetaDataBasketDef = 67, 
+    RuleMetaDataBasketRef = 68, RuleMetaObjectRef = 69, RuleParameterDef = 70, 
+    RuleProperties = 71, RuleRunTimeParameterDef = 72, RuleRunTimeParameter = 73, 
+    RuleConstraintDef = 74, RuleMandatoryConstraint = 75, RulePlausibilityConstraint = 76, 
+    RuleExistenceConstraint = 77, RuleUniquenessConstraint = 78, RuleGlobalUniqueness = 79, 
+    RuleUniqueEl = 80, RuleLocalUniqueness = 81, RuleLocalUniqueEl = 82, 
+    RuleSetConstraint = 83, RuleConstraintsDef = 84, RuleExpression = 85, 
+    RuleTerm1 = 86, RuleOperator1 = 87, RuleTerm2 = 88, RuleOperator2 = 89, 
+    RuleTerm3 = 90, RuleTerm = 91, RuleRelation = 92, RuleFactor = 93, RuleObjectOrAttributePath = 94, 
+    RuleAttributePath = 95, RulePathEl = 96, RuleObjectRef = 97, RuleFunctionCall = 98, 
+    RuleFunctionCallArgument = 99, RuleFunctionDef = 100, RuleFunctionDefParam = 101, 
+    RuleArgumentType = 102, RuleViewDef = 103, RuleFormationDef = 104, RuleProjection = 105, 
+    RuleJoin = 106, RuleIliunion = 107, RuleAggregation = 108, RuleInspection = 109, 
+    RuleRenamedViewableRef = 110, RuleBaseExtensionDef = 111, RuleSelection = 112, 
+    RuleViewAttribute = 113, RuleGraphicDef = 114, RuleDrawingRule = 115, 
+    RuleCondSignParamAssignment = 116, RuleSignParamAssignment = 117, RuleEnumAssignment = 118, 
+    RuleEnumRange = 119
   };
 
   Ili2Parser(antlr4::TokenStream *input);
@@ -111,6 +112,7 @@ public:
   class ImportingContext;
   class TopicDefContext;
   class TopicPathContext;
+  class DeferredGenericsContext;
   class ClassDefContext;
   class StructureDefContext;
   class ClassOrStructureDefContext;
@@ -149,6 +151,7 @@ public:
   class BaseAttrRefContext;
   class FormattedConstContext;
   class ContextDefContext;
+  class ContextBlockContext;
   class ContextDeclContext;
   class CoordinateTypeContext;
   class RotationDefContext;
@@ -388,7 +391,6 @@ public:
     Ili2Parser::PathContext *topicbase = nullptr;;
     Ili2Parser::PathContext *basketOid = nullptr;;
     Ili2Parser::PathContext *topicOid = nullptr;;
-    Ili2Parser::PathContext *genericref = nullptr;;
     antlr4::Token *topicname2 = nullptr;;
     TopicDefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
@@ -413,8 +415,7 @@ public:
     antlr4::tree::TerminalNode* ON(size_t i);
     std::vector<TopicPathContext *> topicPath();
     TopicPathContext* topicPath(size_t i);
-    antlr4::tree::TerminalNode *DEFERRED();
-    antlr4::tree::TerminalNode *GENERICS();
+    DeferredGenericsContext *deferredGenerics();
     std::vector<MetaDataBasketDefContext *> metaDataBasketDef();
     MetaDataBasketDefContext* metaDataBasketDef(size_t i);
     std::vector<UnitDeclContext *> unitDecl();
@@ -457,6 +458,24 @@ public:
   };
 
   TopicPathContext* topicPath();
+
+  class  DeferredGenericsContext : public antlr4::ParserRuleContext {
+  public:
+    DeferredGenericsContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *DEFERRED();
+    antlr4::tree::TerminalNode *GENERICS();
+    std::vector<PathContext *> path();
+    PathContext* path(size_t i);
+    antlr4::tree::TerminalNode *SEMI();
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  DeferredGenericsContext* deferredGenerics();
 
   class  ClassDefContext : public antlr4::ParserRuleContext {
   public:
@@ -1158,10 +1177,23 @@ public:
 
   class  ContextDefContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *name = nullptr;;
     ContextDefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *CONTEXT();
+    std::vector<ContextBlockContext *> contextBlock();
+    ContextBlockContext* contextBlock(size_t i);
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  ContextDefContext* contextDef();
+
+  class  ContextBlockContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *name = nullptr;;
+    ContextBlockContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *EQUAL();
     antlr4::tree::TerminalNode *NAME();
     std::vector<ContextDeclContext *> contextDecl();
@@ -1173,7 +1205,7 @@ public:
    
   };
 
-  ContextDefContext* contextDef();
+  ContextBlockContext* contextBlock();
 
   class  ContextDeclContext : public antlr4::ParserRuleContext {
   public:

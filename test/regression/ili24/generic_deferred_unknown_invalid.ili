@@ -1,0 +1,10 @@
+INTERLIS 2.4;
+
+MODEL GenericDeferredUnknownInvalid AT "https://example.invalid" VERSION "1" =
+  TOPIC Data =
+    DEFERRED GENERICS UnknownPosition;
+    CLASS Item =
+      name: TEXT;
+    END Item;
+  END Data;
+END GenericDeferredUnknownInvalid.

@@ -1,0 +1,22 @@
+INTERLIS 2.4;
+
+MODEL GenericDeferredNestedValid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Position (GENERIC) = COORD NUMERIC, NUMERIC;
+    PositionA = COORD 0.00 .. 100.00, 0.00 .. 100.00;
+    PositionB = COORD 200.00 .. 300.00, 200.00 .. 300.00;
+
+  CONTEXT default =
+    Position = PositionA OR PositionB;
+
+  STRUCTURE Geometry =
+    edge: POLYLINE WITH (STRAIGHTS) VERTEX Position;
+  END Geometry;
+
+  TOPIC Data =
+    DEFERRED GENERICS Position;
+    CLASS Item =
+      geometry: Geometry;
+    END Item;
+  END Data;
+END GenericDeferredNestedValid.

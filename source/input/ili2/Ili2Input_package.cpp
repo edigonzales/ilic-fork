@@ -311,6 +311,13 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
       }
    }
 
+   if (ctx->deferredGenerics() != nullptr) {
+      for (auto path : ctx->deferredGenerics()->path()) {
+         string name = visitPath(path);
+         s->DeferredGenerics.push_back({name,find_domaintype(name,get_line(path)),get_line(path)});
+      }
+   }
+
    // metaDataBasketDef
    // unitDecl
    // functionDef

@@ -107,8 +107,9 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
    t->Name = name;
    t->Super = basetype;
       
-   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,FINAL}));
+   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,GENERIC,FINAL}));
    t->Abstract = properties[ABSTRACT];
+   t->Generic = properties[GENERIC];
    t->Final = properties[FINAL];
    if (ctx->MANDATORY() != nullptr) {
       t->Mandatory = true;
@@ -143,6 +144,58 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
 
    return t;
 
+}
+
+antlrcpp::Any Ili2Input::visitContextDef(parser::Ili2Parser::ContextDefContext *ctx)
+{
+   return visitChildren(ctx);
+}
+
+antlrcpp::Any Ili2Input::visitContextBlock(parser::Ili2Parser::ContextBlockContext *ctx)
+{
+   Context *context = new Context();
+   init_metaelement(context,get_line(ctx->name));
+   context->Name = ctx->name->getText();
+
+   push_context(context);
+   for (auto declaration : ctx->contextDecl()) {
+      visitContextDecl(declaration);
+   }
+   pop_context();
+   return context;
+}
+
+antlrcpp::Any Ili2Input::visitContextDecl(parser::Ili2Parser::ContextDeclContext *ctx)
+{
+   Context *context = dynamic_cast<Context *>(get_context());
+   if (context == nullptr) {
+      return static_cast<GenericDef *>(nullptr);
+   }
+
+   vector<parser::Ili2Parser::PathContext *> paths = ctx->path();
+   if (paths.size() < 2) {
+      return static_cast<GenericDef *>(nullptr);
+   }
+
+   GenericDef *definition = new GenericDef();
+   init_mmobject(definition,get_line(ctx));
+   definition->Context = context;
+
+   DomainType *generic = find_domaintype(visitPath(paths.front()),get_line(paths.front()));
+   if (generic != nullptr) {
+      definition->GenericDomain.push_back(generic);
+      if (generic->GenericDef == nullptr) {
+         generic->GenericDef = definition;
+      }
+   }
+   for (size_t index = 1; index < paths.size(); ++index) {
+      DomainType *concrete = find_domaintype(visitPath(paths[index]),get_line(paths[index]));
+      if (concrete != nullptr) {
+         definition->ConcreteDomain.push_back(concrete);
+      }
+   }
+   context->GenericDefinitions.push_back(definition);
+   return definition;
 }
 
 antlrcpp::Any Ili2Input::visitType(parser::Ili2Parser::TypeContext *ctx)

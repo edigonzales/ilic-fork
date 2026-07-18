@@ -36,6 +36,8 @@ public:
 
     virtual antlrcpp::Any visitTopicPath(Ili2Parser::TopicPathContext *context) = 0;
 
+    virtual antlrcpp::Any visitDeferredGenerics(Ili2Parser::DeferredGenericsContext *context) = 0;
+
     virtual antlrcpp::Any visitClassDef(Ili2Parser::ClassDefContext *context) = 0;
 
     virtual antlrcpp::Any visitStructureDef(Ili2Parser::StructureDefContext *context) = 0;
@@ -111,6 +113,8 @@ public:
     virtual antlrcpp::Any visitFormattedConst(Ili2Parser::FormattedConstContext *context) = 0;
 
     virtual antlrcpp::Any visitContextDef(Ili2Parser::ContextDefContext *context) = 0;
+
+    virtual antlrcpp::Any visitContextBlock(Ili2Parser::ContextBlockContext *context) = 0;
 
     virtual antlrcpp::Any visitContextDecl(Ili2Parser::ContextDeclContext *context) = 0;
 

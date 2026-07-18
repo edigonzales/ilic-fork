@@ -1,0 +1,27 @@
+INTERLIS 2.4;
+
+MODEL GenericContextTransitiveBase AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Position (GENERIC) = COORD NUMERIC, NUMERIC;
+END GenericContextTransitiveBase.
+
+MODEL GenericContextTransitiveProvider AT "https://example.invalid" VERSION "1" =
+  IMPORTS GenericContextTransitiveBase;
+  DOMAIN
+    Concrete = COORD 0 .. 100, 0 .. 100;
+  CONTEXT default =
+    GenericContextTransitiveBase.Position = Concrete;
+END GenericContextTransitiveProvider.
+
+MODEL GenericContextTransitiveBridge AT "https://example.invalid" VERSION "1" =
+  IMPORTS GenericContextTransitiveProvider;
+END GenericContextTransitiveBridge.
+
+MODEL GenericContextTransitiveImportValid AT "https://example.invalid" VERSION "1" =
+  IMPORTS GenericContextTransitiveBase, GenericContextTransitiveBridge;
+  TOPIC Data =
+    CLASS Item =
+      position: GenericContextTransitiveBase.Position;
+    END Item;
+  END Data;
+END GenericContextTransitiveImportValid.

@@ -485,6 +485,186 @@ int decimal_accuracy(const string &value)
    return point == string::npos ? 0 : static_cast<int>(mantissa.size() - point - 1);
 }
 
+struct ExactDecimal {
+   bool Negative = false;
+   string Digits;
+   int Scale = 0;
+   bool Valid = false;
+};
+
+// Coordinate range specialization is defined on decimal source values. Keep
+// scaled values exact instead of introducing binary floating-point rounding.
+ExactDecimal parse_exact_decimal(const string &value)
+{
+   ExactDecimal result;
+   if (value.empty()) {
+      return result;
+   }
+
+   size_t offset = 0;
+   if (value[offset] == '+' || value[offset] == '-') {
+      result.Negative = value[offset] == '-';
+      ++offset;
+   }
+   size_t exponentPosition = value.find_first_of("eES",offset);
+   string mantissa = value.substr(offset,exponentPosition == string::npos ? string::npos :
+                                  exponentPosition - offset);
+   int exponent = 0;
+   try {
+      if (exponentPosition != string::npos) {
+         exponent = stoi(value.substr(exponentPosition + 1));
+      }
+   }
+   catch (...) {
+      return result;
+   }
+
+   size_t point = mantissa.find('.');
+   if (point != string::npos && mantissa.find('.',point + 1) != string::npos) {
+      return result;
+   }
+   int fractionDigits = point == string::npos ? 0 :
+      static_cast<int>(mantissa.size() - point - 1);
+   for (char digit : mantissa) {
+      if (digit == '.') {
+         continue;
+      }
+      if (digit < '0' || digit > '9') {
+         return result;
+      }
+      result.Digits.push_back(digit);
+   }
+   size_t firstNonZero = result.Digits.find_first_not_of('0');
+   if (firstNonZero == string::npos) {
+      result.Digits = "0";
+      result.Negative = false;
+      result.Scale = 0;
+      result.Valid = true;
+      return result;
+   }
+   result.Digits.erase(0,firstNonZero);
+   result.Scale = fractionDigits - exponent;
+   while (result.Digits.size() > 1 && result.Digits.back() == '0') {
+      result.Digits.pop_back();
+      --result.Scale;
+   }
+   result.Valid = true;
+   return result;
+}
+
+int compare_exact_decimal(const string &leftValue,const string &rightValue)
+{
+   ExactDecimal left = parse_exact_decimal(leftValue);
+   ExactDecimal right = parse_exact_decimal(rightValue);
+   if (!left.Valid || !right.Valid) {
+      return leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
+   }
+   if (left.Negative != right.Negative) {
+      return left.Negative ? -1 : 1;
+   }
+
+   int leftMagnitude = static_cast<int>(left.Digits.size()) - left.Scale;
+   int rightMagnitude = static_cast<int>(right.Digits.size()) - right.Scale;
+   int comparison = 0;
+   if (leftMagnitude != rightMagnitude) {
+      comparison = leftMagnitude < rightMagnitude ? -1 : 1;
+   }
+   else {
+      size_t width = max(left.Digits.size(),right.Digits.size());
+      string leftDigits = left.Digits + string(width - left.Digits.size(),'0');
+      string rightDigits = right.Digits + string(width - right.Digits.size(),'0');
+      comparison = leftDigits < rightDigits ? -1 : leftDigits > rightDigits ? 1 : 0;
+   }
+   return left.Negative ? -comparison : comparison;
+}
+
+GenericDef *generic_definition_in(Model *model,DomainType *generic)
+{
+   if (model == nullptr || generic == nullptr) {
+      return nullptr;
+   }
+   for (MetaElement *element : model->Element) {
+      auto context = dynamic_cast<Context *>(element);
+      if (context == nullptr) {
+         continue;
+      }
+      for (GenericDef *definition : context->GenericDefinitions) {
+         if (definition != nullptr && !definition->GenericDomain.empty() &&
+             definition->GenericDomain.front() == generic) {
+            return definition;
+         }
+      }
+   }
+   return nullptr;
+}
+
+vector<Model *> directly_imported_models(Model *model)
+{
+   vector<Model *> result;
+   for (Import *import : get_all_imports()) {
+      if (import != nullptr && import->ImportingP == model) {
+         if (auto imported = dynamic_cast<Model *>(import->ImportedP)) {
+            result.push_back(imported);
+         }
+      }
+   }
+   reverse(result.begin(),result.end());
+   return result;
+}
+
+GenericDef *generic_definition_in_imports(Model *model,DomainType *generic,
+                                          unordered_set<Model *> &visited)
+{
+   if (model == nullptr || !visited.insert(model).second) {
+      return nullptr;
+   }
+   // RefHB 3.8 makes contexts transitively visible; ili2c resolves the most
+   // recently declared import first and stops at the first effective mapping.
+   for (Model *imported : directly_imported_models(model)) {
+      if (GenericDef *definition = generic_definition_in(imported,generic)) {
+         return definition;
+      }
+      if (GenericDef *definition = generic_definition_in_imports(imported,generic,visited)) {
+         return definition;
+      }
+   }
+   return nullptr;
+}
+
+GenericDef *visible_generic_definition(Model *model,DomainType *generic)
+{
+   if (GenericDef *definition = generic_definition_in(model,generic)) {
+      return definition;
+   }
+   unordered_set<Model *> visited;
+   return generic_definition_in_imports(model,generic,visited);
+}
+
+bool coordinate_type_fits(CoordType *concrete,CoordType *generic)
+{
+   if (concrete == nullptr || generic == nullptr || concrete->Axis.size() != generic->Axis.size()) {
+      return false;
+   }
+   auto concreteAxis = concrete->Axis.begin();
+   auto genericAxis = generic->Axis.begin();
+   for (; concreteAxis != concrete->Axis.end(); ++concreteAxis,++genericAxis) {
+      NumType *candidate = *concreteAxis;
+      NumType *base = *genericAxis;
+      if (candidate == nullptr || base == nullptr) {
+         return false;
+      }
+      if (!base->Min.empty() &&
+          (candidate->Min.empty() || compare_exact_decimal(candidate->Min,base->Min) < 0)) {
+         return false;
+      }
+      if (!base->Max.empty() &&
+          (candidate->Max.empty() || compare_exact_decimal(candidate->Max,base->Max) > 0)) {
+         return false;
+      }
+   }
+   return true;
+}
+
 class Checker {
 public:
    Descriptor evaluate(Expression *expression,DomainType *domain = nullptr)
@@ -644,6 +824,7 @@ public:
       }
       if (auto topic = dynamic_cast<SubModel *>(package)) {
          check_topic_abstract_classes(topic);
+         check_topic_generics(topic);
       }
       check_package_namespace(package);
       for (MetaElement *element : package->Element) {
@@ -658,6 +839,9 @@ public:
             for (Constraint *constraint : domain->Constraint) {
                check_constraint(constraint);
             }
+         }
+         else if (auto context = dynamic_cast<Context *>(element)) {
+            check_context(context);
          }
          if (auto graphic = dynamic_cast<Graphic *>(element)) {
             require_topic_dependency(containing_topic(graphic),
@@ -689,6 +873,189 @@ private:
    unordered_set<Package *> checkedPackages;
    unordered_set<Class *> checkedClasses;
    unordered_set<Type *> checkedTypes;
+
+   void check_context(Context *context)
+   {
+      if (context == nullptr) {
+         return;
+      }
+      Model *model = containing_model(context);
+      for (GenericDef *definition : context->GenericDefinitions) {
+         if (definition == nullptr || definition->GenericDomain.empty()) {
+            continue;
+         }
+         DomainType *generic = definition->GenericDomain.front();
+         auto genericCoordinate = dynamic_cast<CoordType *>(generic);
+         if (genericCoordinate == nullptr || !generic->Generic) {
+            Log.error("context " + context->Name + " requires a GENERIC coordinate domain",
+                      definition->_line);
+            continue;
+         }
+
+         unordered_set<Model *> visited;
+         GenericDef *imported = generic_definition_in_imports(model,generic,visited);
+         for (DomainType *concrete : definition->ConcreteDomain) {
+            auto concreteCoordinate = dynamic_cast<CoordType *>(concrete);
+            if (concreteCoordinate == nullptr ||
+                !coordinate_type_fits(concreteCoordinate,genericCoordinate)) {
+               Log.error("concrete domain " + (concrete == nullptr ? string("???") : concrete->Name) +
+                         " is not a compatible specialization of generic domain " + generic->Name,
+                         definition->_line);
+               continue;
+            }
+            if (imported == nullptr) {
+               continue;
+            }
+            bool allowed = false;
+            for (DomainType *base : imported->ConcreteDomain) {
+               if (declared_type_is_same_or_extension(concrete,base)) {
+                  allowed = true;
+                  break;
+               }
+            }
+            if (!allowed) {
+               Log.error("concrete domain " + concrete->Name +
+                         " does not extend a concrete domain from the imported context",
+                         definition->_line);
+            }
+         }
+      }
+   }
+
+   DomainType *generic_domain(Type *type)
+   {
+      auto domain = dynamic_cast<DomainType *>(canonical_declared_type(type));
+      return domain != nullptr && domain->Generic ? domain : nullptr;
+   }
+
+   void collect_generic_domains(Type *type,set<DomainType *> &domains,
+                                unordered_set<Type *> &visitedTypes,
+                                unordered_set<Class *> &visitedViewables)
+   {
+      if (type == nullptr || !visitedTypes.insert(type).second) {
+         return;
+      }
+      if (DomainType *generic = generic_domain(type)) {
+         domains.insert(generic);
+      }
+
+      Type *declared = canonical_declared_type(type);
+      Type *effective = declared == nullptr ? type : declared;
+      if (auto line = dynamic_cast<LineType *>(effective)) {
+         if (DomainType *generic = generic_domain(line->CoordType)) {
+            domains.insert(generic);
+         }
+      }
+      if (auto multi = dynamic_cast<MultiValue *>(effective)) {
+         if (auto component = dynamic_cast<Class *>(multi->BaseType)) {
+            collect_generic_domains(component,domains,visitedTypes,visitedViewables);
+         }
+         else {
+            collect_generic_domains(multi->BaseType,domains,visitedTypes,visitedViewables);
+         }
+         for (Type *restriction : multi->TypeRestriction) {
+            collect_generic_domains(restriction,domains,visitedTypes,visitedViewables);
+         }
+      }
+      if (auto viewable = dynamic_cast<Class *>(effective)) {
+         collect_generic_domains(viewable,domains,visitedTypes,visitedViewables);
+      }
+   }
+
+   void collect_generic_domains(Class *viewable,set<DomainType *> &domains,
+                                unordered_set<Type *> &visitedTypes,
+                                unordered_set<Class *> &visitedViewables)
+   {
+      if (viewable == nullptr || !visitedViewables.insert(viewable).second) {
+         return;
+      }
+      for (AttrOrParam *attribute : viewable->ClassAttribute) {
+         if (attribute != nullptr) {
+            collect_generic_domains(attribute->Type,domains,visitedTypes,visitedViewables);
+         }
+      }
+      collect_generic_domains(dynamic_cast<Class *>(viewable->Super),domains,
+                              visitedTypes,visitedViewables);
+   }
+
+   void collect_topic_generics(SubModel *topic,set<DomainType *> &domains,
+                               unordered_set<SubModel *> &visitedTopics,
+                               unordered_set<Model *> &scopeModels,
+                               unordered_set<Type *> &visitedTypes,
+                               unordered_set<Class *> &visitedViewables)
+   {
+      if (topic == nullptr || !visitedTopics.insert(topic).second) {
+         return;
+      }
+      if (Model *model = containing_model(topic)) {
+         scopeModels.insert(model);
+      }
+      for (MetaElement *element : topic->Element) {
+         if (auto viewable = dynamic_cast<Class *>(element)) {
+            collect_generic_domains(viewable,domains,visitedTypes,visitedViewables);
+         }
+      }
+      collect_topic_generics(dynamic_cast<SubModel *>(topic->_super),domains,
+                             visitedTopics,scopeModels,visitedTypes,visitedViewables);
+   }
+
+   void check_topic_generics(SubModel *topic)
+   {
+      if (topic == nullptr || topic->_dataunit == nullptr || topic->_dataunit->Abstract) {
+         return;
+      }
+
+      set<DomainType *> used;
+      unordered_set<SubModel *> visitedTopics;
+      unordered_set<Model *> scopeModels;
+      unordered_set<Type *> visitedTypes;
+      unordered_set<Class *> visitedViewables;
+      collect_topic_generics(topic,used,visitedTopics,scopeModels,visitedTypes,visitedViewables);
+
+      // Model-level structures can specialize an imported structure used by
+      // the topic. RefHB 3.5/3.8 and ili2c therefore include all viewables in
+      // the lexical model scope when determining indirect generic usage.
+      for (Model *model : scopeModels) {
+         for (MetaElement *element : model->Element) {
+            if (auto viewable = dynamic_cast<Class *>(element)) {
+               collect_generic_domains(viewable,used,visitedTypes,visitedViewables);
+            }
+         }
+      }
+
+      Model *model = containing_model(topic);
+      set<DomainType *> deferred;
+      for (const SubModel::DeferredGenericRef &reference : topic->DeferredGenerics) {
+         DomainType *domain = reference.Domain;
+         if (domain == nullptr) {
+            continue;
+         }
+         deferred.insert(domain);
+         if (!domain->Generic || dynamic_cast<CoordType *>(domain) == nullptr) {
+            Log.error("DEFERRED GENERICS requires a GENERIC coordinate domain",
+                      reference.Line);
+         }
+         if (visible_generic_definition(model,domain) == nullptr) {
+            Log.error("deferred generic domain " + domain->Name + " has no visible context",
+                      reference.Line);
+         }
+         if (used.find(domain) == used.end()) {
+            Log.error("deferred generic domain " + domain->Name + " is not used by topic " +
+                      topic->Name,reference.Line);
+         }
+      }
+
+      for (DomainType *domain : used) {
+         GenericDef *definition = visible_generic_definition(model,domain);
+         if (definition == nullptr) {
+            Log.error("generic domain " + domain->Name + " has no visible context",topic->_line);
+         }
+         else if (definition->ConcreteDomain.size() > 1 && deferred.find(domain) == deferred.end()) {
+            Log.error("generic domain " + domain->Name + " must be listed in DEFERRED GENERICS",
+                      topic->_line);
+         }
+      }
+   }
 
    void require(const Descriptor &descriptor,Kind expected,const string &message,int line)
    {

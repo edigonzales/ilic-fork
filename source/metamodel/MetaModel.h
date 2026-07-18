@@ -4,6 +4,7 @@
 
 #include <string>
 #include <list>
+#include <vector>
 
 using namespace std;
 
@@ -171,6 +172,12 @@ namespace metamodel {
       // MetaElement.Name := TopicName as defined in the INTERLIS-Model
    public:
       DataUnit *_dataunit = nullptr;
+      struct DeferredGenericRef {
+         string Name;
+         DomainType *Domain = nullptr;
+         int Line = -1;
+      };
+      vector<DeferredGenericRef> DeferredGenerics;
       virtual string getClass() { return "SubModel"; }
       virtual string getBaseClass() { return "Package"; };
    };
@@ -447,6 +454,7 @@ namespace metamodel {
 
    class Context : public MetaElement { // 2.4
    public:
+      list<GenericDef *> GenericDefinitions;
       virtual string getClass() { return "Context"; }
       virtual string getBaseClass() { return "MetaElement"; };
    };

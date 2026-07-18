@@ -742,6 +742,7 @@ namespace metamodel {
 Log.message(">>> clone topic");
       clone_init_package(clone,org);
       clone->_dataunit = org->_dataunit;
+      clone->DeferredGenerics = org->DeferredGenerics;
    }
 
    static void clone_init_type(Type *clone,Type *org)
@@ -770,7 +771,6 @@ Log.message(">>> clone topic");
    {
 
       clone_init_metaelement(clone,org);
-
       clone->toDomain = org->toDomain;
       clone->ToClass = org->ToClass;
 
@@ -944,7 +944,7 @@ Log.message(">>> clone topic");
    {
 
       clone_init_metaelement(clone,org);
-
+      clone->GenericDefinitions = org->GenericDefinitions;
 
    }
 
@@ -955,6 +955,8 @@ Log.message(">>> clone topic");
 
       clone->OID = org->OID;
       clone->Context = org->Context;
+      clone->GenericDomain = org->GenericDomain;
+      clone->ConcreteDomain = org->ConcreteDomain;
 
    }
 

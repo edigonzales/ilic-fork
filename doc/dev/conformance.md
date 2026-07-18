@@ -536,6 +536,76 @@ previously conformant case regresses. The recorded result was produced by the
 cause commit containing this section (the report's candidate commit is verified
 after the commit is created).
 
+### Generic domains, contexts, and deferred selection
+
+This cause covers ten invalid INTERLIS 2.4 models accepted by ilic and one valid
+model rejected by the parser:
+
+```text
+ili24.generic-value-ranges.context-domain-not-generic
+ili24.generic-value-ranges.deferred-domain-no-context
+ili24.generic-value-ranges.deferred-missing
+ili24.generic-value-ranges.deferred-unused-type
+ili24.generic-value-ranges.generic-in-struct-attr-missign-deferred-fail
+ili24.generic-value-ranges.invalid-deferred-domain
+ili24.generic-value-ranges.invalid-dimensions
+ili24.generic-value-ranges.invalid-range
+ili24.generic-value-ranges.missing-context
+ili24.generic-value-ranges.multiple-contexts
+ili24.generic-value-ranges.multiple-contexts-not-extending
+```
+
+Reference-manual sections 3.5 and 3.8 define three separate invariants. A
+`GENERIC` declaration is currently restricted to coordinate domains. A context
+maps such a domain to one or more structurally compatible coordinate domains;
+the dimension count must match and each concrete numeric axis must stay inside
+the generic range. Contexts are visible through direct and indirect model
+imports. If an importing model replaces an already visible mapping, every new
+concrete domain must be identical to or extend one of the previously allowed
+domains. Finally, a concrete topic must list an actually used generic domain in
+`DEFERRED GENERICS` exactly when the effective context leaves more than one
+concrete choice. Missing contexts, unknown or unused deferred domains, and
+indirect uses without the required declaration are errors. Abstract topics are
+exempt until concretized.
+
+The implementation follows ili2c's `ContextDef.checkIntegrity`,
+`Model.resolveGenericDomain`, and `Topic.getUsedGenericDomains`. Context lookup
+first checks the current model and then traverses imports depth-first in the
+same reverse declaration order as ili2c. Generic usage includes inherited topic
+classes, composition structures, their restrictions and extensions, and line
+control-point domains. Model-level structure extensions in the lexical model
+are deliberately included: they can add a generic line domain to an imported
+structure reached from a topic. Numeric range comparisons normalize decimal and
+scaled values and compare them exactly instead of converting through binary
+floating point.
+
+Reference-manual production `ContextDef` permits several context names after a
+single `CONTEXT` keyword. The old ilic rule represented only one. The parser now
+uses explicit context blocks and a dedicated deferred-generics production, and
+the generated C++ parser was regenerated with the bundled ANTLR 4.7.1 JAR. The
+ili2c 2.4 grammar has the same repeated-name structure. Both LSP grammars model
+one context name per rule and compensate by making `CONTEXT` optional on later
+rules; this is useful for error-tolerant editing but is broader than the
+reference production. `grammars-ng` and `grammars-antlr4` do not differ for
+this construct, so their optional keyword was not copied.
+
+The metamodel now retains context mappings and source-level deferred references.
+INTERLIS 2.4 output preserves `GENERIC`, `CONTEXT`, and `DEFERRED GENERICS`, and
+a roundtrip recompiles successfully. Twelve focused source fixtures cover
+multiple names, exact range and dimension checks, non-generic mappings,
+transitive context visibility, imported-context refinement, missing and unused
+deferred selections, unknown domains, and generic use through a nested
+structure. A thirteenth CTest verifies the output roundtrip. All 96 local CTests,
+all 16 unchanged upstream generic-value-range cases, and the ANTLR consistency
+check pass.
+
+The complete frozen corpus improves from 560 to 571 conformant cases: no invalid
+model is accepted, no valid model is rejected, no infrastructure error remains,
+and no previously conformant case regresses. The corpus SHA-256 is
+`5baa41c6172e169e7dd35b1241a9dc9ba6e60ab90f4918e864c90c988cc51a57`.
+The recorded result was produced by the cause commit containing this section
+(the report's candidate commit is verified after the commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -605,14 +675,14 @@ ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes | Namespace fixes | Import fixes | Constraint fixes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 | 550 | 556 | 560 |
-| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 | 19 | 14 | 10 |
-| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 | 2 | 1 | 1 |
-| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes | Namespace fixes | Import fixes | Constraint fixes | Generic fixes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 | 550 | 556 | 560 | 571 |
+| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 | 19 | 14 | 10 | 0 |
+| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 | 2 | 1 | 1 | 0 |
+| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The
-remaining non-conformant cases are regular semantic-validation backlog; none is
-an infrastructure error.
+The complete frozen corpus now has no remaining candidate mismatch or
+infrastructure error.

@@ -348,6 +348,59 @@ if(BUILD_TESTING)
     add_ilic_regression_test(ilic_regression_unique_basket_global_valid TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/unique_basket_global_valid.ili"
     )
+    add_ilic_regression_test(ilic_regression_generic_contexts_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_contexts_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_generic_context_transitive_import_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_context_transitive_import_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_generic_deferred_nested_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_deferred_nested_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_generic_context_non_generic_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_context_non_generic_invalid.ili"
+        OUTPUT_REGEX "requires a GENERIC coordinate domain"
+    )
+    add_ilic_regression_test(ilic_regression_generic_context_dimension_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_context_dimension_invalid.ili"
+        OUTPUT_REGEX "not a compatible specialization"
+    )
+    add_ilic_regression_test(ilic_regression_generic_context_range_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_context_range_invalid.ili"
+        OUTPUT_REGEX "not a compatible specialization"
+    )
+    add_ilic_regression_test(ilic_regression_generic_context_refinement_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_context_refinement_invalid.ili"
+        OUTPUT_REGEX "does not extend a concrete domain from the imported context"
+    )
+    add_ilic_regression_test(ilic_regression_generic_context_missing_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_context_missing_invalid.ili"
+        OUTPUT_REGEX "has no visible context"
+    )
+    add_ilic_regression_test(ilic_regression_generic_deferred_missing_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_deferred_missing_invalid.ili"
+        OUTPUT_REGEX "must be listed in DEFERRED GENERICS"
+    )
+    add_ilic_regression_test(ilic_regression_generic_deferred_unused_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_deferred_unused_invalid.ili"
+        OUTPUT_REGEX "is not used by topic"
+    )
+    add_ilic_regression_test(ilic_regression_generic_deferred_unknown_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_deferred_unknown_invalid.ili"
+        OUTPUT_REGEX "type UnknownPosition not found"
+    )
+    add_ilic_regression_test(ilic_regression_generic_nested_deferred_missing_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_nested_deferred_missing_invalid.ili"
+        OUTPUT_REGEX "must be listed in DEFERRED GENERICS"
+    )
+    add_test(
+        NAME ilic_regression_generic_roundtrip
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC=$<TARGET_FILE:ilic>"
+            "-DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_deferred_nested_valid.ili"
+            "-DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/generic-roundtrip.ili"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_generic_roundtrip.cmake"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"

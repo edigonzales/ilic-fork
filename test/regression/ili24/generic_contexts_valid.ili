@@ -1,0 +1,19 @@
+INTERLIS 2.4;
+
+MODEL GenericContextsValid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Generic2 (GENERIC) = COORD NUMERIC, NUMERIC;
+    Generic3 (GENERIC) = COORD NUMERIC, NUMERIC, NUMERIC;
+    Concrete2 = COORD 0.00 .. 100.00, 0.00 .. 100.00;
+    Concrete3 = COORD 0.00 .. 100.00, 0.00 .. 100.00, 0.00 .. 100.00;
+
+  CONTEXT
+    two = Generic2 = Concrete2;
+    three = Generic3 = Concrete3;
+
+  TOPIC Data =
+    CLASS Item =
+      position: Generic2;
+    END Item;
+  END Data;
+END GenericContextsValid.

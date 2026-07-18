@@ -49,6 +49,10 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual antlrcpp::Any visitDeferredGenerics(Ili2Parser::DeferredGenericsContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual antlrcpp::Any visitClassDef(Ili2Parser::ClassDefContext *ctx) override {
     return visitChildren(ctx);
   }
@@ -198,6 +202,10 @@ public:
   }
 
   virtual antlrcpp::Any visitContextDef(Ili2Parser::ContextDefContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitContextBlock(Ili2Parser::ContextBlockContext *ctx) override {
     return visitChildren(ctx);
   }
 

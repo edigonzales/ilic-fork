@@ -30,6 +30,7 @@ namespace output {
       void visitUniqueConstraint(metamodel::UniqueConstraint* c) override;
 
       void visitDomainType(metamodel::DomainType *t) override;
+      void visitContext(metamodel::Context *context) override;
 
       void visitAttrOrParam(metamodel::AttrOrParam *a) override;
       void visitRole(metamodel::Role* r) override;
