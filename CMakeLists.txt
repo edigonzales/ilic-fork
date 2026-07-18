@@ -147,6 +147,18 @@ if(BUILD_TESTING)
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads/RoadsExgm2ien.ili"
         ILIDIRS "${CMAKE_CURRENT_SOURCE_DIR}/test/ili23/Roads"
     )
+    add_ilic_regression_test(ilic_regression_lexer_scaling_name TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/lexer_scaling_name.ili"
+    )
+    add_ilic_regression_test(ilic_regression_lexer_nested_comment TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/lexer_nested_comment.ili"
+    )
+    add_ilic_regression_test(ilic_regression_lexer_unterminated_comment FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/lexer_unterminated_comment.ili"
+    )
+    add_ilic_regression_test(ilic_regression_lexer_malformed_scaling FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/lexer_malformed_scaling.ili"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"

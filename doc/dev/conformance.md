@@ -40,6 +40,40 @@ Other broad syntax questions, including the shared `restrictedRef` rule, remain
 isolated grammar-conformance work. Any such correction must include its own
 reference-manual evidence, ANTLR 4.7.1 regeneration, and generated-file diff.
 
+## Conformance parity campaign
+
+The post-translation baseline was reproduced from a clean Debug build of commit
+`d399fe11ec3e20d420b30e55b498d96b1d53fd42`. The frozen 571-case corpus has
+SHA-256 `5baa41c6172e169e7dd35b1241a9dc9ba6e60ab90f4918e864c90c988cc51a57`.
+That run produced 468 conformant cases, 95 cases where ilic accepted an invalid
+model, eight cases where ilic rejected a valid model, and no infrastructure
+errors. Each cause below is checked with local regressions and a complete run
+of that same corpus before it is committed.
+
+### Lexer tokenization and nested comments
+
+Cases `ili23.ili-symbols.dec-number-extended` and
+`ili23.ili-symbols.nested-comment` were valid models rejected by ilic. The first
+failure was caused by `SCALING` being an emitted lexer token. Consequently the
+legal domain name `e1` was tokenized as a numeric exponent instead of `NAME`.
+The second failure was caused by a non-recursive block-comment rule, which left
+the outer closing delimiter in the parser token stream.
+
+Reference-manual section 3.2 defines a name as starting with a letter and
+defines `Scaling` only as a component of a decimal number. The same section
+explicitly permits nested block comments. `SCALING` is therefore a lexer
+fragment and the block-comment rule recursively consumes nested comments. Both
+LSP lexer variants use standalone `Scaling` and non-recursive block comments;
+those editor-oriented rules were deliberately not copied because they conflict
+with the reference manual and the ili2c 2.3 acceptance tests.
+
+Local tests cover a name beginning with `e`, valid scaled decimals, nested and
+unterminated comments, and a malformed exponent. ANTLR 4.7.1 regeneration
+changes only the Ili2 lexer and the Ili2 parser's generated token vocabulary;
+`check-parser-regeneration` matches all 36 generated files. The full corpus
+improves from 468 to 470 conformant cases, with 95 invalid models still accepted
+and six valid models still rejected. No previously conformant case regresses.
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -101,19 +135,20 @@ The external conformance suite can be run after building `ilic`:
 cd /path/to/interlis-compiler-conformance
 ILIC_REPO=/path/to/ilic \
 ILIC_EXECUTABLE=/path/to/ilic/build/macos/ilic \
-ILI2C_SOURCE_REPO=/path/to/ili2c \
+ILI2C_JAR=/path/to/ili2c-5.6.8/ili2c.jar \
+ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 ./gradlew runConformance generateConformanceReport
 ```
 
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Baseline | After corrections |
-| --- | ---: | ---: |
-| conformant | 268 | 468 |
-| candidate accepts invalid | 280 | 95 |
-| candidate rejects valid | 12 | 8 |
-| infrastructure error | 11 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes |
+| --- | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 |
+| candidate accepts invalid | 280 | 95 | 95 |
+| candidate rejects valid | 12 | 8 | 6 |
+| infrastructure error | 11 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The
