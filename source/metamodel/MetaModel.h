@@ -74,6 +74,7 @@ namespace metamodel {
    public:
       string Name = "";
       string Value = "";
+      string _rawText = "";
       // ROLE from ASSOCIATION MetaAttributes
       MetaElement *MetaElement = nullptr;
       virtual string getClass() { return "MetaAttribute"; }

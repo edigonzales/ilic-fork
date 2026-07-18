@@ -20,6 +20,61 @@ namespace {
 
 std::mutex compilerMutex;
 
+metamodel::MetaElement *findExternalMetaTarget(
+   metamodel::Package *package,const std::string &path,const std::string &prefix)
+{
+   if (package == nullptr) return nullptr;
+   const std::string packagePath = prefix.empty() ? package->Name : prefix + "." + package->Name;
+   if (packagePath == path) return package;
+   for (auto *element : package->Element) {
+      if (element == nullptr) continue;
+      const std::string elementPath = packagePath + "." + element->Name;
+      if (elementPath == path) return element;
+      if (auto *childPackage = dynamic_cast<metamodel::Package *>(element)) {
+         if (auto *found = findExternalMetaTarget(childPackage,path,packagePath)) return found;
+      }
+      if (auto *viewable = dynamic_cast<metamodel::Class *>(element)) {
+         for (auto *attribute : viewable->ClassAttribute)
+            if (attribute != nullptr && elementPath + "." + attribute->Name == path) return attribute;
+         for (auto *parameter : viewable->ClassParameter)
+            if (parameter != nullptr && elementPath + "." + parameter->Name == path) return parameter;
+         for (auto *role : viewable->Role)
+            if (role != nullptr && elementPath + "." + role->Name == path) return role;
+         for (auto *constraint : viewable->Constraint)
+            if (constraint != nullptr && elementPath + "." + constraint->Name == path) return constraint;
+      }
+      if (auto *function = dynamic_cast<metamodel::FunctionDef *>(element)) {
+         for (auto *argument : function->Argument)
+            if (argument != nullptr && elementPath + "." + argument->Name == path) return argument;
+      }
+   }
+   return nullptr;
+}
+
+void applyExternalMetaAttributes(const CompilationRequest &request)
+{
+   for (const auto &external : request.externalMetaAttributes) {
+      metamodel::MetaElement *target = nullptr;
+      for (auto *model : metamodel::get_all_models()) {
+         target = findExternalMetaTarget(model,external.element,"");
+         if (target != nullptr) break;
+      }
+      if (target == nullptr) {
+         Log.error("external meta attribute target " + external.element + " not found",-1,0,
+            "ILIC-META-TARGET");
+         continue;
+      }
+      if (external.name == "ili2c.translationOf") {
+         if (auto *model = dynamic_cast<metamodel::Model *>(target)) {
+            model->_translationOfName = external.value;
+         }
+         else {
+            Log.error("ili2c.translationOf may only target a model",-1,0,"ILIC-META-TARGET");
+         }
+      }
+   }
+}
+
 std::string joinDirectories(const std::vector<std::string> &directories)
 {
    std::ostringstream value;
@@ -135,10 +190,15 @@ CompilationResult CompilerSession::compile(const CompilationRequest &request)
       if (pass == util::all_ilifiles.size()) Log.error("unable to order model dependencies");
    }
 
+   applyExternalMetaAttributes(request);
    metamodel::check_model_semantics();
    metamodel::check_model_translations();
    for (auto *model : metamodel::get_all_models()) {
-      result.models.push_back({model->Name, model->iliVersion, model->_ilifile});
+      CompiledModel compiled{model->Name, model->iliVersion, model->_ilifile, {}};
+      for (auto *attribute : model->MetaAttribute) {
+         if (attribute != nullptr) compiled.metaAttributes.push_back({attribute->Name,attribute->Value});
+      }
+      result.models.push_back(std::move(compiled));
    }
    result.errorCount = Log.getErrorCount();
    result.warningCount = Log.getWarningCount();

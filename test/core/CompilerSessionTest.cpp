@@ -1,6 +1,7 @@
 #include "ilic/Compiler.h"
 
 #include <cassert>
+#include <iostream>
 
 int main()
 {
@@ -20,6 +21,9 @@ END AnyClassRegression.
    ilic::CompilationRequest request;
    request.roots.push_back(uri);
    ilic::CompilationResult result = session.compile(request);
+   for (const auto &diagnostic : result.diagnostics) {
+      if (!result.success) std::cerr << diagnostic.code << ": " << diagnostic.message << "\n";
+   }
    assert(result.success);
    assert(result.errorCount == 0);
    assert(!result.models.empty());
@@ -45,5 +49,42 @@ END UnknownDomain.
       if (diagnostic.range.valid && diagnostic.range.uri == invalidUri) located = true;
    }
    assert(located);
+
+   ilic::CompilerSession metaSession;
+   const char *metaUri = "memory:///MetaAttributes.ili";
+   metaSession.putSource(metaUri, R"ili(INTERLIS 2.3;
+!!@ displayName = "A model with spaces"
+!! this ordinary comment must not consume the attribute
+/** documentation also remains between attribute and declaration */
+MODEL MetaAttributes AT "https://example.invalid/ilic/tests" VERSION "1" =
+END MetaAttributes.
+)ili");
+   ilic::CompilationRequest metaRequest;
+   metaRequest.roots.push_back(metaUri);
+   ilic::CompilationResult meta = metaSession.compile(metaRequest);
+   assert(meta.success);
+   bool metaFound = false;
+   for (const auto &model : meta.models) {
+      if (model.name != "MetaAttributes") continue;
+      for (const auto &attribute : model.metaAttributes) {
+         if (attribute.name == "displayName" && attribute.value == "A model with spaces") metaFound = true;
+      }
+   }
+   assert(metaFound);
+
+   ilic::CompilerSession translationSession;
+   const char *translationUri = "memory:///ExternalTranslation.ili";
+   translationSession.putSource(translationUri, R"ili(INTERLIS 2.3;
+MODEL Base AT "https://example.invalid/ilic/tests" VERSION "1" =
+END Base.
+MODEL Translation AT "https://example.invalid/ilic/tests" VERSION "1" =
+END Translation.
+)ili");
+   ilic::CompilationRequest translationRequest;
+   translationRequest.roots.push_back(translationUri);
+   translationRequest.externalMetaAttributes.push_back(
+      {"Translation","ili2c.translationOf","Base"});
+   ilic::CompilationResult translation = translationSession.compile(translationRequest);
+   assert(translation.success);
    return 0;
 }

@@ -3,6 +3,7 @@
 #include "../util/Logger.h"
 
 #include <sstream>
+#include <cctype>
 
 using namespace util;
 using namespace metamodel;
@@ -25,7 +26,38 @@ namespace metamodel {
    static Class AnyClass;
    static Class AnyStructure;
    static bool UniversalClassesInitialized = false;
-   static map<int,list<pair<string,string>>> PendingMetaAttributes;
+   struct PendingMetaAttribute {
+      string Name;
+      string Value;
+      string RawText;
+      int Line = -1;
+      int Column = 0;
+   };
+   static map<int,list<PendingMetaAttribute>> PendingMetaAttributes;
+
+   static string trim_copy(const string &value)
+   {
+      size_t first = 0;
+      while (first < value.size() && isspace(static_cast<unsigned char>(value[first]))) ++first;
+      size_t last = value.size();
+      while (last > first && isspace(static_cast<unsigned char>(value[last - 1]))) --last;
+      return value.substr(first,last - first);
+   }
+
+   static string decode_meta_value(string value)
+   {
+      value = trim_copy(value);
+      if (value.size() < 2 || value.front() != '"' || value.back() != '"') return value;
+      string decoded;
+      for (size_t i = 1; i + 1 < value.size(); ++i) {
+         if (value[i] == '\\' && i + 2 < value.size()
+             && (value[i + 1] == '\\' || value[i + 1] == '"')) {
+            decoded += value[++i];
+         }
+         else decoded += value[i];
+      }
+      return decoded;
+   }
 
    void reset_input_state()
    {
@@ -46,23 +78,58 @@ namespace metamodel {
    void prepare_meta_attributes(const string &source)
    {
       PendingMetaAttributes.clear();
-      list<pair<string,string>> pending;
+      list<PendingMetaAttribute> pending;
       istringstream lines(source);
       string line;
       int lineNumber = 0;
+      bool inBlockComment = false;
       while (getline(lines,line)) {
          ++lineNumber;
          size_t first = line.find_first_not_of(" \t\r");
          string trimmed = first == string::npos ? "" : line.substr(first);
-         if (trimmed.rfind("!!@",0) == 0) {
-            string option = trimmed.substr(3);
-            size_t equals = option.find('=');
-            pending.push_back({option.substr(0,equals),equals == string::npos ? "" : option.substr(equals + 1)});
+         if (inBlockComment) {
+            size_t end = trimmed.find("*/");
+            if (end == string::npos) continue;
+            inBlockComment = false;
+            trimmed = trim_copy(trimmed.substr(end + 2));
+            if (trimmed.empty()) continue;
          }
-         else if (!trimmed.empty() && trimmed.rfind("!!",0) != 0 && !pending.empty()) {
+         while (trimmed.rfind("/*",0) == 0) {
+            size_t end = trimmed.find("*/",2);
+            if (end == string::npos) {
+               inBlockComment = true;
+               trimmed.clear();
+               break;
+            }
+            trimmed = trim_copy(trimmed.substr(end + 2));
+         }
+         if (trimmed.empty()) continue;
+         if (trimmed.rfind("!!@",0) == 0) {
+            string option = trim_copy(trimmed.substr(3));
+            size_t equals = option.find('=');
+            string name = equals == string::npos ? "" : trim_copy(option.substr(0,equals));
+            if (equals == string::npos || name.empty()) {
+               Log.error("invalid meta attribute; expected !!@ name=value",lineNumber,
+                  static_cast<int>(first == string::npos ? 0 : first),"ILIC-META-SYNTAX");
+               continue;
+            }
+            PendingMetaAttribute attribute;
+            attribute.Name = std::move(name);
+            attribute.Value = decode_meta_value(option.substr(equals + 1));
+            attribute.RawText = trimmed;
+            attribute.Line = lineNumber;
+            attribute.Column = static_cast<int>(first == string::npos ? 0 : first);
+            pending.push_back(std::move(attribute));
+         }
+         else if (trimmed.rfind("!!",0) != 0 && !pending.empty()) {
             PendingMetaAttributes[lineNumber] = pending;
             pending.clear();
          }
+      }
+      if (!pending.empty()) {
+         const PendingMetaAttribute &attribute = pending.front();
+         Log.error("meta attribute is not followed by a model element",attribute.Line,
+            attribute.Column,"ILIC-META-DANGLING");
       }
    }
 
@@ -106,8 +173,13 @@ namespace metamodel {
       if (metadata != PendingMetaAttributes.end()) {
          for (const auto &entry : metadata->second) {
             MetaAttribute *attribute = new MetaAttribute();
-            attribute->Name = entry.first;
-            attribute->Value = entry.second;
+            init_mmobject(attribute,entry.Line);
+            attribute->_source.start.character = static_cast<size_t>(entry.Column);
+            attribute->_source.end = attribute->_source.start;
+            attribute->_source.end.character += entry.RawText.size();
+            attribute->Name = entry.Name;
+            attribute->Value = entry.Value;
+            attribute->_rawText = entry.RawText;
             attribute->MetaElement = e;
             e->MetaAttribute.push_back(attribute);
          }

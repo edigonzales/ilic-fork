@@ -17,12 +17,23 @@ struct CompilerOptions {
 struct CompilationRequest {
    std::vector<std::string> roots;
    CompilerOptions options;
+   struct ExternalMetaAttribute {
+      std::string element;
+      std::string name;
+      std::string value;
+   };
+   std::vector<ExternalMetaAttribute> externalMetaAttributes;
 };
 
 struct CompiledModel {
+   struct MetaAttributeValue {
+      std::string name;
+      std::string value;
+   };
    std::string name;
    std::string iliVersion;
    std::string uri;
+   std::vector<MetaAttributeValue> metaAttributes;
 };
 
 struct CompilationResult {
