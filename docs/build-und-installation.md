@@ -154,8 +154,8 @@ Die geprüften Tarballs liegen danach unter `build/npm/tarballs`. Ein anderes
 Projekt kann sie direkt installieren:
 
 ```sh
-npm install /pfad/zu/build/npm/tarballs/ilic-compiler-wasm-0.9.9-SNAPSHOT.ZEITSTEMPEL.tgz
-npm install /pfad/zu/build/npm/tarballs/ilic-tools-0.9.9-SNAPSHOT.ZEITSTEMPEL.tgz
+npm install /pfad/zu/build/npm/tarballs/ilic-compiler-wasm-0.10.0-SNAPSHOT.ZEITSTEMPEL.tgz
+npm install /pfad/zu/build/npm/tarballs/ilic-tools-0.10.0-SNAPSHOT.ZEITSTEMPEL.tgz
 ```
 
 Die öffentliche Snapshot-Publikation, der einmalige Bootstrap und die

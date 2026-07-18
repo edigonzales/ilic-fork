@@ -82,6 +82,7 @@ for object-path resolution in graphics and views.
   - start with the [documentation index](./docs/README.md)
   - use the verified [CLI reference](./docs/cli.md) for command line options
   - see the [native APIs](./docs/native-api.md) and [WASM SDK](./docs/wasm.md) for embedding
+  - see the [language-tooling snapshots](./docs/language-tooling-snapshots.md) for editor integrations
   - see [npm snapshot publication](./docs/npm-publikation.md) for package builds and authentication
 + reference material:
   - consult the [changelog](./doc/changelog.txt) for historical changes
