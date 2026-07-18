@@ -1083,6 +1083,7 @@ namespace metamodel {
 
    // initialization
    void init(string version);
+   void reset();
 
    // model helpers
    void add_dataunit(DataUnit* u);

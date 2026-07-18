@@ -21,7 +21,10 @@ target_include_directories(antlr4-runtime
         "${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/include"
 )
 
-add_executable(ilic
+set(ILIC_CORE_SOURCES
+    source/core/Compiler.cpp
+    source/core/SourceManager.cpp
+
     source/input/ili1/Ili1Input.cpp
     source/input/ili1/Ili1Input_package.cpp
     source/input/ili1/Ili1Input_table.cpp
@@ -43,8 +46,6 @@ add_executable(ilic
     source/input/ili2/InterlisModel.cpp
 
     source/input/parser/IliParserErrorListener.cpp
-
-    source/main/ilic.cpp
 
     source/metamodel/MetaModel.cpp
     source/metamodel/MetaModelInput.cpp
@@ -70,9 +71,22 @@ add_executable(ilic
     source/util/XTFWriter.cpp
 )
 
-target_link_libraries(ilic PRIVATE antlr4-runtime)
+add_library(ilic-core STATIC ${ILIC_CORE_SOURCES})
+add_library(ilic::core ALIAS ilic-core)
+target_include_directories(ilic-core
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+target_link_libraries(ilic-core PUBLIC antlr4-runtime)
+
+add_executable(ilic source/main/ilic.cpp)
+target_link_libraries(ilic PRIVATE ilic-core)
 
 if(BUILD_TESTING)
+    add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
+    target_link_libraries(ilic_core_session_test PRIVATE ilic-core)
+    add_test(NAME ilic_core_session COMMAND ilic_core_session_test)
+
     function(add_ilic_regression_test name expected_success)
         set(options)
         set(one_value_args OUTPUT_REGEX ILIDIRS)

@@ -51,6 +51,20 @@ Logger Log;
 
 // general
 
+void Logger::reset()
+{
+   closeFile();
+   nestLevel = 0;
+   errorcount = 0;
+   warningcount = 0;
+   silent = false;
+   display_info = true;
+   display_warning = true;
+   display_error = true;
+   display_debug = false;
+   warnings_as_errors = false;
+}
+
 void Logger::setLevel(int level)
 {
    nestLevel = level;

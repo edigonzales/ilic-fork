@@ -14,6 +14,7 @@ namespace metamodel {
    extern bool ili23;
    extern bool ili24;
    extern string iliversion;
+   void reset_input_state();
 
    // mmobject helpers
    void init_mmobject(MMObject *o, int line);

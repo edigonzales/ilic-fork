@@ -43,6 +43,7 @@ namespace util {
    };
 
    extern list<IliFile *> all_ilifiles;
+   void reset_ilifiles();
    void set_autosearch(bool auto_search);
    void set_ilidirs(string ilidirs);
    IliFile* load_ilifiles_by_file(string filepath);

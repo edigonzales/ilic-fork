@@ -29,6 +29,7 @@ namespace util {
          void messageNoNL(string message);
          void messageNoIdent(string message);
          void warningsAsErrors();
+         void reset();
 
          // info
          void displayInfo(bool state);

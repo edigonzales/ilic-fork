@@ -11,6 +11,7 @@
 #include "StringUtil.h"
 #include "IliFile.h"
 #include "Logger.h"
+#include "../../include/ilic/SourceManager.h"
 
 using namespace std;
 using namespace parser;
@@ -24,6 +25,15 @@ namespace util {
    static map <string, IliFile*> all_ilimodels;
    static bool auto_search = true;
    static list<string> ilidirs;
+
+   void reset_ilifiles()
+   {
+      all_ilifiles.clear();
+      all_ilifiles_full.clear();
+      all_ilimodels.clear();
+      ilidirs.clear();
+      auto_search = true;
+   }
 
    // constructor
 
@@ -177,17 +187,17 @@ namespace util {
       Log.debug(">>> load_ilifile(" + filepath + ")");
       Log.incNestLevel();
 
-      // open file
-      Log.debug("opening file " + filepath);
-      ifstream stream;
-      stream.open(filepath);
-      if (!stream.is_open()) {
+      Log.debug("opening source " + filepath);
+      string source = util::load_string(filepath);
+      bool registered = ilic::activeSourceManager() != nullptr
+         && ilic::activeSourceManager()->contains(filepath);
+      if (source.empty() && !registered && !filesystem::exists(filepath)) {
          Log.error("unable to open " + filepath);
-         exit(1);
+         return nullptr;
       }
 
       // create lexer
-      antlr4::ANTLRInputStream input(util::load_filtered_string_from_file(filepath));
+      antlr4::ANTLRInputStream input(source);
       Log.debug("creating ilifile lexer (1) ...");
       lexer::IliFileLexer lexer(&input);
       Log.debug("creating ilifile lexer (2) ...");
@@ -255,6 +265,22 @@ namespace util {
          IliFile *interlis = new IliFile("INTERLIS");
          all_ilifiles.push_front(interlis);
          return interlis;
+      }
+
+      // Virtual sources supplied by CompilerSession are searched before the
+      // filesystem. This is the import path used by WASM and editor buffers.
+      if (ilic::activeSourceManager() != nullptr) {
+         for (const string &uri : ilic::activeSourceManager()->uris()) {
+            IliFile *ff = load_ilifile(uri);
+            if (ff == nullptr || ff->getIliVersion() != iliversion) continue;
+            for (const string &model : ff->getModels()) {
+               if (model == modelname) {
+                  ff->setAutoSearch(true);
+                  add_ilifile(ff);
+                  return ff;
+               }
+            }
+         }
       }
 
       if (!auto_search) {

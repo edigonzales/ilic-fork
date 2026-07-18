@@ -22,11 +22,23 @@ namespace metamodel {
    static list <Dependency*> AllDependencies;
    static list <AxisSpec*> AllAxisSpecs;
    static Class* class_context;
+   static list<MetaElement*> context;
 
    // helper functions
 
    void init(string version)
    {
+   }
+
+   void reset()
+   {
+      AllDataUnits.clear();
+      AllModels.clear();
+      AllImports.clear();
+      AllDependencies.clear();
+      AllAxisSpecs.clear();
+      context.clear();
+      class_context = nullptr;
    }
 
    // model helpers
@@ -256,8 +268,6 @@ namespace metamodel {
 
    // context helpers
 
-   static list<MetaElement*> context;
-   
    static string get_context_string()
    {
       string cstring = "";

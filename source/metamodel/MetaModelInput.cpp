@@ -27,6 +27,22 @@ namespace metamodel {
    static bool UniversalClassesInitialized = false;
    static map<int,list<pair<string,string>>> PendingMetaAttributes;
 
+   void reset_input_state()
+   {
+      AllPackages.clear();
+      AllTypes.clear();
+      AllUnits.clear();
+      AllImports.clear();
+      AllFunctions.clear();
+      AllLineForms.clear();
+      AllGraphics.clear();
+      PendingMetaAttributes.clear();
+      UniversalClassesInitialized = false;
+      ili23 = true;
+      ili24 = true;
+      iliversion.clear();
+   }
+
    void prepare_meta_attributes(const string &source)
    {
       PendingMetaAttributes.clear();
