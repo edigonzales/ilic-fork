@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-and-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libcurl4-openssl-dev libxml2-dev ninja-build
+      - name: Configure native build
+        run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build native compiler and tests
+        run: cmake --build build/ci --parallel
+      - name: Run native tests
+        run: ctest --test-dir build/ci --output-on-failure
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Test JavaScript packages
+        run: |
+          npm test --prefix packages/tools
+          npm test --prefix packages/compiler-wasm
+          node --test test/npm/PrepareNpmSnapshotTest.mjs
+      - name: Verify snapshot package consumers
+        run: |
+          node scripts/prepare-npm-snapshot.mjs --timestamp 20260101000000
+          node scripts/test-npm-packages.mjs

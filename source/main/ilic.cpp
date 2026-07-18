@@ -49,7 +49,7 @@ string get_program_name()
 
 string get_version()
 {
-   return "0.9.9";
+   return "0.10.0";
 }
 
 string get_version_string()
