@@ -225,6 +225,24 @@ if(BUILD_TESTING)
             "-DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/domain-constraints-roundtrip.ili"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_domain_roundtrip.cmake"
     )
+    add_ilic_regression_test(ilic_regression_association_roles_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/association_roles_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_association_cardinality_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/association_cardinality_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_association_strength_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/association_strength_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_association_target_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/association_target_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_association_visibility_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/association_visibility_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_association_duplicate_role_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/association_duplicate_role_invalid.ili"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"

@@ -1,0 +1,24 @@
+INTERLIS 2.3;
+
+MODEL AssociationCardinalityInvalid AT "https://example.invalid" VERSION "1" =
+  TOPIC T =
+    CLASS A =
+    END A;
+    CLASS B =
+    END B;
+
+    ASSOCIATION Composition =
+      whole -<#> {1..*} A;
+      part -- B;
+    END Composition;
+
+    ASSOCIATION Base =
+      a -<> A;
+      b -- {1..10} B;
+    END Base;
+
+    ASSOCIATION Wider EXTENDS Base =
+      b (EXTENDED) -- {1..20} B;
+    END Wider;
+  END T;
+END AssociationCardinalityInvalid.

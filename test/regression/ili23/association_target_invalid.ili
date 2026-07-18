@@ -1,0 +1,15 @@
+INTERLIS 2.3;
+
+MODEL AssociationTargetInvalid AT "https://example.invalid" VERSION "1" =
+  TOPIC T =
+    CLASS A =
+    END A;
+    STRUCTURE S =
+    END S;
+
+    ASSOCIATION InvalidTarget =
+      a -- A;
+      s -- S;
+    END InvalidTarget;
+  END T;
+END AssociationTargetInvalid.

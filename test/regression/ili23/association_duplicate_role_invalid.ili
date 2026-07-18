@@ -1,0 +1,15 @@
+INTERLIS 2.3;
+
+MODEL AssociationDuplicateRoleInvalid AT "https://example.invalid" VERSION "1" =
+  TOPIC T =
+    CLASS A =
+    END A;
+    CLASS B =
+    END B;
+
+    ASSOCIATION InvalidRoles =
+      duplicate -- A;
+      duplicate -- B;
+    END InvalidRoles;
+  END T;
+END AssociationDuplicateRoleInvalid.

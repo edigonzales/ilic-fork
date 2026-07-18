@@ -1,0 +1,34 @@
+INTERLIS 2.3;
+
+MODEL AssociationRolesValid AT "https://example.invalid" VERSION "1" =
+  TOPIC Base =
+    CLASS A =
+    END A;
+
+    ASSOCIATION Ternary =
+      a -- A;
+      b -- A;
+      c -- A;
+    END Ternary;
+  END Base;
+
+  TOPIC Left EXTENDS Base =
+    CLASS LeftTarget =
+    END LeftTarget;
+
+    ASSOCIATION Link =
+      common -- A;
+      target -- LeftTarget;
+    END Link;
+  END Left;
+
+  TOPIC Right EXTENDS Base =
+    CLASS RightTarget =
+    END RightTarget;
+
+    ASSOCIATION Link =
+      common -- A;
+      target -- RightTarget;
+    END Link;
+  END Right;
+END AssociationRolesValid.

@@ -352,6 +352,9 @@ namespace metamodel {
       enum { Assoc, Aggr, Comp } Strongness = Assoc;
       bool Ordered = false;
       Multiplicity Multiplicity;
+      // An omitted cardinality and an explicit {*} both use {-1,-1}; keep the
+      // syntactic distinction so extensions can inherit only when omitted.
+      bool MultiplicityDefined = false;
       list<Expression *> Derivates; // LIST
       bool EmbeddedTransfer = false;
       bool Hiding = false;

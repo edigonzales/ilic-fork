@@ -211,6 +211,58 @@ accepted, five valid models remain rejected, and no previously conformant case
 regresses. The recorded result was produced by the cause commit containing this
 section (the report's candidate commit is verified after the commit is created).
 
+### Association role semantics and visibility
+
+This cause covers seven invalid models accepted by ilic and two valid models
+rejected by ilic:
+
+```text
+ili23.association.association-3roles
+ili23.association.association-same-rolename-in-diff-ext-topics
+ili23.association.association-cardinalities-in-composition-role-fail
+ili23.association.association-cross-topic-role-fail
+ili23.association.association-detect-multiple-aggregation-roles-fail
+ili23.association.association-dublicating-role-names-fail
+ili23.association.association-greater-card-size-than-base-fail
+ili23.association.association-role-points-to-structure-fail
+ili23.association.association-role-with-less-aggregation-than-base-fail
+```
+
+Reference-manual section 3.7 requires at least two uniquely named roles, allows
+roles to target identifiable classes or associations but not structures, and
+permits only one aggregate or composite end. A composition end has maximum
+cardinality one. An extended role may narrow its cardinality, strengthen its
+aggregation, and specialize its target, but may not do the reverse. A role into
+an unrelated topic requires `EXTERNAL`; a target in a base topic of the current
+topic does not. Association accesses are added only to target classes belonging
+to the association's topic. An inherited class receives such accesses only if
+it is explicitly extended in that topic.
+
+The implementation was cross-checked against the ili2c 2.3 `roleDef` parser
+action, `AssociationDef.fixupRoles`, and `RoleDef.setExtending`. ilic now records
+whether cardinality syntax was present, which distinguishes inheritance from an
+explicit `{*}`. The semantic post-pass computes effective defaults and validates
+composition maxima, cardinality subsets, strength, target specialization,
+target kind, cross-topic `EXTERNAL`, and duplicate/aggregate roles. The parser's
+access installation now follows the topic ownership rule. Reaching the same
+role access repeatedly in a ternary self-association is deduplicated by identity;
+it is not mistaken for a name collision. Likewise, associations in two
+independent extensions of a topic do not mutate their common inherited class.
+
+Both LSP grammars contain the same `RoleDef`, cardinality, strength, and
+`EXTERNAL` syntax but do not model effective role inheritance or topic-owned
+association accesses. They support the conclusion that these are semantic and
+ownership corrections; no grammar or generated parser file changed.
+
+Six local fixtures cover ternary and independent-topic positive cases, plus
+cardinality, strength, structure target, cross-topic visibility, and duplicate
+role failures. All 48 local CTests and all nine unchanged upstream cases pass.
+The complete frozen corpus improves from 517 to 526 conformant cases: 42 invalid
+models remain accepted, three valid models remain rejected, and no previously
+conformant case regresses. The recorded result was produced by the cause commit
+containing this section (the report's candidate commit is verified after the
+commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -280,12 +332,12 @@ ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| conformant | 268 | 468 | 470 | 476 | 517 |
-| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 |
-| candidate rejects valid | 12 | 8 | 6 | 5 | 5 |
-| infrastructure error | 11 | 0 | 0 | 0 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 | 476 | 517 | 526 |
+| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 |
+| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 |
+| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The

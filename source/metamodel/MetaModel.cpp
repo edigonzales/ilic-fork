@@ -860,6 +860,7 @@ Log.message(">>> clone topic");
       clone->Strongness = org->Strongness;
       clone->Ordered = org->Ordered;
       clone->Multiplicity = org->Multiplicity;
+      clone->MultiplicityDefined = org->MultiplicityDefined;
       clone->Derivates = org->Derivates;
       clone->EmbeddedTransfer = org->EmbeddedTransfer;
       clone->Association = org->Association;

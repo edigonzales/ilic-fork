@@ -259,6 +259,78 @@ bool same_declared_type(const Descriptor &left,const Descriptor &right)
    return left.DeclaredType != nullptr && left.DeclaredType == right.DeclaredType;
 }
 
+bool package_is_same_or_extension(Package *candidate,Package *base)
+{
+   for (Package *current = candidate; current != nullptr; current = current->_super) {
+      if (current == base) {
+         return true;
+      }
+   }
+   return false;
+}
+
+bool class_is_same_or_extension(Class *candidate,Class *base)
+{
+   for (Class *current = candidate; current != nullptr;
+        current = dynamic_cast<Class *>(current->Super)) {
+      if (current == base) {
+         return true;
+      }
+   }
+   return false;
+}
+
+Model *containing_model(MetaElement *element)
+{
+   for (MetaElement *current = element; current != nullptr;
+        current = current->ElementInPackage) {
+      if (auto model = dynamic_cast<Model *>(current)) {
+         return model;
+      }
+   }
+   return nullptr;
+}
+
+Multiplicity effective_role_cardinality(Role *role)
+{
+   if (role == nullptr) {
+      return {};
+   }
+   if (role->MultiplicityDefined) {
+      Multiplicity value = role->Multiplicity;
+      if (value.Min < 0) {
+         value.Min = 0;
+      }
+      return value;
+   }
+   if (auto base = dynamic_cast<Role *>(role->Super)) {
+      return effective_role_cardinality(base);
+   }
+
+   Multiplicity value;
+   if (role->Strongness == Role::Comp) {
+      Model *model = containing_model(role->Association);
+      value.Min = model != nullptr && model->iliVersion == "2.4" ? 1 : 0;
+      value.Max = 1;
+   }
+   else {
+      value.Min = 0;
+      value.Max = -1;
+   }
+   return value;
+}
+
+bool cardinality_is_subset(const Multiplicity &candidate,const Multiplicity &base)
+{
+   if (candidate.Min < base.Min) {
+      return false;
+   }
+   if (base.Max < 0) {
+      return true;
+   }
+   return candidate.Max >= 0 && candidate.Max <= base.Max;
+}
+
 class Checker {
 public:
    Descriptor evaluate(Expression *expression,DomainType *domain = nullptr)
@@ -613,6 +685,9 @@ private:
       if (viewable == nullptr || !checkedClasses.insert(viewable).second) {
          return;
       }
+      if (viewable->Kind == Class::Association) {
+         check_association(viewable);
+      }
       for (Constraint *constraint : viewable->Constraints) check_constraint(constraint);
       for (Constraint *constraint : viewable->Constraint) check_constraint(constraint);
       for (AttrOrParam *attribute : viewable->ClassAttribute) {
@@ -626,6 +701,65 @@ private:
             require(evaluate(view->Where),Kind::Boolean,"logical expression required",view->Where->_line);
          }
          for (Expression *parameter : view->FormationParameter) evaluate(parameter);
+      }
+   }
+
+   void check_association(Class *association)
+   {
+      // RefHB 3.7 and ili2c RoleDef.setExtending define role compatibility
+      // independently of the syntax used to declare the association.
+      set<string> roleNames;
+      int aggregateRoles = 0;
+      for (Role *role : association->Role) {
+         if (role == nullptr) {
+            continue;
+         }
+         if (!roleNames.insert(role->Name).second) {
+            Log.error("duplicate role " + role->Name + " in association " + association->Name,role->_line);
+         }
+         if (role->Strongness != Role::Assoc) {
+            ++aggregateRoles;
+         }
+         if (role->_baseclass != nullptr && role->_baseclass->Kind == Class::Structure) {
+            Log.error("role " + role->Name + " may only reference a class or association",role->_line);
+         }
+
+         auto associationTopic = dynamic_cast<SubModel *>(association->ElementInPackage);
+         auto targetTopic = role->_baseclass == nullptr ? nullptr :
+            dynamic_cast<SubModel *>(role->_baseclass->ElementInPackage);
+         if (associationTopic != nullptr && targetTopic != nullptr &&
+             !package_is_same_or_extension(associationTopic,targetTopic) && !role->External) {
+            Log.error("cross-topic role " + role->Name + " requires EXTERNAL",role->_line);
+         }
+
+         Multiplicity cardinality = effective_role_cardinality(role);
+         if (role->Strongness == Role::Comp && (cardinality.Max < 0 || cardinality.Max > 1)) {
+            Log.error("composition role " + role->Name + " has maximum cardinality greater than 1",role->_line);
+         }
+
+         if (auto base = dynamic_cast<Role *>(role->Super)) {
+            Multiplicity baseCardinality = effective_role_cardinality(base);
+            if (!cardinality_is_subset(cardinality,baseCardinality)) {
+               Log.error("cardinality of extended role " + role->Name + " is not a subset of its base",role->_line);
+            }
+            if (role->Strongness < base->Strongness) {
+               Log.error("extended role " + role->Name + " weakens its aggregation strength",role->_line);
+            }
+            if (role->_baseclass != nullptr && base->_baseclass != nullptr &&
+                !class_is_same_or_extension(role->_baseclass,base->_baseclass)) {
+               Log.error("target of extended role " + role->Name + " does not extend its base target",role->_line);
+            }
+            if (base->Ordered && !role->Ordered && cardinality.Max != 1) {
+               Log.error("extended role " + role->Name + " removes ordering",role->_line);
+            }
+         }
+      }
+
+      if (aggregateRoles > 1) {
+         Log.error("an association may have only one aggregation or composition role",association->_line);
+      }
+      if (aggregateRoles == 1 && association->Role.size() > 2) {
+         Log.error("aggregation and composition associations must be binary",association->_line);
       }
    }
 };

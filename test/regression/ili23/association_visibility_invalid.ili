@@ -1,0 +1,19 @@
+INTERLIS 2.3;
+
+MODEL AssociationVisibilityInvalid AT "https://example.invalid" VERSION "1" =
+  TOPIC Source =
+    CLASS A =
+    END A;
+  END Source;
+
+  TOPIC Consumer =
+    DEPENDS ON Source;
+    CLASS B =
+    END B;
+
+    ASSOCIATION MissingExternal =
+      a -- Source.A;
+      b -- B;
+    END MissingExternal;
+  END Consumer;
+END AssociationVisibilityInvalid.
