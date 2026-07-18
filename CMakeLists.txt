@@ -285,6 +285,27 @@ if(BUILD_TESTING)
     add_ilic_regression_test(ilic_regression_inherited_abstract_class_concretized_valid TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/inherited_abstract_class_concretized_valid.ili"
     )
+    add_ilic_regression_test(ilic_regression_model_end_name_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/model_end_name_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_topic_end_name_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/topic_end_name_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_class_end_name_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/class_end_name_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_package_namespace_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/package_namespace_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_runtime_parameter_namespace_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/runtime_parameter_namespace_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_view_attribute_namespace_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/view_attribute_namespace_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_declaration_namespaces_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/declaration_namespaces_valid.ili"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"

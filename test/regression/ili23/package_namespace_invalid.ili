@@ -1,0 +1,16 @@
+INTERLIS 2.3;
+
+MODEL PackageNamespaceInvalid AT "https://example.invalid" VERSION "1" =
+  DOMAIN Duplicate = TEXT*20;
+
+  TOPIC Duplicate =
+  END Duplicate;
+
+  TOPIC BaseTopic =
+    DOMAIN Inherited = TEXT*20;
+  END BaseTopic;
+
+  TOPIC ExtendedTopic EXTENDS BaseTopic =
+    DOMAIN Inherited = TEXT*10;
+  END ExtendedTopic;
+END PackageNamespaceInvalid.

@@ -556,6 +556,7 @@ public:
       if (auto topic = dynamic_cast<SubModel *>(package)) {
          check_topic_abstract_classes(topic);
       }
+      check_package_namespace(package);
       for (MetaElement *element : package->Element) {
          if (auto child = dynamic_cast<Package *>(element)) {
             check_package(child);
@@ -803,6 +804,7 @@ private:
       }
       for (Constraint *constraint : viewable->Constraints) check_constraint(constraint);
       for (Constraint *constraint : viewable->Constraint) check_constraint(constraint);
+      check_attribute_namespace(viewable);
       for (AttrOrParam *attribute : viewable->ClassAttribute) {
          check_attribute(attribute);
          for (Expression *derivation : attribute->Derivates) evaluate(derivation);
@@ -906,6 +908,81 @@ private:
             Log.error("concrete topic " + topic->Name +
                       " contains abstract class " + abstractClass->Name +
                       " without a concrete extension",topic->_line);
+         }
+      }
+   }
+
+   void check_package_namespace(Package *package)
+   {
+      unordered_map<string,MetaElement *> localNames;
+      for (MetaElement *element : package->Element) {
+         if (element == nullptr || element->ElementInPackage != package ||
+             dynamic_cast<DataUnit *>(element) != nullptr ||
+             element->Name.empty() || element->Name == "???") {
+            continue;
+         }
+         auto existing = localNames.find(element->Name);
+         if (existing != localNames.end()) {
+            Log.error("duplicate declaration " + element->Name + " in " + package->Name,
+                      element->_line);
+         }
+         else {
+            localNames[element->Name] = element;
+         }
+      }
+
+      if (auto model = dynamic_cast<Model *>(package)) {
+         unordered_set<string> runtimeParameterNames;
+         for (AttrOrParam *parameter : model->_runtimeparameter) {
+            if (parameter == nullptr || parameter->Name.empty()) {
+               continue;
+            }
+            if (!runtimeParameterNames.insert(parameter->Name).second) {
+               Log.error("duplicate runtime parameter " + parameter->Name + " in model " + model->Name,
+                         parameter->_line);
+            }
+         }
+      }
+
+      auto topic = dynamic_cast<SubModel *>(package);
+      if (topic == nullptr || topic->_super == nullptr) {
+         return;
+      }
+      unordered_map<string,MetaElement *> inheritedNames;
+      for (SubModel *scope = dynamic_cast<SubModel *>(topic->_super); scope != nullptr;
+           scope = dynamic_cast<SubModel *>(scope->_super)) {
+         for (MetaElement *element : scope->Element) {
+            if (element != nullptr && element->ElementInPackage == scope &&
+                dynamic_cast<DataUnit *>(element) == nullptr &&
+                !element->Name.empty() && element->Name != "???" &&
+                inheritedNames.find(element->Name) == inheritedNames.end()) {
+               inheritedNames[element->Name] = element;
+            }
+         }
+      }
+      for (MetaElement *element : package->Element) {
+         auto inherited = element == nullptr ? inheritedNames.end() :
+            inheritedNames.find(element->Name);
+         if (inherited == inheritedNames.end()) {
+            continue;
+         }
+         auto extendable = dynamic_cast<ExtendableME *>(element);
+         bool explicitOverride = extendable != nullptr && extendable->Extended &&
+                                 extendable->Super == inherited->second;
+         if (!explicitOverride) {
+            Log.error("declaration " + element->Name + " in topic " + topic->Name +
+                      " conflicts with an inherited declaration",element->_line);
+         }
+      }
+   }
+
+   void check_attribute_namespace(Class *viewable)
+   {
+      unordered_set<string> names;
+      for (AttrOrParam *attribute : viewable->ClassAttribute) {
+         if (attribute != nullptr && !names.insert(attribute->Name).second) {
+            Log.error("duplicate attribute or view-base name " + attribute->Name +
+                      " in " + viewable->Name,attribute->_line);
          }
       }
    }

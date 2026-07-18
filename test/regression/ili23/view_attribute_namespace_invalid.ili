@@ -1,0 +1,33 @@
+INTERLIS 2.3;
+
+MODEL ViewAttributeNamespaceInvalid AT "https://example.invalid" VERSION "1" =
+  TOPIC Data =
+    CLASS First =
+      duplicate: TEXT*20;
+      source: TEXT*10;
+    END First;
+
+    CLASS Second =
+      duplicate: TEXT*30;
+    END Second;
+  END Data;
+
+  TOPIC Views =
+    DEPENDS ON Data;
+
+    VIEW Projection
+      PROJECTION OF source ~ Data.First;
+    =
+      ATTRIBUTE
+        ALL OF source;
+    END Projection;
+
+    VIEW Joined
+      JOIN OF first ~ Data.First, second ~ Data.Second;
+    =
+      ATTRIBUTE
+        ALL OF first;
+        ALL OF second;
+    END Joined;
+  END Views;
+END ViewAttributeNamespaceInvalid.

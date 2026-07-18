@@ -1,0 +1,4 @@
+INTERLIS 2.3;
+
+MODEL ModelEndNameInvalid AT "https://example.invalid" VERSION "1" =
+END DifferentModelName.

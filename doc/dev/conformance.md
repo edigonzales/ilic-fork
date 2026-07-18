@@ -375,6 +375,61 @@ conformant case regresses. The recorded result was produced by the cause commit
 containing this section (the report's candidate commit is verified after the
 commit is created).
 
+### Declaration namespaces and closing names
+
+This cause covers eight invalid INTERLIS 2.3 models accepted by ilic:
+
+```text
+ili23.classes.class-detect-non-matching-names-fail
+ili23.models.models-domain-and-topic-same-names-fail
+ili23.models.models-dublicate-runtime-param
+ili23.models.models-non-matching-names-fail
+ili23.topics.topics-detect-name-conflicts-fail
+ili23.topics.topics-detect-non-matching-name-fail
+ili23.view.view-detect-attrname-conflict-with-base-viewname-fail
+ili23.view.view-detect-dublicate-attrname-in-view-fail
+```
+
+Reference-manual section 3.5 defines separate type-name, component-name, and
+metaobject-name categories for every modelling element. Type names include
+domains and topics and are inherited into an extending topic; a local type name
+may collide with an inherited name only for an explicit `EXTENDED` declaration.
+View-base aliases and attributes are component names, so `ALL OF` may neither
+collide with its base alias nor import the same attribute name from two bases.
+Runtime parameters are also component names and must be unique among themselves,
+but a runtime parameter and a domain may legally share a name because the
+domain is a type name. The valid upstream case
+`ili23.models.models-domain-and-runtime-param-same-name` and a local regression
+make this category boundary explicit.
+
+The grammar productions in section 3.5 write the opening name again after
+`END` for models, topics, classes, and structures. ili2c treats a mismatch as a
+semantic error. ilic already did so for structures and views, but emitted only
+a warning for models, topics, and classes; those three checks now report errors.
+Both LSP grammars preserve the paired-name syntax, but name equality and scope
+collisions remain semantic checks, so no grammar or generated parser changed.
+
+The semantic post-pass now validates package type-name namespaces across their
+complete topic inheritance chain and validates each class/view component-name
+set after `ALL OF` expansion. Only actual package members whose
+`ElementInPackage` still names that package participate. Internal metamodel
+objects such as the synthetic `BASKET` data unit and coordinate-axis types are
+therefore not mistaken for source declarations. Same-name `EXTENDED` classes,
+associations, and views remain legal. Association-role visibility continues to
+use its dedicated rules and is not folded into the package namespace.
+
+Seven local fixtures cover all three closing-name mismatches, direct and
+inherited package collisions, duplicate runtime parameters, both view-attribute
+collisions, and positive category/extension cases. All 69 local CTests, all
+eight unchanged invalid upstream cases, and the valid separate-category case
+pass.
+
+The complete frozen corpus improves from 542 to 550 conformant cases: 19 invalid
+models remain accepted, two valid models remain rejected, and no previously
+conformant case regresses. The recorded result was produced by the cause commit
+containing this section (the report's candidate commit is verified after the
+commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -444,12 +499,12 @@ ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 |
-| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 |
-| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 |
-| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes | Namespace fixes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 | 550 |
+| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 | 19 |
+| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 | 2 |
+| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The

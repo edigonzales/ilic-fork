@@ -73,7 +73,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    }
 
    if (name1 != name2) {
-      Log.warning(
+      Log.error(
          "classname " + name2 + " must match " + name1,
          get_line(ctx->classname2)
       );

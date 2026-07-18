@@ -51,7 +51,7 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
    debug(ctx,">>> visitModelDef(" + name1 + ")");
    Log.incNestLevel();
    if (name1 != name2) {
-      Log.warning(
+      Log.error(
          "modelname " + name2 + " must match " + name1,
          ctx->modelname2->getLine()
       );
@@ -240,7 +240,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    Log.incNestLevel();
 
    if (name1 != name2) {
-      Log.warning(
+      Log.error(
          "topicname " + name2 + " must match " + name1,
          get_line(ctx->topicname2)
       );
