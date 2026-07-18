@@ -910,6 +910,14 @@ void Ili2Output::visitUniqueConstraint(metamodel::UniqueConstraint *c)
 
    ili2.decNestLevel();
    ili2.write("UNIQUE ");
+
+   if (c->PerBasket) {
+      ili2.write(0,"(BASKET) ");
+   }
+
+   if (!c->Name.empty()) {
+      ili2.write(0,c->Name + ": ");
+   }
    
    if (c->Kind == UniqueConstraint::LocalU) {
       ili2.write(0,"(LOCAL) ");

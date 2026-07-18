@@ -330,6 +330,24 @@ if(BUILD_TESTING)
     add_ilic_regression_test(ilic_regression_model_imports_valid TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/model_imports_valid.ili"
     )
+    add_ilic_regression_test(ilic_regression_set_constraint_structure_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/set_constraint_structure_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_unique_multivalue_attribute_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/unique_multivalue_attribute_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_unique_multivalue_role_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/unique_multivalue_role_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_unique_path_cardinality_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/unique_path_cardinality_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_unique_basket_local_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/unique_basket_local_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_unique_basket_global_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/unique_basket_global_valid.ili"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"

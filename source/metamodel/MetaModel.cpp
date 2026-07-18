@@ -1446,6 +1446,9 @@ Log.message(">>> clone topic");
       clone_init_constraint(clone,org);
 
       clone->Kind = org->Kind;
+      clone->PerBasket = org->PerBasket;
+      clone->Where = org->Where;
+      clone->UniqueDef = org->UniqueDef;
 
    }
 
@@ -1454,6 +1457,8 @@ Log.message(">>> clone topic");
 
       clone_init_constraint(clone,org);
 
+      clone->Where = org->Where;
+      clone->PerBasket = org->PerBasket;
       clone->Constraint = org->Constraint;
 
    }

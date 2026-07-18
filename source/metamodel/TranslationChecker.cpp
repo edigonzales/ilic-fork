@@ -604,6 +604,7 @@ private:
       if (auto constraint = dynamic_cast<UniqueConstraint *>(translated)) {
          UniqueConstraint *base_constraint = static_cast<UniqueConstraint *>(base);
          value(translated,base,"uniqueness kind",constraint->Kind,base_constraint->Kind);
+         value(translated,base,"uniqueness basket scope",constraint->PerBasket,base_constraint->PerBasket);
          compare_expression_list(translated,base,"uniqueness precondition",constraint->Where,base_constraint->Where);
          vector<PathOrInspFactor *> actual = as_vector(constraint->UniqueDef);
          vector<PathOrInspFactor *> expected = as_vector(base_constraint->UniqueDef);
@@ -614,6 +615,7 @@ private:
       }
       if (auto constraint = dynamic_cast<SetConstraint *>(translated)) {
          SetConstraint *base_constraint = static_cast<SetConstraint *>(base);
+         value(translated,base,"set basket scope",constraint->PerBasket,base_constraint->PerBasket);
          compare_expression_list(translated,base,"set precondition",constraint->Where,base_constraint->Where);
          if (!same_expression(constraint->Constraint,base_constraint->Constraint)) mismatch(translated,base,"set expression");
       }

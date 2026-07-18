@@ -585,11 +585,51 @@ public:
          for (Expression *where : unique->Where) {
             require(evaluate(where,domain),Kind::Boolean,"logical expression required",where->_line);
          }
-         for (Expression *path : unique->UniqueDef) {
+         if (unique->PerBasket && unique->Kind == UniqueConstraint::LocalU) {
+            // RefHB 2.4 section 3.12 and ili2c uniquenessConstraint: LOCAL is
+            // already scoped by its owning object and cannot also be BASKET.
+            Log.error("UNIQUE cannot combine BASKET and LOCAL",constraint->_line);
+         }
+         for (PathOrInspFactor *path : unique->UniqueDef) {
             evaluate(path,domain);
+            if (unique->Kind != UniqueConstraint::GlobalU || path == nullptr) {
+               continue;
+            }
+            // Every hop in a global uniqueness key denotes one value. A
+            // collection-valued attribute or role would produce several keys
+            // for one object and is prohibited by RefHB 3.12/ili2c uniqueEl.
+            for (PathEl *element : path->PathEls) {
+               if (element == nullptr) {
+                  continue;
+               }
+               if (auto attribute = dynamic_cast<AttrOrParam *>(element->Ref)) {
+                  Multiplicity cardinality = attribute_cardinality(attribute->Type);
+                  if (cardinality.Max < 0 || cardinality.Max > 1) {
+                     Log.error("global UNIQUE path contains multivalued attribute " +
+                               attribute->Name,constraint->_line);
+                  }
+               }
+               else if (auto role = dynamic_cast<Role *>(element->Ref)) {
+                  if (path->OccurrenceScope == role->Association) {
+                     // A role named inside its own association selects that
+                     // association instance's endpoint. Its external access
+                     // cardinality applies only when navigating from the
+                     // opposite target class (ili2c PathElAbstractClassRole).
+                     continue;
+                  }
+                  Multiplicity cardinality = effective_role_cardinality(role);
+                  if (cardinality.Max < 0 || cardinality.Max > 1) {
+                     Log.error("global UNIQUE path contains multivalued role " +
+                               role->Name,constraint->_line);
+                  }
+               }
+            }
          }
       }
       else if (auto set = dynamic_cast<SetConstraint *>(constraint)) {
+         if (set->ToClass != nullptr && set->ToClass->Kind == Class::Structure) {
+            Log.error("SET CONSTRAINT is not allowed in a STRUCTURE",constraint->_line);
+         }
          for (Expression *where : set->Where) {
             require(evaluate(where,domain),Kind::Boolean,"logical expression required",where->_line);
          }

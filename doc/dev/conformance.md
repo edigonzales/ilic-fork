@@ -484,6 +484,58 @@ conformant case regresses. The recorded result was produced by the cause commit
 containing this section (the report's candidate commit is verified after the
 commit is created).
 
+### Set and uniqueness constraint invariants
+
+This cause covers four invalid models accepted by ilic:
+
+```text
+ili23.constraints.set-basic-fail
+ili23.constraints.unique-global-attr-path-fail
+ili23.constraints.unique-global-role-path-fail
+ili24.constraints.compile-fail
+```
+
+Reference-manual section 3.12 defines a `SET CONSTRAINT` over the set of
+identifiable class or association objects; it is not meaningful on a structure.
+Every attribute or externally navigated role in a global `UNIQUE` key path must
+have maximum cardinality one. A role named from inside its own association is
+different: it selects the endpoint of the current association instance, so the
+role's external access cardinality does not multiply that path. The same section
+defines `(BASKET)` as the scope of a global uniqueness check and `(LOCAL)` as
+uniqueness among substructure values owned by one object. Those two scopes are
+mutually exclusive in INTERLIS 2.4.
+
+The implementation was cross-checked against the `setConstraint`,
+`uniquenessConstraint`, and `uniqueEl` actions in ili2c's `interlis23.g` and
+`interlis24.g`, plus `UniquenessConstraint`, `SetConstraint`, and
+`Table.add`. ilic now retains the per-basket flag and optional name, preserves
+that state through cloning and translation comparison, and emits `(BASKET)` for
+uniqueness constraints. The semantic post-pass rejects set constraints on
+structures, the incompatible basket/local combination, and collection-valued
+attributes or externally accessed roles in global uniqueness paths.
+
+Both LSP grammars and ilic's grammar already match the reference-manual syntax;
+the prior defect was discarded metamodel state and missing semantic checks. No
+grammar or generated parser file changed.
+
+The new cardinality check exposed that the existing DatasetIdx16 smoke fixture
+was itself invalid: its global key traversed the multivalued `baskets` attribute.
+ili2c 5.6.8 reports the same error. The fixture now expresses the apparent
+intent as `UNIQUE (LOCAL) baskets: id, version`; both compilers accept the
+corrected model. This test-data correction is not a compiler exception.
+
+Six local fixtures cover invalid structure/set usage, multivalued attributes
+and roles, association-internal versus external role paths, legal per-basket
+global uniqueness, and illegal basket/local uniqueness. All 83 local CTests,
+the corrected DatasetIdx16 model under ili2c, and all affected unchanged
+upstream cases pass.
+
+The complete frozen corpus improves from 556 to 560 conformant cases: ten
+invalid models remain accepted, one valid model remains rejected, and no
+previously conformant case regresses. The recorded result was produced by the
+cause commit containing this section (the report's candidate commit is verified
+after the commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -553,12 +605,12 @@ ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes | Namespace fixes | Import fixes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 | 550 | 556 |
-| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 | 19 | 14 |
-| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 | 2 | 1 |
-| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes | Namespace fixes | Import fixes | Constraint fixes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 | 550 | 556 | 560 |
+| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 | 19 | 14 | 10 |
+| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 | 2 | 1 | 1 |
+| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The

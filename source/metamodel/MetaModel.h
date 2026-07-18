@@ -987,6 +987,7 @@ namespace metamodel {
    public:
       list<Expression *> Where;
       enum {GlobalU, LocalU} Kind;
+      bool PerBasket = false;
       list<PathOrInspFactor *> UniqueDef;
       virtual string getClass() { return "UniqueConstraint"; }
       virtual string getBaseClass() { return "Constraint"; };
@@ -995,6 +996,7 @@ namespace metamodel {
    class SetConstraint : public Constraint {
    public:
       list<Expression *> Where;
+      bool PerBasket = false;
       Expression *Constraint = nullptr;
       virtual string getClass() { return "SetConstraint"; }
       virtual string getBaseClass() { return "Constraint"; };

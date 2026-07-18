@@ -1,0 +1,23 @@
+INTERLIS 2.3;
+
+MODEL UniqueMultivalueRoleInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  TOPIC Topic =
+    CLASS Left =
+      Code : TEXT;
+    END Left;
+
+    CLASS Right =
+      Code : TEXT;
+    END Right;
+
+    ASSOCIATION Link =
+      LeftEnd -- {0..1} Left;
+      RightEnds -- {0..*} Right;
+    END Link;
+
+    CONSTRAINTS OF Left =
+      UNIQUE RightEnds->Code;
+    END;
+  END Topic;
+END UniqueMultivalueRoleInvalid.

@@ -1,0 +1,34 @@
+INTERLIS 2.3;
+
+MODEL UniquePathCardinalityValid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  TOPIC Topic =
+    STRUCTURE Item =
+      Code : TEXT;
+    END Item;
+
+    CLASS Left =
+      ItemValue : Item;
+      UNIQUE ItemValue->Code;
+    END Left;
+
+    CLASS Right =
+      Code : TEXT;
+    END Right;
+
+    ASSOCIATION LinkMany =
+      LeftMany -- {0..1} Left;
+      RightMany -- {0..*} Right;
+      UNIQUE RightMany->Code;
+    END LinkMany;
+
+    ASSOCIATION LinkOne =
+      LeftEnd -- {0..1} Left;
+      RightEnd -- {0..1} Right;
+    END LinkOne;
+
+    CONSTRAINTS OF Left =
+      UNIQUE RightEnd->Code;
+    END;
+  END Topic;
+END UniquePathCardinalityValid.

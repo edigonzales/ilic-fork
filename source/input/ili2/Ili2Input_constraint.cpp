@@ -222,6 +222,10 @@ antlrcpp::Any Ili2Input::visitUniquenessConstraint(parser::Ili2Parser::Uniquenes
    
    UniqueConstraint *c = new UniqueConstraint();
    init_constraint(c,get_line(ctx));
+   c->PerBasket = ctx->BASKET() != nullptr;
+   if (ctx->name != nullptr) {
+      c->Name = ctx->name->getText();
+   }
    
    if (ctx->WHERE() != nullptr) {
       c->Where.push_back(visitExpression(ctx->expression()));
@@ -366,6 +370,10 @@ antlrcpp::Any Ili2Input::visitSetConstraint(parser::Ili2Parser::SetConstraintCon
    
    SetConstraint *c = new SetConstraint();
    init_constraint(c,get_line(ctx));
+   c->PerBasket = ctx->BASKET() != nullptr;
+   if (ctx->name != nullptr) {
+      c->Name = ctx->name->getText();
+   }
    auto expressions = ctx->expression();
    if (ctx->logical != nullptr) {
       c->Where.push_back(visitExpression(ctx->logical));
