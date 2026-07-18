@@ -1,0 +1,16 @@
+INTERLIS 2.3;
+
+MODEL GraphicTopicDependencyInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC Source =
+    CLASS Object =
+    END Object;
+  END Source;
+
+  TOPIC Consumer =
+    GRAPHIC Drawing BASED ON Source.Object =
+    END Drawing;
+  END Consumer;
+
+END GraphicTopicDependencyInvalid.

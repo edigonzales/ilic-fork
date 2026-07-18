@@ -276,8 +276,19 @@ void input::check_references(Class *c,string name,int line)
             classrestriction = t->_classrestriction;            
          }
          for (auto c: classrestriction) {
-            if (c != nullptr && c->ElementInPackage != nullptr &&
-                get_package_context() != c->ElementInPackage && !t->External) {
+            auto sourceTopic = dynamic_cast<SubModel *>(get_package_context());
+            auto targetTopic = c == nullptr ? nullptr :
+               dynamic_cast<SubModel *>(c->ElementInPackage);
+            bool targetIsBaseTopic = false;
+            for (SubModel *scope = sourceTopic; scope != nullptr;
+                 scope = dynamic_cast<SubModel *>(scope->_super)) {
+               if (scope == targetTopic) {
+                  targetIsBaseTopic = true;
+                  break;
+               }
+            }
+            if (sourceTopic != nullptr && targetTopic != nullptr &&
+                !targetIsBaseTopic && !t->External) {
                Log.error("reference to other topic must be declared EXTERNAL",l);
                break;
             }

@@ -430,6 +430,60 @@ conformant case regresses. The recorded result was produced by the cause commit
 containing this section (the report's candidate commit is verified after the
 commit is created).
 
+### Model imports and topic dependencies
+
+This cause covers five invalid models accepted by ilic and one valid model
+rejected by ilic:
+
+```text
+ili23.attributes.ref-attr-in-struct-model-level
+ili23.constraints.existence-require-adepends-on-fail
+ili23.models.models-imported-referenced-models-fail
+ili23.models.models-qualified-unit-references-without-import-fail
+ili23.topics.topics-check-topic-dependencies-on-views-fail
+ili23.topics.topics-topic-dependencies-on-graphic-defs-fail
+```
+
+Reference-manual section 3.5 requires a direct `IMPORTS` relation when a model
+uses an element of another model. This applies to qualified references as well;
+qualification does not make a declaration visible. Sections 3.6, 3.12, 3.15,
+and 3.16 require a topic dependency for cross-topic object paths, existence
+constraints, view bases, and graphic bases. A model-level structure has no
+lexical topic, however, so its reference into a topic neither requires
+`EXTERNAL` nor creates a topic dependency. A target in the current topic or any
+base topic is already in the topic's effective scope.
+
+The implementation was cross-checked against ili2c's `Model.isDependentOn`,
+`Topic.isDependentOn`, `ViewableAlias`, `ExistenceConstraint`, `View`, and
+`Graphic` checks and the unchanged tests listed above. Direct model imports are
+deliberately distinct from the transitive context visibility used by generic
+domains; the latter is handled in the generic-domain cause. A translation base
+also remains a loading dependency rather than an implicit `IMPORTS` relation.
+
+Expressions now retain both their semantic object scope and the package at
+their textual occurrence. This distinction matters for `CONSTRAINTS OF` in an
+extending topic: name resolution may start from a class declared in the base
+topic, while dependency validation must use the extending topic in which the
+constraint occurs. View and graphic bases and terminal object-path targets are
+checked from that lexical topic. Metadata-basket topic and numeric-unit
+references are checked against direct model imports. Unqualified unit names are
+resolved in the current model and then its direct imports instead of depending
+on the global model loading order.
+
+Both LSP grammars contain the same `IMPORTS`, `DEPENDS ON`, existence, view,
+graphic, reference, and unit-reference syntax. Neither can encode lexical
+ownership or dependency closure, so no grammar or generated parser file
+changed. Eight local fixtures cover model-level references, missing and present
+dependencies for paths/views/graphics, missing imports for metadata and units,
+and the corresponding imported positive case. All 77 local CTests and all six
+unchanged upstream cases pass.
+
+The complete frozen corpus improves from 550 to 556 conformant cases: 14 invalid
+models remain accepted, one valid model remains rejected, and no previously
+conformant case regresses. The recorded result was produced by the cause commit
+containing this section (the report's candidate commit is verified after the
+commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -499,12 +553,12 @@ ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes | Namespace fixes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 | 550 |
-| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 | 19 |
-| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 | 2 |
-| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes | Association fixes | Extension fixes | Abstract fixes | Namespace fixes | Import fixes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 | 476 | 517 | 526 | 540 | 542 | 550 | 556 |
+| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 | 42 | 28 | 27 | 19 | 14 |
+| candidate rejects valid | 12 | 8 | 6 | 5 | 5 | 3 | 3 | 2 | 2 | 1 |
+| infrastructure error | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The

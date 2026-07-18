@@ -1,0 +1,17 @@
+INTERLIS 2.3;
+
+MODEL ImportedDefinitions (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  UNIT
+    SwissFrancs [CHF] EXTENDS INTERLIS.MONEY;
+  TOPIC ReferenceSystem =
+  END ReferenceSystem;
+END ImportedDefinitions.
+
+MODEL ModelImportsValid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  IMPORTS ImportedDefinitions;
+  REFSYSTEM BASKET Basket ~ ImportedDefinitions.ReferenceSystem;
+  DOMAIN
+    Amount = 0 .. 100 [ImportedDefinitions.CHF];
+END ModelImportsValid.

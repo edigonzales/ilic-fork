@@ -1,0 +1,20 @@
+INTERLIS 2.3;
+
+MODEL ExistenceTopicDependencyInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC Source =
+    CLASS Required =
+      Value : TEXT;
+    END Required;
+  END Source;
+
+  TOPIC Consumer =
+    CLASS Object =
+      Value : TEXT;
+      EXISTENCE CONSTRAINT Value REQUIRED IN
+        ExistenceTopicDependencyInvalid.Source.Required:Value;
+    END Object;
+  END Consumer;
+
+END ExistenceTopicDependencyInvalid.

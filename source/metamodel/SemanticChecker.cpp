@@ -302,6 +302,55 @@ Model *containing_model(MetaElement *element)
    return nullptr;
 }
 
+SubModel *containing_topic(MetaElement *element)
+{
+   if (auto attribute = dynamic_cast<AttrOrParam *>(element)) {
+      element = attribute->AttrParent;
+   }
+   else if (auto role = dynamic_cast<Role *>(element)) {
+      element = role->Association;
+   }
+   else if (auto type = dynamic_cast<Type *>(element)) {
+      if (type->ElementInPackage == nullptr && type->_attr != nullptr) {
+         element = type->_attr->AttrParent;
+      }
+   }
+   for (MetaElement *current = element; current != nullptr;
+        current = current->ElementInPackage) {
+      if (auto topic = dynamic_cast<SubModel *>(current)) {
+         return topic;
+      }
+   }
+   return nullptr;
+}
+
+bool model_imports_directly(Model *source,Model *target)
+{
+   if (source == nullptr || target == nullptr || source == target || target->Name == "INTERLIS") {
+      return true;
+   }
+   for (Import *import : get_all_imports()) {
+      if (import != nullptr && import->ImportingP == source && import->ImportedP == target) {
+         return true;
+      }
+   }
+   return false;
+}
+
+bool topic_has_dependency(SubModel *source,SubModel *target)
+{
+   if (source == nullptr || target == nullptr || package_is_same_or_extension(source,target)) {
+      return true;
+   }
+   for (Dependency *dependency : get_all_dependencies()) {
+      if (dependency != nullptr && dependency->Using == source->_dataunit &&
+          dependency->Dependent == target->_dataunit) {
+         return true;
+      }
+   }
+   return false;
+}
+
 Multiplicity effective_role_cardinality(Role *role)
 {
    if (role == nullptr) {
@@ -565,13 +614,22 @@ public:
             check_class(viewable);
          }
          else if (auto domain = dynamic_cast<DomainType *>(element)) {
-            check_type(domain);
+            check_type(domain,containing_model(domain));
             for (Constraint *constraint : domain->Constraint) {
                check_constraint(constraint);
             }
          }
          if (auto graphic = dynamic_cast<Graphic *>(element)) {
+            require_topic_dependency(containing_topic(graphic),
+                                     containing_topic(graphic->Base),graphic->_line,
+                                     "graphic base");
             require(evaluate(graphic->Where),Kind::Boolean,"logical expression required",graphic->_line);
+         }
+         if (auto basket = dynamic_cast<MetaBasketDef *>(element)) {
+            require_model_import(containing_model(basket),
+                                 basket->MetaDataTopic == nullptr ? nullptr :
+                                    containing_model(basket->MetaDataTopic->ElementInPackage),
+                                 basket->_line,"metadata basket topic");
          }
          if (auto rule = dynamic_cast<DrawingRule *>(element)) {
             for (CondSignParamAssignment *assignment : rule->Rule) {
@@ -605,6 +663,15 @@ private:
          return {};
       }
       PathEl *terminal = path->PathEls.back();
+      MetaElement *target = terminal->Ref;
+      if (auto attribute = dynamic_cast<AttrOrParam *>(target)) {
+         target = attribute->AttrParent;
+      }
+      else if (auto role = dynamic_cast<Role *>(target)) {
+         target = role->_baseclass;
+      }
+      require_topic_dependency(containing_topic(path->OccurrencePackage),
+                               containing_topic(target),path->_line,"object path");
       if (terminal->Kind == PathEl::This) {
          DomainType *valueDomain = domain != nullptr ? domain : dynamic_cast<DomainType *>(path->OccurrenceScope);
          if (valueDomain != nullptr) {
@@ -813,6 +880,15 @@ private:
          for (Expression *derivation : role->Derivates) evaluate(derivation);
       }
       if (auto view = dynamic_cast<View *>(viewable)) {
+         for (AttrOrParam *attribute : view->ClassAttribute) {
+            auto object = attribute == nullptr ? nullptr :
+               dynamic_cast<ObjectType *>(attribute->Type);
+            if (object != nullptr) {
+               require_topic_dependency(containing_topic(view),
+                                        containing_topic(object->_baseclass),view->_line,
+                                        "view base");
+            }
+         }
          if (view->Where != nullptr) {
             require(evaluate(view->Where),Kind::Boolean,"logical expression required",view->Where->_line);
          }
@@ -987,7 +1063,7 @@ private:
       }
    }
 
-   void check_type(Type *type)
+   void check_type(Type *type,Model *occurrenceModel)
    {
       if (type == nullptr || !checkedTypes.insert(type).second) {
          return;
@@ -1014,8 +1090,14 @@ private:
             }
          }
       }
+      if (auto numeric = dynamic_cast<NumType *>(type)) {
+         require_model_import(occurrenceModel,
+                              numeric->Unit == nullptr ? nullptr :
+                                 containing_model(numeric->Unit),
+                              numeric->_line,"unit reference");
+      }
       if (auto multi = dynamic_cast<MultiValue *>(type)) {
-         check_type(multi->BaseType);
+         check_type(multi->BaseType,occurrenceModel);
       }
    }
 
@@ -1024,7 +1106,7 @@ private:
       if (attribute == nullptr) {
          return;
       }
-      check_type(attribute->Type);
+      check_type(attribute->Type,containing_model(attribute->AttrParent));
       AttrOrParam *base = attribute->Extending;
       if (base == nullptr || base->Type == nullptr || attribute->Type == nullptr) {
          return;
@@ -1086,6 +1168,20 @@ private:
              !class_is_same_or_extension(target,baseTarget)) {
             Log.error("structure target of extended attribute does not extend its base",attribute->_line);
          }
+      }
+   }
+
+   void require_model_import(Model *source,Model *target,int line,const string &kind)
+   {
+      if (!model_imports_directly(source,target)) {
+         Log.error(kind + " requires model " + source->Name + " to import " + target->Name,line);
+      }
+   }
+
+   void require_topic_dependency(SubModel *source,SubModel *target,int line,const string &kind)
+   {
+      if (!topic_has_dependency(source,target)) {
+         Log.error(kind + " requires topic " + source->Name + " to depend on " + target->Name,line);
       }
    }
 

@@ -1,0 +1,13 @@
+INTERLIS 2.3;
+
+MODEL ImportedUnits (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  UNIT
+    SwissFrancs [CHF] EXTENDS INTERLIS.MONEY;
+END ImportedUnits.
+
+MODEL ModelImportUnitInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  DOMAIN
+    Amount = 0 .. 100 [ImportedUnits.CHF];
+END ModelImportUnitInvalid.

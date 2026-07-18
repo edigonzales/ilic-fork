@@ -268,14 +268,45 @@ namespace metamodel {
    Unit* find_unit(string name, int line)
    {
       Log.debug("find_unit " + name);
+
+      // Qualified unit references identify their declaration directly. The
+      // semantic checker separately enforces that the declaring model was
+      // imported at this lexical occurrence.
       for (Unit* u : AllUnits) {
          if (get_path(u) == name) {
             return u;
          }
-         else if (u->Name == name) {
+      }
+
+      Model *model = get_model_context();
+      auto matches = [&name](Unit *unit) {
+         return unit != nullptr && (unit->Name == name || unit->_unitname == name);
+      };
+
+      // Short unit names are resolved in the current model first and then in
+      // directly imported models. This avoids the old load-order-dependent
+      // global lookup while retaining the RefHB unit-short-name notation.
+      for (Unit *u : AllUnits) {
+         if (matches(u) && u->ElementInPackage == model) {
             return u;
          }
-         else if (u->_unitname == name) {
+      }
+      for (Import *import : get_all_imports()) {
+         if (import == nullptr || import->ImportingP != model) {
+            continue;
+         }
+         for (Unit *u : AllUnits) {
+            if (matches(u) && u->ElementInPackage == import->ImportedP) {
+               return u;
+            }
+         }
+      }
+
+      // Preserve a useful semantic "missing import" diagnostic for an
+      // otherwise uniquely named unit instead of reducing it to an unknown
+      // symbol solely because the model omitted IMPORTS.
+      for (Unit *u : AllUnits) {
+         if (matches(u)) {
             return u;
          }
       }
@@ -825,6 +856,7 @@ namespace metamodel {
    {
       init_mmobject(e, line);
       e->OccurrenceScope = get_context();
+      e->OccurrencePackage = get_package_context();
    }
 
    void init_factor(Factor* f, int line)

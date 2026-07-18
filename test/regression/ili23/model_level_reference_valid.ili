@@ -1,0 +1,15 @@
+INTERLIS 2.3;
+
+MODEL ModelLevelReference (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC Catalog =
+    CLASS Entry =
+    END Entry;
+  END Catalog;
+
+  STRUCTURE EntryRef =
+    Ref : MANDATORY REFERENCE TO ModelLevelReference.Catalog.Entry;
+  END EntryRef;
+
+END ModelLevelReference.

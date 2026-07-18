@@ -802,6 +802,10 @@ namespace metamodel {
       // Lexical occurrence, required for domain THIS and later visibility
       // checks. It is deliberately independent of the parser context stack.
       MetaElement *OccurrenceScope = nullptr;
+      // Package at the textual occurrence. OccurrenceScope may deliberately
+      // point at a base viewable while a constraint is declared in an
+      // extending topic, so it cannot represent dependency visibility.
+      Package *OccurrencePackage = nullptr;
       virtual string getClass() { return "Expression"; }
       virtual string getBaseClass() { return "MMObject"; };
       virtual bool isAbstract() { return true; }

@@ -1249,6 +1249,7 @@ Log.message(">>> clone topic");
       clone->_type = org->_type;
       clone->ResolvedType = org->ResolvedType;
       clone->OccurrenceScope = org->OccurrenceScope;
+      clone->OccurrencePackage = org->OccurrencePackage;
 
    }
 

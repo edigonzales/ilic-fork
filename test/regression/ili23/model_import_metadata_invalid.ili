@@ -1,0 +1,12 @@
+INTERLIS 2.3;
+
+MODEL MetadataSource (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  TOPIC ReferenceSystem =
+  END ReferenceSystem;
+END MetadataSource.
+
+MODEL ModelImportMetadataInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  REFSYSTEM BASKET Basket ~ MetadataSource.ReferenceSystem;
+END ModelImportMetadataInvalid.

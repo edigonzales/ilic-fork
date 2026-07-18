@@ -306,6 +306,30 @@ if(BUILD_TESTING)
     add_ilic_regression_test(ilic_regression_declaration_namespaces_valid TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/declaration_namespaces_valid.ili"
     )
+    add_ilic_regression_test(ilic_regression_model_level_reference_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/model_level_reference_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_existence_topic_dependency_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/existence_topic_dependency_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_view_topic_dependency_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/view_topic_dependency_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_graphic_topic_dependency_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/graphic_topic_dependency_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_topic_dependencies_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/topic_dependencies_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_model_import_unit_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/model_import_unit_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_model_import_metadata_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/model_import_metadata_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_model_imports_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/model_imports_valid.ili"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"
