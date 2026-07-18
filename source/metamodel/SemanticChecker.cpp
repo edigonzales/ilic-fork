@@ -280,6 +280,17 @@ bool class_is_same_or_extension(Class *candidate,Class *base)
    return false;
 }
 
+bool extended_class_chain_contains(Class *extended,Class *candidateBase)
+{
+   for (Class *current = extended; current != nullptr && current->Extended;) {
+      current = dynamic_cast<Class *>(current->Super);
+      if (current == candidateBase) {
+         return true;
+      }
+   }
+   return false;
+}
+
 Model *containing_model(MetaElement *element)
 {
    for (MetaElement *current = element; current != nullptr;
@@ -329,6 +340,100 @@ bool cardinality_is_subset(const Multiplicity &candidate,const Multiplicity &bas
       return true;
    }
    return candidate.Max >= 0 && candidate.Max <= base.Max;
+}
+
+bool domain_is_mandatory(Type *type)
+{
+   if (auto domain = dynamic_cast<DomainType *>(type)) {
+      return domain->Mandatory;
+   }
+   if (auto viewable = dynamic_cast<Class *>(type)) {
+      return viewable->Mandatory;
+   }
+   return false;
+}
+
+Multiplicity attribute_cardinality(Type *type)
+{
+   Multiplicity value;
+   if (auto multi = dynamic_cast<MultiValue *>(type)) {
+      value = multi->Multiplicity;
+      if (value.Min < 0) {
+         value.Min = 0;
+      }
+      if (value.Max < 0 && multi->Multiplicity.Min >= 0) {
+         value.Max = -1;
+      }
+   }
+   else {
+      value.Min = 0;
+      value.Max = 1;
+   }
+   if (domain_is_mandatory(type) && value.Min == 0) {
+      value.Min = 1;
+   }
+   return value;
+}
+
+bool declared_type_is_same_or_extension(Type *candidate,Type *base)
+{
+   Type *expected = canonical_declared_type(base);
+   for (Type *current = canonical_declared_type(candidate); current != nullptr;
+        current = dynamic_cast<Type *>(current->Super)) {
+      if (current == expected) {
+         return true;
+      }
+   }
+   return false;
+}
+
+bool validate_unique_enum_nodes(EnumNode *parent,const string &prefix)
+{
+   if (parent == nullptr) {
+      return true;
+   }
+   bool valid = true;
+   set<string> siblings;
+   for (EnumNode *node : parent->Node) {
+      if (node == nullptr) {
+         continue;
+      }
+      string path = prefix.empty() ? node->Name : prefix + "." + node->Name;
+      if (!siblings.insert(node->Name).second) {
+         Log.error("duplicate enumeration element " + path,node->_line);
+         valid = false;
+      }
+      if (!validate_unique_enum_nodes(node,path)) {
+         valid = false;
+      }
+   }
+   return valid;
+}
+
+void validate_enum_extension_nodes(EnumNode *parent,const string &prefix,
+                                   const set<string> &baseValues)
+{
+   if (parent == nullptr) {
+      return;
+   }
+   for (EnumNode *node : parent->Node) {
+      if (node == nullptr) {
+         continue;
+      }
+      string path = prefix.empty() ? node->Name : prefix + "." + node->Name;
+      if (baseValues.find(path) != baseValues.end() && node->Node.empty() && !node->Final) {
+         Log.error("enumeration extension duplicates element " + path,node->_line);
+      }
+      validate_enum_extension_nodes(node,path,baseValues);
+   }
+}
+
+int decimal_accuracy(const string &value)
+{
+   size_t exponent = value.find_first_of("eES");
+   string mantissa = value.substr(0,exponent);
+   size_t point = mantissa.find('.');
+   return point == string::npos ? 0 : static_cast<int>(mantissa.size() - point - 1);
 }
 
 class Checker {
@@ -456,6 +561,7 @@ public:
             check_class(viewable);
          }
          else if (auto domain = dynamic_cast<DomainType *>(element)) {
+            check_type(domain);
             for (Constraint *constraint : domain->Constraint) {
                check_constraint(constraint);
             }
@@ -480,6 +586,7 @@ private:
    unordered_set<Constraint *> checkedConstraints;
    unordered_set<Package *> checkedPackages;
    unordered_set<Class *> checkedClasses;
+   unordered_set<Type *> checkedTypes;
 
    void require(const Descriptor &descriptor,Kind expected,const string &message,int line)
    {
@@ -688,9 +795,13 @@ private:
       if (viewable->Kind == Class::Association) {
          check_association(viewable);
       }
+      else if (viewable->Kind == Class::ClassVal || viewable->Kind == Class::Structure) {
+         check_class_specialization(viewable);
+      }
       for (Constraint *constraint : viewable->Constraints) check_constraint(constraint);
       for (Constraint *constraint : viewable->Constraint) check_constraint(constraint);
       for (AttrOrParam *attribute : viewable->ClassAttribute) {
+         check_attribute(attribute);
          for (Expression *derivation : attribute->Derivates) evaluate(derivation);
       }
       for (Role *role : viewable->Role) {
@@ -701,6 +812,151 @@ private:
             require(evaluate(view->Where),Kind::Boolean,"logical expression required",view->Where->_line);
          }
          for (Expression *parameter : view->FormationParameter) evaluate(parameter);
+      }
+   }
+
+   void check_class_specialization(Class *viewable)
+   {
+      auto base = dynamic_cast<Class *>(viewable->Super);
+      auto topic = dynamic_cast<SubModel *>(viewable->ElementInPackage);
+      auto baseTopic = base == nullptr ? nullptr :
+         dynamic_cast<SubModel *>(base->ElementInPackage);
+      if (base == nullptr || topic == nullptr || baseTopic == nullptr) {
+         return;
+      }
+
+      // RefHB 3.5: same-name specialization across inherited topics is the
+      // EXTENDED form; EXTENDS must introduce a distinct class name.
+      if (!viewable->Extended && viewable->Name == base->Name &&
+          topic != baseTopic && package_is_same_or_extension(topic,baseTopic)) {
+         Log.error("class or structure " + viewable->Name +
+                   " must use EXTENDED when retaining the base name",viewable->_line);
+         return;
+      }
+      if (!viewable->Extended) {
+         return;
+      }
+
+      // An inherited class can either be extended in place or specialized by
+      // a differently named class in the topic chain, but not both.
+      for (SubModel *scope = topic; scope != nullptr; scope =
+           dynamic_cast<SubModel *>(scope->_super)) {
+         for (MetaElement *element : scope->Element) {
+            auto other = dynamic_cast<Class *>(element);
+            auto otherBase = other == nullptr ? nullptr :
+               dynamic_cast<Class *>(other->Super);
+            if (other == nullptr || other == viewable || other == base || otherBase == nullptr) {
+               continue;
+            }
+            if (extended_class_chain_contains(viewable,otherBase)) {
+               Log.error("class or structure " + viewable->Name +
+                         " cannot be EXTENDED because " + other->Name +
+                         " specializes the same base",viewable->_line);
+               return;
+            }
+         }
+      }
+   }
+
+   void check_type(Type *type)
+   {
+      if (type == nullptr || !checkedTypes.insert(type).second) {
+         return;
+      }
+      if (auto enumeration = dynamic_cast<EnumType *>(type)) {
+         validate_unique_enum_nodes(enumeration->TopNode,"");
+         if (enumeration->ElementInPackage != nullptr) {
+            if (auto base = dynamic_cast<EnumType *>(enumeration->Super)) {
+               set<string> baseValues;
+               collect_enum_values(base,baseValues);
+               validate_enum_extension_nodes(enumeration->TopNode,"",baseValues);
+            }
+         }
+      }
+      if (auto line = dynamic_cast<LineType *>(type)) {
+         if (!line->MaxOverlap.empty() && line->CoordType != nullptr &&
+             !line->CoordType->Axis.empty()) {
+            NumType *axis = line->CoordType->Axis.front();
+            string coordinateLimit = axis == nullptr ? "" :
+               (!axis->Min.empty() ? axis->Min : axis->Max);
+            if (!coordinateLimit.empty() &&
+                decimal_accuracy(line->MaxOverlap) != decimal_accuracy(coordinateLimit)) {
+               Log.error("line overlap must use the coordinate domain precision",line->_line);
+            }
+         }
+      }
+      if (auto multi = dynamic_cast<MultiValue *>(type)) {
+         check_type(multi->BaseType);
+      }
+   }
+
+   void check_attribute(AttrOrParam *attribute)
+   {
+      if (attribute == nullptr) {
+         return;
+      }
+      check_type(attribute->Type);
+      AttrOrParam *base = attribute->Extending;
+      if (base == nullptr || base->Type == nullptr || attribute->Type == nullptr) {
+         return;
+      }
+
+      Multiplicity baseCardinality = attribute_cardinality(base->Type);
+      Multiplicity cardinality = attribute_cardinality(attribute->Type);
+      if (!cardinality_is_subset(cardinality,baseCardinality)) {
+         Log.error("cardinality of extended attribute " + attribute->Name +
+                   " is not a subset of its base",attribute->_line);
+      }
+      if (attribute->Transient != base->Transient) {
+         Log.error("TRANSIENT mode of extended attribute " + attribute->Name +
+                   " differs from its base",attribute->_line);
+      }
+
+      Type *baseDeclared = canonical_declared_type(base->Type);
+      Type *declared = canonical_declared_type(attribute->Type);
+      if (baseDeclared != nullptr && declared != nullptr &&
+          baseDeclared->ElementInPackage != nullptr && declared->ElementInPackage != nullptr &&
+          !declared_type_is_same_or_extension(attribute->Type,base->Type)) {
+         Log.error("domain of extended attribute " + attribute->Name +
+                   " does not extend its base domain",attribute->_line);
+      }
+
+      if (base->Type->getClass() != attribute->Type->getClass()) {
+         Log.error("type of extended attribute " + attribute->Name +
+                   " is incompatible with its base",attribute->_line);
+         return;
+      }
+      if (auto text = dynamic_cast<TextType *>(attribute->Type)) {
+         auto baseText = static_cast<TextType *>(base->Type);
+         if (text->Kind != baseText->Kind) {
+            Log.error("TEXT and MTEXT kinds may not change in an attribute extension",attribute->_line);
+         }
+         if (baseText->MaxLength >= 0 &&
+             (text->MaxLength < 0 || text->MaxLength > baseText->MaxLength)) {
+            Log.error("text length of extended attribute exceeds its base",attribute->_line);
+         }
+      }
+      if (attribute->TypeExplicitlyDefined) {
+         if (auto enumeration = dynamic_cast<EnumType *>(attribute->Type)) {
+            auto baseEnumeration = static_cast<EnumType *>(base->Type);
+            if (declared->ElementInPackage == nullptr && baseDeclared->ElementInPackage == nullptr) {
+               set<string> baseValues;
+               collect_enum_values(baseEnumeration,baseValues);
+               validate_enum_extension_nodes(enumeration->TopNode,"",baseValues);
+            }
+         }
+      }
+      if (auto multi = dynamic_cast<MultiValue *>(attribute->Type)) {
+         auto baseMulti = static_cast<MultiValue *>(base->Type);
+         if (baseMulti->Ordered && !multi->Ordered) {
+            Log.error("an extended LIST attribute may not become an unordered BAG",attribute->_line);
+         }
+         auto target = dynamic_cast<Class *>(multi->BaseType);
+         auto baseTarget = dynamic_cast<Class *>(baseMulti->BaseType);
+         if (target != nullptr && baseTarget != nullptr &&
+             !class_is_same_or_extension(target,baseTarget)) {
+            Log.error("structure target of extended attribute does not extend its base",attribute->_line);
+         }
       }
    }
 

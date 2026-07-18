@@ -263,6 +263,78 @@ conformant case regresses. The recorded result was produced by the cause commit
 containing this section (the report's candidate commit is verified after the
 commit is created).
 
+### Type, attribute, enumeration, and class extension rules
+
+This cause covers 14 invalid INTERLIS 2.3 models that ilic accepted:
+
+```text
+ili23.attributes.extended-attr-ref-with-diff-cardinality-fail
+ili23.attributes.extended-attr-simple-with-diff-cardinality-fail
+ili23.attributes.extended-attr-struct-with-diff-cardinality-fail
+ili23.attributes.extended-attr-with-diff-transient-mode-fail
+ili23.classes.class-extension-detect-class-spec-of-ext-base-class-fail
+ili23.classes.class-extension-detect-ext-class-of-spec-base-class-fail
+ili23.classes.class-extension-extending-class-in-extending-topic-fail
+ili23.enumerations.enumeration-unique-elements-in-extend-enum
+ili23.enumerations.enumeration-uniqueness-elements-in-basic-enum
+ili23.enumerations.extended-attr-fail
+ili23.enumerations.extended-enum-fail
+ili23.line-type.overlap-too-small-fail
+ili23.text-type.string-limit-length-extended-to-unlimited-length-fail
+ili23.text-type.string-multiline-text-extended-to-single-line-fail
+```
+
+The missing checks were independent manifestations of extension compatibility.
+An extending attribute must narrow, not widen, its effective cardinality and
+must retain `TRANSIENT`. A named attribute domain must be the same domain or an
+extension of it. Inline text types retain `TEXT` versus `MTEXT` and may only
+reduce their maximum length. Enumeration children must be unique among their
+siblings; a vertical or horizontal extension can add children and can mark an
+inherited leaf `FINAL`, but cannot redeclare that inherited leaf. A line type's
+maximum overlap cannot use finer precision than its coordinate domain.
+
+Reference-manual sections 3.5, 3.6, and 3.8 specify the class, attribute, and
+domain extension invariants. The line-type accuracy rule is defined by the
+line-type production in section 3.8. The implementation was cross-checked
+against `Table.checkIntegrity`, `AttributeDef.setExtending`,
+`TextType.checkTypeExtension`, `EnumerationType.checkTypeExtension`, and the
+2.3 parser's line-type validation in ili2c. Both LSP grammars recognize the
+same declaration syntax but do not perform these metamodel compatibility
+checks; no grammar or generated parser file was changed.
+
+Class specialization across inherited topics has two distinct forms. A class
+retaining its inherited name must use `EXTENDED`; `EXTENDS` introduces a new
+name. In one topic-inheritance chain the same base cannot simultaneously be
+extended in place and specialized under another name. The semantic post-pass
+therefore examines the completed topic, including declarations that occur
+after the `EXTENDED` class, and all base topics. It does not prohibit differently
+named specializations in independent topic extensions.
+
+The parser clones the inherited inline type for the shorthand
+`attribute (EXTENDED): MANDATORY`. A new metamodel flag distinguishes that
+shorthand from an explicit type redefinition, preventing the clone from being
+misclassified as an enum redeclaration. Likewise, `FINAL` on an inherited enum
+leaf is retained as a legal restriction. These two rules are covered by the
+unchanged valid upstream cases
+`ili23.enumerations.enumeration-extended-enumeration-type` and
+`ili23.enumerations.extended-enum` and prevent regressions introduced by the
+new checks.
+
+Eleven local fixtures cover valid and invalid cardinality, transient, named and
+inline type, enum, overlap, and class-specialization behaviour. The Roads
+regression fixture previously widened a mandatory enum attribute to optional;
+ili2c 5.6.8 also rejects that input. Its extended enum is now explicitly
+`MANDATORY`, preserving the intended base cardinality. All 59 local CTests and
+all affected unchanged upstream cases pass.
+
+The complete frozen corpus improves from 526 to 540 conformant cases: 28 invalid
+models remain accepted, three valid models remain rejected, and no previously
+conformant case regresses. The measured improvement is two cases larger than
+the planning estimate because the three class-specialization cases share this
+same extension invariant. The recorded result was produced by the cause commit
+containing this section (the report's candidate commit is verified after the
+commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the

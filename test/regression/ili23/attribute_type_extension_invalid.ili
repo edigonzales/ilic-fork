@@ -1,0 +1,21 @@
+INTERLIS 2.3;
+
+MODEL AttributeTypeExtensionInvalid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    BaseEnum = (one, two);
+    OtherEnum = (three, four);
+
+  CLASS Base (ABSTRACT) =
+    transientValue (ABSTRACT, TRANSIENT): TEXT*20 := "base";
+    multiline: MTEXT;
+    bounded: TEXT*20;
+    choice: BaseEnum;
+  END Base;
+
+  CLASS Invalid (ABSTRACT) EXTENDS Base =
+    transientValue (EXTENDED): TEXT*20;
+    multiline (EXTENDED): TEXT;
+    bounded (EXTENDED): TEXT;
+    choice (EXTENDED): OtherEnum;
+  END Invalid;
+END AttributeTypeExtensionInvalid.

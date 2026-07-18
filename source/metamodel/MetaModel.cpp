@@ -811,6 +811,7 @@ Log.message(">>> clone topic");
       clone->Derivates = org->Derivates;
       clone->AttrParent = org->AttrParent;
       clone->Type = org->Type;
+      clone->TypeExplicitlyDefined = org->TypeExplicitlyDefined;
 
    }
 

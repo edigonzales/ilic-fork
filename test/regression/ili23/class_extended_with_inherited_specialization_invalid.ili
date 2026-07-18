@@ -1,0 +1,18 @@
+INTERLIS 2.3;
+
+MODEL ClassExtendedWithInheritedSpecializationInvalid AT "https://example.invalid" VERSION "1" =
+
+  TOPIC BaseTopic =
+    CLASS Base =
+    END Base;
+
+    CLASS Specialized EXTENDS Base =
+    END Specialized;
+  END BaseTopic;
+
+  TOPIC ExtendedTopic EXTENDS BaseTopic =
+    CLASS Base (EXTENDED) =
+    END Base;
+  END ExtendedTopic;
+
+END ClassExtendedWithInheritedSpecializationInvalid.

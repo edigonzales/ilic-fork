@@ -453,6 +453,8 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
 
    push_context(a);
    a->Type = visitAttrTypeDef(ctx->attrTypeDef());
+   a->TypeExplicitlyDefined = ctx->attrTypeDef()->attrType() != nullptr ||
+                              ctx->attrTypeDef()->bagOrListType() != nullptr;
    pop_context();
 
    if (aa != nullptr && aa->AttrParent != get_class_context()) {

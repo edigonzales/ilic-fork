@@ -243,6 +243,39 @@ if(BUILD_TESTING)
     add_ilic_regression_test(ilic_regression_association_duplicate_role_invalid FALSE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/association_duplicate_role_invalid.ili"
     )
+    add_ilic_regression_test(ilic_regression_attribute_extension_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/attribute_extension_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_attribute_cardinality_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/attribute_cardinality_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_attribute_type_extension_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/attribute_type_extension_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_enum_extension_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/enum_extension_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_enum_extension_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/enum_extension_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_line_overlap_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/line_overlap_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_line_overlap_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/line_overlap_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_class_specialization_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/class_specialization_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_class_same_name_extends_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/class_same_name_extends_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_class_extended_with_local_specialization_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/class_extended_with_local_specialization_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_class_extended_with_inherited_specialization_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/class_extended_with_inherited_specialization_invalid.ili"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"

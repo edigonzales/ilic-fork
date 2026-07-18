@@ -289,6 +289,9 @@ namespace metamodel {
       // ROLE from ASSOCIATION AttrOrParamType
       Type *Type = nullptr;
       AttrOrParam* Extending = nullptr;
+      // False for the shorthand "MANDATORY" on an extended attribute, where
+      // the base type is inherited instead of redefined.
+      bool TypeExplicitlyDefined = true;
       bool _visible = true;
       virtual string getClass() { return "AttrOrParam"; }
       virtual string getBaseClass() { return "ExtendableME"; };
