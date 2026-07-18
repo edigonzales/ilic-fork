@@ -94,7 +94,7 @@ target_include_directories(ilic-capi
 target_link_libraries(ilic-capi PUBLIC ilic-core)
 
 add_executable(ilic source/main/ilic.cpp)
-target_link_libraries(ilic PRIVATE ilic-core)
+target_link_libraries(ilic PRIVATE ilic-capi)
 
 add_executable(ilic-format source/main/ilic_format.cpp)
 target_link_libraries(ilic-format PRIVATE ilic-core)
@@ -207,6 +207,14 @@ if(BUILD_TESTING)
     )
     set_tests_properties(ilic_version PROPERTIES
         PASS_REGULAR_EXPRESSION "platform=macos64"
+    )
+
+    add_test(
+        NAME ilic_compile_json
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC=$<TARGET_FILE:ilic>"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/compile-json-test"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_compile_json_test.cmake"
     )
 
     add_test(
