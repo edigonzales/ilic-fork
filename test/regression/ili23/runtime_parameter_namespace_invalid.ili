@@ -1,0 +1,10 @@
+INTERLIS 2.3;
+
+MODEL RuntimeParameterNamespaceInvalid AT "https://example.invalid" VERSION "1" =
+  DOMAIN Collision = TEXT*20;
+
+  PARAMETER
+    duplicate: BOOLEAN;
+    duplicate: TEXT*20;
+    Collision: BOOLEAN;
+END RuntimeParameterNamespaceInvalid.

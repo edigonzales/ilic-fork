@@ -1,5 +1,5 @@
 
-// Generated from ..\..\..\..\source\c\ilic\input\parser\generated\Ili2Parser.g4 by ANTLR 4.7.1
+// Generated from Ili2Parser.g4 by ANTLR 4.7.1
 
 #pragma once
 
@@ -13,8 +13,8 @@ namespace parser {
 class  Ili2Parser : public antlr4::Parser {
 public:
   enum {
-    WS = 1, NL = 2, SL_COMMENT = 3, ILI_DOC = 4, ILI_OPTION = 5, ILI_BLOCKCOMMENT = 6, 
-    INTERLIS = 7, ILI23 = 8, ILI24 = 9, CONTRACTED = 10, REFSYSTEM = 11, 
+    SL_COMMENT = 1, ILI_OPTION = 2, ILI_BLOCKCOMMENT = 3, WS = 4, NL = 5, 
+    ILI_DOC = 6, INTERLIS = 7, ILI23 = 8, ILI24 = 9, CONTRACTED = 10, REFSYSTEM = 11, 
     SYMBOLOGY = 12, TYPE = 13, MODEL = 14, END = 15, VERSION = 16, NOINCREMENTALTRANSFER = 17, 
     TRANSLATION = 18, OF = 19, ATT = 20, CHARSET = 21, XMLNS = 22, IMPORTS = 23, 
     UNQUALIFIED = 24, TOPIC = 25, DEPENDS = 26, ON = 27, AS = 28, VIEW = 29, 
@@ -25,68 +25,69 @@ public:
     LBRACE = 51, RBRACE = 52, LCURLY = 53, RCURLY = 54, STAR = 55, SLASH = 56, 
     BACKSLASH = 57, PERCENT = 58, AT = 59, HASH = 60, TILDE = 61, LESS = 62, 
     LESSEQUAL = 63, IMPL = 64, GREATERGREATER = 65, GREATER = 66, GREATEREQUAL = 67, 
-    SEMI = 68, EQUAL = 69, EQUALEQUAL = 70, LESSGREATER = 71, NOTEQUAL = 72, 
-    COLONEQUAL = 73, DOT = 74, DOTDOT = 75, COLON = 76, COMMA = 77, LARROW = 78, 
-    RARROW = 79, PLUS = 80, MINUS = 81, AGGREGATE = 82, ASSOCIATE = 83, 
-    COMPOSITE = 84, STRUCTURE = 85, PARAMETER = 86, MANDATORY = 87, GENERICS = 88, 
-    DEFERRED = 89, CONTEXT = 90, MULTICOORD = 91, MULTIPOLYLINE = 92, MULTISURFACE = 93, 
-    MULTIAREA = 94, BAG = 95, LIST = 96, REFERENCE = 97, TO = 98, ANYCLASS = 99, 
-    RESTRICTION = 100, ASSOCIATION = 101, DERIVED = 102, EXTERNAL = 103, 
-    FROM = 104, UNDEFINED = 105, MTEXT = 106, NAME_CONST = 107, URI = 108, 
-    ALL = 109, CIRCULAR = 110, OTHERS = 111, NUMERIC = 112, CLOCKWISE = 113, 
-    COUNTERCLOCKWISE = 114, CARDINALITY = 115, OR = 116, HIDING = 117, ORDERED = 118, 
-    ILIDOMAIN = 119, PI = 120, LNBASE = 121, FORMAT = 122, INHERIT = 123, 
-    COORD = 124, ROTATION = 125, ANY = 126, BLACKBOX = 127, XML = 128, BINARY = 129, 
-    DIRECTED = 130, POLYLINE = 131, SURFACE = 132, AREA = 133, WITH = 134, 
-    STRAIGHTS = 135, ARCS = 136, VERTEX = 137, WITHOUT = 138, OVERLAPS = 139, 
-    LINE = 140, ATTRIBUTES = 141, FORM = 142, UNIT = 143, FUNCTION = 144, 
-    SIGN = 145, OBJECTS = 146, METAOBJECT = 147, CONSTRAINT = 148, CONSTRAINTS = 149, 
-    EXISTENCE = 150, REQUIRED = 151, IN = 152, UNIQUE = 153, WHERE = 154, 
-    LOCAL = 155, SET = 156, AND = 157, NOT = 158, BASED = 159, BASE = 160, 
-    INHERITANCE = 161, DEFINED = 162, INSPECTION = 163, THIS = 164, THISAREA = 165, 
-    THATAREA = 166, PARENT = 167, FIRST = 168, LAST = 169, AGGREGATES = 170, 
-    OBJECT = 171, ENUMVAL = 172, ENUMTREEVAL = 173, PROJECTION = 174, JOIN = 175, 
-    ILINULL = 176, UNION = 177, AGGREGATION = 178, BY = 179, GRAPHIC = 180, 
-    ACCORDING = 181, WHEN = 182, ANYSTRUCTURE = 183, TRANSFER = 184, EXPLANATION = 185, 
-    ESC = 186, STRING = 187, POSNUMBER = 188, NUMBER = 189, DEC = 190, SCALING = 191, 
-    DECIMAL = 192, HEXNUMBER = 193, NAME = 194
+    SEMI = 68, EQUAL = 69, EQUAL_CONST = 70, EQUALEQUAL = 71, LESSGREATER = 72, 
+    NOTEQUAL = 73, COLONEQUAL = 74, DOT = 75, DOTDOT = 76, COLON = 77, COMMA = 78, 
+    LARROW = 79, RARROW = 80, PLUS = 81, MINUS = 82, AGGREGATE = 83, ASSOCIATE = 84, 
+    COMPOSITE = 85, STRUCTURE = 86, PARAMETER = 87, MANDATORY = 88, GENERIC = 89, 
+    GENERICS = 90, DEFERRED = 91, CONTEXT = 92, MULTICOORD = 93, MULTIPOLYLINE = 94, 
+    MULTISURFACE = 95, MULTIAREA = 96, BAG = 97, LIST = 98, REFERENCE = 99, 
+    TO = 100, ANYCLASS = 101, RESTRICTION = 102, ASSOCIATION = 103, DERIVED = 104, 
+    EXTERNAL = 105, FROM = 106, UNDEFINED = 107, MTEXT = 108, NAME_CONST = 109, 
+    URI = 110, ALL = 111, CIRCULAR = 112, OTHERS = 113, NUMERIC = 114, CLOCKWISE = 115, 
+    COUNTERCLOCKWISE = 116, CARDINALITY = 117, OR = 118, HIDING = 119, ORDERED = 120, 
+    ILIDOMAIN = 121, PI = 122, LNBASE = 123, FORMAT = 124, INHERIT = 125, 
+    COORD = 126, ROTATION = 127, ANY = 128, BLACKBOX = 129, XML = 130, BINARY = 131, 
+    DIRECTED = 132, POLYLINE = 133, SURFACE = 134, AREA = 135, WITH = 136, 
+    STRAIGHTS = 137, ARCS = 138, VERTEX = 139, WITHOUT = 140, OVERLAPS = 141, 
+    LINE = 142, ATTRIBUTES = 143, FORM = 144, UNIT = 145, FUNCTION = 146, 
+    SIGN = 147, OBJECTS = 148, METAOBJECT = 149, CONSTRAINT = 150, CONSTRAINTS = 151, 
+    EXISTENCE = 152, REQUIRED = 153, IN = 154, UNIQUE = 155, WHERE = 156, 
+    LOCAL = 157, SET = 158, AND = 159, NOT = 160, BASED = 161, BASE = 162, 
+    INHERITANCE = 163, DEFINED = 164, INSPECTION = 165, THIS = 166, THISAREA = 167, 
+    THATAREA = 168, PARENT = 169, FIRST = 170, LAST = 171, AGGREGATES = 172, 
+    OBJECT = 173, ENUMVAL = 174, ENUMTREEVAL = 175, PROJECTION = 176, JOIN = 177, 
+    ILINULL = 178, UNION = 179, AGGREGATION = 180, BY = 181, GRAPHIC = 182, 
+    ACCORDING = 183, WHEN = 184, ANYSTRUCTURE = 185, TRANSFER = 186, EXPLANATION = 187, 
+    ESC = 188, STRING = 189, POSNUMBER = 190, NUMBER = 191, DEC = 192, DECIMAL = 193, 
+    HEXNUMBER = 194, NAME = 195
   };
 
   enum {
     RuleDecimal = 0, RulePath = 1, RuleInterlis2Def = 2, RuleModelDef = 3, 
     RuleImportDef = 4, RuleImporting = 5, RuleTopicDef = 6, RuleTopicPath = 7, 
-    RuleClassDef = 8, RuleStructureDef = 9, RuleClassOrStructureDef = 10, 
-    RuleAttributeDef = 11, RuleAttrTypeDef = 12, RuleBagOrListType = 13, 
-    RuleAttrType = 14, RuleReferenceAttr = 15, RuleRestrictedRef = 16, RuleRestriction = 17, 
-    RuleAssociationDef = 18, RuleAssociationRef = 19, RuleRoleDef = 20, 
-    RuleCardinality = 21, RuleDomainDef = 22, RuleDomainType = 23, RuleType = 24, 
-    RuleBaseType = 25, RuleConstant = 26, RuleTextType = 27, RuleTextConst = 28, 
-    RuleEnumerationType = 29, RuleEnumTreeValueType = 30, RuleAlignmentType = 31, 
-    RuleBooleanType = 32, RuleEnumeration = 33, RuleEnumElement = 34, RuleEnumConst = 35, 
-    RuleNumericType = 36, RuleDateTimeType = 37, RuleRefSys = 38, RuleDecConst = 39, 
-    RuleNumericConst = 40, RuleFormattedType = 41, RuleFormatDef = 42, RuleBaseAttrRef = 43, 
-    RuleFormattedConst = 44, RuleContextDef = 45, RuleContextDecl = 46, 
-    RuleCoordinateType = 47, RuleRotationDef = 48, RuleOIDType = 49, RuleBlackboxType = 50, 
-    RuleClassType = 51, RuleAttributePathType = 52, RuleClassConst = 53, 
-    RuleAttributeConst = 54, RuleLineType = 55, RuleLineForm = 56, RuleLineFormType = 57, 
-    RuleLineFormTypeDef = 58, RuleLineFormTypeDecl = 59, RuleUnitDecl = 60, 
-    RuleUnitDef = 61, RuleDerivedUnit = 62, RuleComposedUnit = 63, RuleMetaDataBasketDef = 64, 
-    RuleMetaDataBasketRef = 65, RuleMetaObjectRef = 66, RuleParameterDef = 67, 
-    RuleProperties = 68, RuleRunTimeParameterDef = 69, RuleConstraintDef = 70, 
-    RuleMandatoryConstraint = 71, RulePlausibilityConstraint = 72, RuleExistenceConstraint = 73, 
-    RuleUniquenessConstraint = 74, RuleGlobalUniqueness = 75, RuleUniqueEl = 76, 
-    RuleLocalUniqueness = 77, RuleSetConstraint = 78, RuleConstraintsDef = 79, 
-    RuleExpression = 80, RuleTerm1 = 81, RuleOperator1 = 82, RuleTerm2 = 83, 
-    RuleOperator2 = 84, RuleTerm3 = 85, RuleTerm = 86, RuleRelation = 87, 
-    RuleFactor = 88, RuleObjectOrAttributePath = 89, RuleAttributePath = 90, 
-    RulePathEl = 91, RuleAssociationPath = 92, RuleAttributeRef = 93, RuleFunctionCall = 94, 
-    RuleFunctionCallArgument = 95, RuleFunctionDef = 96, RuleFunctionDefParam = 97, 
-    RuleArgumentType = 98, RuleViewDef = 99, RuleFormationDef = 100, RuleProjection = 101, 
-    RuleJoin = 102, RuleIliunion = 103, RuleAggregation = 104, RuleInspection = 105, 
-    RuleRenamedViewableRef = 106, RuleBaseExtensionDef = 107, RuleSelection = 108, 
-    RuleViewAttribute = 109, RuleGraphicDef = 110, RuleDrawingRule = 111, 
-    RuleCondSignParamAssignment = 112, RuleSignParamAssignment = 113, RuleEnumAssignment = 114, 
-    RuleEnumRange = 115
+    RuleDeferredGenerics = 8, RuleClassDef = 9, RuleStructureDef = 10, RuleClassOrStructureDef = 11, 
+    RuleAttributeDef = 12, RuleAttrTypeDef = 13, RuleBagOrListType = 14, 
+    RuleAttrType = 15, RuleReferenceAttr = 16, RuleRestrictedRef = 17, RuleRestriction = 18, 
+    RuleAssociationDef = 19, RuleAssociationRef = 20, RuleRoleDef = 21, 
+    RuleCardinality = 22, RuleDomainDef = 23, RuleDomainType = 24, RuleType = 25, 
+    RuleBaseType = 26, RuleConstant = 27, RuleTextType = 28, RuleTextConst = 29, 
+    RuleEnumerationType = 30, RuleEnumTreeValueType = 31, RuleAlignmentType = 32, 
+    RuleBooleanType = 33, RuleEnumeration = 34, RuleEnumElement = 35, RuleEnumConst = 36, 
+    RuleNumericType = 37, RuleDateTimeType = 38, RuleRefSys = 39, RuleDecConst = 40, 
+    RuleNumericConst = 41, RuleFormattedType = 42, RuleFormatDef = 43, RuleBaseAttrRef = 44, 
+    RuleFormattedConst = 45, RuleContextDef = 46, RuleContextBlock = 47, 
+    RuleContextDecl = 48, RuleCoordinateType = 49, RuleRotationDef = 50, 
+    RuleOIDType = 51, RuleBlackboxType = 52, RuleClassRefType = 53, RuleAttributePathType = 54, 
+    RuleClassConst = 55, RuleAttributePathConst = 56, RuleLineType = 57, 
+    RuleLineForm = 58, RuleLineFormType = 59, RuleLineFormTypeDef = 60, 
+    RuleLineFormTypeDecl = 61, RuleUnitDecl = 62, RuleUnitDef = 63, RuleDerivedUnit = 64, 
+    RuleComposedUnit = 65, RuleComposedUnitExpr = 66, RuleMetaDataBasketDef = 67, 
+    RuleMetaDataBasketRef = 68, RuleMetaObjectRef = 69, RuleParameterDef = 70, 
+    RuleProperties = 71, RuleRunTimeParameterDef = 72, RuleRunTimeParameter = 73, 
+    RuleConstraintDef = 74, RuleMandatoryConstraint = 75, RulePlausibilityConstraint = 76, 
+    RuleExistenceConstraint = 77, RuleUniquenessConstraint = 78, RuleGlobalUniqueness = 79, 
+    RuleUniqueEl = 80, RuleLocalUniqueness = 81, RuleLocalUniqueEl = 82, 
+    RuleSetConstraint = 83, RuleConstraintsDef = 84, RuleExpression = 85, 
+    RuleTerm1 = 86, RuleOperator1 = 87, RuleTerm2 = 88, RuleOperator2 = 89, 
+    RuleTerm3 = 90, RuleTerm = 91, RuleRelation = 92, RuleFactor = 93, RuleObjectOrAttributePath = 94, 
+    RuleAttributePath = 95, RulePathEl = 96, RuleObjectRef = 97, RuleFunctionCall = 98, 
+    RuleFunctionCallArgument = 99, RuleFunctionDef = 100, RuleFunctionDefParam = 101, 
+    RuleArgumentType = 102, RuleViewDef = 103, RuleFormationDef = 104, RuleProjection = 105, 
+    RuleJoin = 106, RuleIliunion = 107, RuleAggregation = 108, RuleInspection = 109, 
+    RuleRenamedViewableRef = 110, RuleBaseExtensionDef = 111, RuleSelection = 112, 
+    RuleViewAttribute = 113, RuleGraphicDef = 114, RuleDrawingRule = 115, 
+    RuleCondSignParamAssignment = 116, RuleSignParamAssignment = 117, RuleEnumAssignment = 118, 
+    RuleEnumRange = 119
   };
 
   Ili2Parser(antlr4::TokenStream *input);
@@ -99,7 +100,7 @@ public:
   virtual antlr4::dfa::Vocabulary& getVocabulary() const override;
 
 
-     bool ili23=true; 
+     bool ili23=false; 
      bool ili24=false;
 
 
@@ -111,6 +112,7 @@ public:
   class ImportingContext;
   class TopicDefContext;
   class TopicPathContext;
+  class DeferredGenericsContext;
   class ClassDefContext;
   class StructureDefContext;
   class ClassOrStructureDefContext;
@@ -149,15 +151,16 @@ public:
   class BaseAttrRefContext;
   class FormattedConstContext;
   class ContextDefContext;
+  class ContextBlockContext;
   class ContextDeclContext;
   class CoordinateTypeContext;
   class RotationDefContext;
   class OIDTypeContext;
   class BlackboxTypeContext;
-  class ClassTypeContext;
+  class ClassRefTypeContext;
   class AttributePathTypeContext;
   class ClassConstContext;
-  class AttributeConstContext;
+  class AttributePathConstContext;
   class LineTypeContext;
   class LineFormContext;
   class LineFormTypeContext;
@@ -167,12 +170,14 @@ public:
   class UnitDefContext;
   class DerivedUnitContext;
   class ComposedUnitContext;
+  class ComposedUnitExprContext;
   class MetaDataBasketDefContext;
   class MetaDataBasketRefContext;
   class MetaObjectRefContext;
   class ParameterDefContext;
   class PropertiesContext;
   class RunTimeParameterDefContext;
+  class RunTimeParameterContext;
   class ConstraintDefContext;
   class MandatoryConstraintContext;
   class PlausibilityConstraintContext;
@@ -181,6 +186,7 @@ public:
   class GlobalUniquenessContext;
   class UniqueElContext;
   class LocalUniquenessContext;
+  class LocalUniqueElContext;
   class SetConstraintContext;
   class ConstraintsDefContext;
   class ExpressionContext;
@@ -195,8 +201,7 @@ public:
   class ObjectOrAttributePathContext;
   class AttributePathContext;
   class PathElContext;
-  class AssociationPathContext;
-  class AttributeRefContext;
+  class ObjectRefContext;
   class FunctionCallContext;
   class FunctionCallArgumentContext;
   class FunctionDefContext;
@@ -238,15 +243,16 @@ public:
   public:
     PathContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *INTERLIS();
-    std::vector<antlr4::tree::TerminalNode *> DOT();
-    antlr4::tree::TerminalNode* DOT(size_t i);
     antlr4::tree::TerminalNode *SIGN();
     antlr4::tree::TerminalNode *URI();
     antlr4::tree::TerminalNode *REFSYSTEM();
     antlr4::tree::TerminalNode *BOOLEAN();
     antlr4::tree::TerminalNode *HALIGNMENT();
     antlr4::tree::TerminalNode *VALIGNMENT();
+    antlr4::tree::TerminalNode *METAOBJECT();
+    antlr4::tree::TerminalNode *INTERLIS();
+    std::vector<antlr4::tree::TerminalNode *> DOT();
+    antlr4::tree::TerminalNode* DOT(size_t i);
     std::vector<antlr4::tree::TerminalNode *> NAME();
     antlr4::tree::TerminalNode* NAME(size_t i);
 
@@ -385,7 +391,6 @@ public:
     Ili2Parser::PathContext *topicbase = nullptr;;
     Ili2Parser::PathContext *basketOid = nullptr;;
     Ili2Parser::PathContext *topicOid = nullptr;;
-    Ili2Parser::PathContext *genericref = nullptr;;
     antlr4::Token *topicname2 = nullptr;;
     TopicDefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
@@ -410,8 +415,7 @@ public:
     antlr4::tree::TerminalNode* ON(size_t i);
     std::vector<TopicPathContext *> topicPath();
     TopicPathContext* topicPath(size_t i);
-    antlr4::tree::TerminalNode *DEFERRED();
-    antlr4::tree::TerminalNode *GENERICS();
+    DeferredGenericsContext *deferredGenerics();
     std::vector<MetaDataBasketDefContext *> metaDataBasketDef();
     MetaDataBasketDefContext* metaDataBasketDef(size_t i);
     std::vector<UnitDeclContext *> unitDecl();
@@ -454,6 +458,24 @@ public:
   };
 
   TopicPathContext* topicPath();
+
+  class  DeferredGenericsContext : public antlr4::ParserRuleContext {
+  public:
+    DeferredGenericsContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *DEFERRED();
+    antlr4::tree::TerminalNode *GENERICS();
+    std::vector<PathContext *> path();
+    PathContext* path(size_t i);
+    antlr4::tree::TerminalNode *SEMI();
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  DeferredGenericsContext* deferredGenerics();
 
   class  ClassDefContext : public antlr4::ParserRuleContext {
   public:
@@ -556,8 +578,8 @@ public:
   public:
     AttrTypeDefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    AttrTypeContext *attrType();
     antlr4::tree::TerminalNode *MANDATORY();
+    AttrTypeContext *attrType();
     BagOrListTypeContext *bagOrListType();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -824,7 +846,7 @@ public:
     CoordinateTypeContext *coordinateType();
     OIDTypeContext *oIDType();
     BlackboxTypeContext *blackboxType();
-    ClassTypeContext *classType();
+    ClassRefTypeContext *classRefType();
     AttributePathTypeContext *attributePathType();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -843,7 +865,7 @@ public:
     FormattedConstContext *formattedConst();
     EnumConstContext *enumConst();
     ClassConstContext *classConst();
-    AttributeConstContext *attributeConst();
+    AttributePathConstContext *attributePathConst();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -946,8 +968,8 @@ public:
     antlr4::tree::TerminalNode *RPAREN();
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
-    antlr4::tree::TerminalNode *FINAL();
     antlr4::tree::TerminalNode *COLON();
+    antlr4::tree::TerminalNode *FINAL();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1094,8 +1116,8 @@ public:
     antlr4::tree::TerminalNode *BASED();
     antlr4::tree::TerminalNode *ON();
     FormatDefContext *formatDef();
-    antlr4::tree::TerminalNode *DOTDOT();
     PathContext *path();
+    antlr4::tree::TerminalNode *DOTDOT();
     std::vector<antlr4::tree::TerminalNode *> STRING();
     antlr4::tree::TerminalNode* STRING(size_t i);
 
@@ -1158,6 +1180,22 @@ public:
     ContextDefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *CONTEXT();
+    std::vector<ContextBlockContext *> contextBlock();
+    ContextBlockContext* contextBlock(size_t i);
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  ContextDefContext* contextDef();
+
+  class  ContextBlockContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *name = nullptr;;
+    ContextBlockContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *EQUAL();
+    antlr4::tree::TerminalNode *NAME();
     std::vector<ContextDeclContext *> contextDecl();
     ContextDeclContext* contextDecl(size_t i);
     std::vector<antlr4::tree::TerminalNode *> SEMI();
@@ -1167,17 +1205,16 @@ public:
    
   };
 
-  ContextDefContext* contextDef();
+  ContextBlockContext* contextBlock();
 
   class  ContextDeclContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *name = nullptr;;
+    Ili2Parser::PathContext *generic = nullptr;;
     ContextDeclContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *EQUAL();
     std::vector<PathContext *> path();
     PathContext* path(size_t i);
-    antlr4::tree::TerminalNode *NAME();
     std::vector<antlr4::tree::TerminalNode *> OR();
     antlr4::tree::TerminalNode* OR(size_t i);
 
@@ -1254,9 +1291,9 @@ public:
 
   BlackboxTypeContext* blackboxType();
 
-  class  ClassTypeContext : public antlr4::ParserRuleContext {
+  class  ClassRefTypeContext : public antlr4::ParserRuleContext {
   public:
-    ClassTypeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    ClassRefTypeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *CLASS();
     RestrictionContext *restriction();
@@ -1266,7 +1303,7 @@ public:
    
   };
 
-  ClassTypeContext* classType();
+  ClassRefTypeContext* classRefType();
 
   class  AttributePathTypeContext : public antlr4::ParserRuleContext {
   public:
@@ -1305,25 +1342,27 @@ public:
 
   ClassConstContext* classConst();
 
-  class  AttributeConstContext : public antlr4::ParserRuleContext {
+  class  AttributePathConstContext : public antlr4::ParserRuleContext {
   public:
     Ili2Parser::PathContext *classref = nullptr;;
     antlr4::Token *attribute = nullptr;;
-    AttributeConstContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    AttributePathConstContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *GREATERGREATER();
     antlr4::tree::TerminalNode *NAME();
-    antlr4::tree::TerminalNode *DOT();
+    antlr4::tree::TerminalNode *RARROW();
     PathContext *path();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
-  AttributeConstContext* attributeConst();
+  AttributePathConstContext* attributePathConst();
 
   class  LineTypeContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *directed = nullptr;;
+    antlr4::Token *multdir = nullptr;;
     Ili2Parser::PathContext *coordref = nullptr;;
     Ili2Parser::DecimalContext *overlap = nullptr;;
     Ili2Parser::PathContext *lineattrstruct = nullptr;;
@@ -1336,17 +1375,16 @@ public:
     antlr4::tree::TerminalNode *VERTEX();
     antlr4::tree::TerminalNode *WITHOUT();
     antlr4::tree::TerminalNode *OVERLAPS();
+    antlr4::tree::TerminalNode *GREATER();
     antlr4::tree::TerminalNode *LINE();
     antlr4::tree::TerminalNode *ATTRIBUTES();
-    std::vector<PathContext *> path();
-    PathContext* path(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> DIRECTED();
-    antlr4::tree::TerminalNode* DIRECTED(size_t i);
-    antlr4::tree::TerminalNode *MULTIPOLYLINE();
     antlr4::tree::TerminalNode *MULTISURFACE();
     antlr4::tree::TerminalNode *MULTIAREA();
-    antlr4::tree::TerminalNode *GREATER();
+    std::vector<PathContext *> path();
+    PathContext* path(size_t i);
     DecimalContext *decimal();
+    antlr4::tree::TerminalNode *DIRECTED();
+    antlr4::tree::TerminalNode *MULTIPOLYLINE();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1488,13 +1526,8 @@ public:
     ComposedUnitContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *LPAREN();
-    std::vector<PathContext *> path();
-    PathContext* path(size_t i);
+    ComposedUnitExprContext *composedUnitExpr();
     antlr4::tree::TerminalNode *RPAREN();
-    std::vector<antlr4::tree::TerminalNode *> STAR();
-    antlr4::tree::TerminalNode* STAR(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> SLASH();
-    antlr4::tree::TerminalNode* SLASH(size_t i);
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1502,6 +1535,21 @@ public:
 
   ComposedUnitContext* composedUnit();
 
+  class  ComposedUnitExprContext : public antlr4::ParserRuleContext {
+  public:
+    ComposedUnitExprContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    PathContext *path();
+    ComposedUnitExprContext *composedUnitExpr();
+    antlr4::tree::TerminalNode *STAR();
+    antlr4::tree::TerminalNode *SLASH();
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  ComposedUnitExprContext* composedUnitExpr();
+  ComposedUnitExprContext* composedUnitExpr(int precedence);
   class  MetaDataBasketDefContext : public antlr4::ParserRuleContext {
   public:
     antlr4::Token *basketname = nullptr;;
@@ -1613,6 +1661,8 @@ public:
     antlr4::tree::TerminalNode* ORDERED(size_t i);
     std::vector<antlr4::tree::TerminalNode *> EXTERNAL();
     antlr4::tree::TerminalNode* EXTERNAL(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> GENERIC();
+    antlr4::tree::TerminalNode* GENERIC(size_t i);
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
 
@@ -1624,24 +1674,33 @@ public:
 
   class  RunTimeParameterDefContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *runtimeparametername = nullptr;;
     RunTimeParameterDefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *PARAMETER();
-    std::vector<antlr4::tree::TerminalNode *> COLON();
-    antlr4::tree::TerminalNode* COLON(size_t i);
-    std::vector<AttrTypeDefContext *> attrTypeDef();
-    AttrTypeDefContext* attrTypeDef(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> SEMI();
-    antlr4::tree::TerminalNode* SEMI(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> NAME();
-    antlr4::tree::TerminalNode* NAME(size_t i);
+    std::vector<RunTimeParameterContext *> runTimeParameter();
+    RunTimeParameterContext* runTimeParameter(size_t i);
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
   RunTimeParameterDefContext* runTimeParameterDef();
+
+  class  RunTimeParameterContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *runtimeparametername = nullptr;;
+    RunTimeParameterContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *COLON();
+    AttrTypeDefContext *attrTypeDef();
+    antlr4::tree::TerminalNode *SEMI();
+    antlr4::tree::TerminalNode *NAME();
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  RunTimeParameterContext* runTimeParameter();
 
   class  ConstraintDefContext : public antlr4::ParserRuleContext {
   public:
@@ -1661,6 +1720,7 @@ public:
 
   class  MandatoryConstraintContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *name = nullptr;;
     Ili2Parser::ExpressionContext *booleanexp = nullptr;;
     MandatoryConstraintContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
@@ -1668,6 +1728,8 @@ public:
     antlr4::tree::TerminalNode *CONSTRAINT();
     antlr4::tree::TerminalNode *SEMI();
     ExpressionContext *expression();
+    antlr4::tree::TerminalNode *COLON();
+    antlr4::tree::TerminalNode *NAME();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1677,6 +1739,7 @@ public:
 
   class  PlausibilityConstraintContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *name = nullptr;;
     Ili2Parser::DecimalContext *percentage = nullptr;;
     PlausibilityConstraintContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
@@ -1687,6 +1750,8 @@ public:
     antlr4::tree::TerminalNode *LESSEQUAL();
     antlr4::tree::TerminalNode *GREATEREQUAL();
     DecimalContext *decimal();
+    antlr4::tree::TerminalNode *COLON();
+    antlr4::tree::TerminalNode *NAME();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1696,6 +1761,7 @@ public:
 
   class  ExistenceConstraintContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *name = nullptr;;
     ExistenceConstraintContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *EXISTENCE();
@@ -1711,6 +1777,7 @@ public:
     antlr4::tree::TerminalNode *SEMI();
     std::vector<antlr4::tree::TerminalNode *> OR();
     antlr4::tree::TerminalNode* OR(size_t i);
+    antlr4::tree::TerminalNode *NAME();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1720,15 +1787,21 @@ public:
 
   class  UniquenessConstraintContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *name = nullptr;;
     UniquenessConstraintContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *UNIQUE();
     antlr4::tree::TerminalNode *SEMI();
     GlobalUniquenessContext *globalUniqueness();
     LocalUniquenessContext *localUniqueness();
+    antlr4::tree::TerminalNode *LPAREN();
+    antlr4::tree::TerminalNode *BASKET();
+    antlr4::tree::TerminalNode *RPAREN();
+    std::vector<antlr4::tree::TerminalNode *> COLON();
+    antlr4::tree::TerminalNode* COLON(size_t i);
     antlr4::tree::TerminalNode *WHERE();
     ExpressionContext *expression();
-    antlr4::tree::TerminalNode *COLON();
+    antlr4::tree::TerminalNode *NAME();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1765,13 +1838,25 @@ public:
 
   class  LocalUniquenessContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *structureattributename = nullptr;;
-    antlr4::Token *attributename = nullptr;;
     LocalUniquenessContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *LPAREN();
     antlr4::tree::TerminalNode *LOCAL();
     antlr4::tree::TerminalNode *RPAREN();
+    LocalUniqueElContext *localUniqueEl();
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  LocalUniquenessContext* localUniqueness();
+
+  class  LocalUniqueElContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *structureattributename = nullptr;;
+    antlr4::Token *attributename = nullptr;;
+    LocalUniqueElContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *COLON();
     std::vector<antlr4::tree::TerminalNode *> NAME();
     antlr4::tree::TerminalNode* NAME(size_t i);
@@ -1784,7 +1869,7 @@ public:
    
   };
 
-  LocalUniquenessContext* localUniqueness();
+  LocalUniqueElContext* localUniqueEl();
 
   class  SetConstraintContext : public antlr4::ParserRuleContext {
   public:
@@ -1797,6 +1882,9 @@ public:
     std::vector<ExpressionContext *> expression();
     ExpressionContext* expression(size_t i);
     antlr4::tree::TerminalNode *SEMI();
+    antlr4::tree::TerminalNode *LPAREN();
+    antlr4::tree::TerminalNode *BASKET();
+    antlr4::tree::TerminalNode *RPAREN();
     std::vector<antlr4::tree::TerminalNode *> COLON();
     antlr4::tree::TerminalNode* COLON(size_t i);
     antlr4::tree::TerminalNode *WHERE();
@@ -1831,9 +1919,7 @@ public:
   public:
     ExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    std::vector<Term1Context *> term1();
-    Term1Context* term1(size_t i);
-    antlr4::tree::TerminalNode *IMPL();
+    Term1Context *term1();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1863,6 +1949,7 @@ public:
     antlr4::tree::TerminalNode *OR();
     antlr4::tree::TerminalNode *PLUS();
     antlr4::tree::TerminalNode *MINUS();
+    antlr4::tree::TerminalNode *IMPL();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -1954,8 +2041,7 @@ public:
   public:
     Ili2Parser::ObjectOrAttributePathContext *objectpath = nullptr;;
     Ili2Parser::ObjectOrAttributePathContext *inspaectionpath = nullptr;;
-    antlr4::Token *modelname = nullptr;;
-    antlr4::Token *runtimeparametername = nullptr;;
+    Ili2Parser::PathContext *parampath = nullptr;;
     FactorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     ObjectOrAttributePathContext *objectOrAttributePath();
@@ -1965,10 +2051,6 @@ public:
     antlr4::tree::TerminalNode *OF();
     FunctionCallContext *functionCall();
     antlr4::tree::TerminalNode *PARAMETER();
-    std::vector<antlr4::tree::TerminalNode *> NAME();
-    antlr4::tree::TerminalNode* NAME(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> DOT();
-    antlr4::tree::TerminalNode* DOT(size_t i);
     ConstantContext *constant();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -2006,22 +2088,13 @@ public:
 
   class  PathElContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *referenceattributename = nullptr;;
-    antlr4::Token *rolename = nullptr;;
-    antlr4::Token *associationname = nullptr;;
-    antlr4::Token *basename = nullptr;;
     PathElContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *THIS();
     antlr4::tree::TerminalNode *THISAREA();
     antlr4::tree::TerminalNode *THATAREA();
     antlr4::tree::TerminalNode *PARENT();
-    std::vector<antlr4::tree::TerminalNode *> NAME();
-    antlr4::tree::TerminalNode* NAME(size_t i);
-    AssociationPathContext *associationPath();
-    antlr4::tree::TerminalNode *LBRACE();
-    antlr4::tree::TerminalNode *RBRACE();
-    AttributeRefContext *attributeRef();
+    ObjectRefContext *objectRef();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -2029,28 +2102,17 @@ public:
 
   PathElContext* pathEl();
 
-  class  AssociationPathContext : public antlr4::ParserRuleContext {
+  class  ObjectRefContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *associationaccessmame = nullptr;;
-    AssociationPathContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *NAME();
-    antlr4::tree::TerminalNode *BACKSLASH();
-
-    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
-   
-  };
-
-  AssociationPathContext* associationPath();
-
-  class  AttributeRefContext : public antlr4::ParserRuleContext {
-  public:
-    antlr4::Token *attributename = nullptr;;
+    antlr4::Token *name = nullptr;;
     antlr4::Token *axislistindex = nullptr;;
-    AttributeRefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    antlr4::Token *associationname = nullptr;;
+    ObjectRefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *AGGREGATES();
-    antlr4::tree::TerminalNode *NAME();
+    antlr4::tree::TerminalNode *BACKSLASH();
+    std::vector<antlr4::tree::TerminalNode *> NAME();
+    antlr4::tree::TerminalNode* NAME(size_t i);
     antlr4::tree::TerminalNode *LBRACE();
     antlr4::tree::TerminalNode *RBRACE();
     antlr4::tree::TerminalNode *FIRST();
@@ -2061,7 +2123,7 @@ public:
    
   };
 
-  AttributeRefContext* attributeRef();
+  ObjectRefContext* objectRef();
 
   class  FunctionCallContext : public antlr4::ParserRuleContext {
   public:
@@ -2175,7 +2237,6 @@ public:
     antlr4::tree::TerminalNode *SEMI();
     std::vector<antlr4::tree::TerminalNode *> NAME();
     antlr4::tree::TerminalNode* NAME(size_t i);
-    FormationDefContext *formationDef();
     antlr4::tree::TerminalNode *EXTENDS();
     PropertiesContext *properties();
     PathContext *path();
@@ -2188,6 +2249,7 @@ public:
     ViewAttributeContext* viewAttribute(size_t i);
     std::vector<ConstraintDefContext *> constraintDef();
     ConstraintDefContext* constraintDef(size_t i);
+    FormationDefContext *formationDef();
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -2276,7 +2338,7 @@ public:
     antlr4::tree::TerminalNode *OF();
     RenamedViewableRefContext *renamedViewableRef();
     antlr4::tree::TerminalNode *ALL();
-    antlr4::tree::TerminalNode *EQUAL();
+    antlr4::tree::TerminalNode *EQUAL_CONST();
     antlr4::tree::TerminalNode *LPAREN();
     UniqueElContext *uniqueEl();
     antlr4::tree::TerminalNode *RPAREN();
@@ -2380,6 +2442,8 @@ public:
   class  GraphicDefContext : public antlr4::ParserRuleContext {
   public:
     antlr4::Token *graphicname1 = nullptr;;
+    Ili2Parser::PathContext *expath = nullptr;;
+    Ili2Parser::PathContext *bpath = nullptr;;
     antlr4::Token *graphicname2 = nullptr;;
     GraphicDefContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
@@ -2393,14 +2457,12 @@ public:
     antlr4::tree::TerminalNode *EXTENDS();
     antlr4::tree::TerminalNode *BASED();
     antlr4::tree::TerminalNode *ON();
-    PathContext *path();
     std::vector<SelectionContext *> selection();
     SelectionContext* selection(size_t i);
     std::vector<DrawingRuleContext *> drawingRule();
     DrawingRuleContext* drawingRule(size_t i);
-    antlr4::tree::TerminalNode *SIGN();
-    antlr4::tree::TerminalNode *INTERLIS();
-    antlr4::tree::TerminalNode *DOT();
+    std::vector<PathContext *> path();
+    PathContext* path(size_t i);
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -2517,8 +2579,12 @@ public:
   bool baseTypeSempred(BaseTypeContext *_localctx, size_t predicateIndex);
   bool coordinateTypeSempred(CoordinateTypeContext *_localctx, size_t predicateIndex);
   bool lineTypeSempred(LineTypeContext *_localctx, size_t predicateIndex);
+  bool composedUnitExprSempred(ComposedUnitExprContext *_localctx, size_t predicateIndex);
+  bool mandatoryConstraintSempred(MandatoryConstraintContext *_localctx, size_t predicateIndex);
+  bool plausibilityConstraintSempred(PlausibilityConstraintContext *_localctx, size_t predicateIndex);
+  bool existenceConstraintSempred(ExistenceConstraintContext *_localctx, size_t predicateIndex);
+  bool uniquenessConstraintSempred(UniquenessConstraintContext *_localctx, size_t predicateIndex);
   bool setConstraintSempred(SetConstraintContext *_localctx, size_t predicateIndex);
-  bool expressionSempred(ExpressionContext *_localctx, size_t predicateIndex);
   bool operator1Sempred(Operator1Context *_localctx, size_t predicateIndex);
   bool operator2Sempred(Operator2Context *_localctx, size_t predicateIndex);
 

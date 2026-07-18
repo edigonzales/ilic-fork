@@ -1,0 +1,33 @@
+INTERLIS 2.3;
+
+MODEL DeclarationNamespacesValid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    ModelDomain = TEXT*20;
+    SharedName = TEXT*10;
+
+  PARAMETER
+    runtimeValue: BOOLEAN;
+    SharedName: BOOLEAN;
+
+  TOPIC BaseTopic =
+    DOMAIN BaseDomain = TEXT*20;
+    CLASS Base =
+      value: TEXT*20;
+    END Base;
+  END BaseTopic;
+
+  TOPIC ExtendedTopic EXTENDS BaseTopic =
+    DOMAIN NewDomain = TEXT*10;
+    CLASS Base (EXTENDED) =
+    END Base;
+  END ExtendedTopic;
+
+  TOPIC Views =
+    DEPENDS ON BaseTopic;
+    VIEW Projection
+      PROJECTION OF source ~ BaseTopic.Base;
+    =
+      ATTRIBUTE ALL OF source;
+    END Projection;
+  END Views;
+END DeclarationNamespacesValid.

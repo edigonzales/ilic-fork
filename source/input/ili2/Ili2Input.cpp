@@ -37,8 +37,11 @@ void input::parseIli2(string ilifile)
          input = util::load_filtered_string_from_file(ilifile);
          input_file = ilifile;
       }
+      Log.setCurrentSource(input_file);
+      Log.setCategory("parser");
 
       antlr4::ANTLRInputStream inputstream(input);
+      prepare_meta_attributes(input);
       int errors = Log.getErrorCount();
 
       Log.debug("creating ili2 lexer ...");
@@ -61,7 +64,7 @@ void input::parseIli2(string ilifile)
       ili2input.visit(ili2d);
 
    }
-   catch (exception e) {
+   catch (const exception &e) {
       Log.setLevel(1);
       Log.internal_error(string(e.what()),1);
    }
@@ -107,6 +110,47 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketRef(parser::Ili2Parser::MetaDataBask
    return nullptr;
 }
 
+namespace {
+
+MetaBasketDef *find_meta_basket_in(Package *package,const string &name)
+{
+   if (package == nullptr) return nullptr;
+   for (MetaElement *element : package->Element) {
+      if (element->getClass() == "MetaBasketDef" && element->Name == name) {
+         return static_cast<MetaBasketDef *>(element);
+      }
+      if (auto child = dynamic_cast<Package *>(element)) {
+         if (MetaBasketDef *found = find_meta_basket_in(child,name)) return found;
+      }
+   }
+   return nullptr;
+}
+
+MetaBasketDef *find_meta_basket(const string &path)
+{
+   string name = path;
+   size_t dot = name.rfind('.');
+   if (dot != string::npos) name = name.substr(dot + 1);
+   if (MetaBasketDef *found = find_meta_basket_in(get_package_context(),name)) return found;
+   for (Model *model : get_all_models()) {
+      if (MetaBasketDef *found = find_meta_basket_in(model,name)) return found;
+   }
+   return nullptr;
+}
+
+Class *find_viewable_in(Package *package,const string &name)
+{
+   if (package == nullptr) return nullptr;
+   for (MetaElement *element : package->Element) {
+      if ((element->getClass() == "Class" || element->getClass() == "View") && element->Name == name) {
+         return static_cast<Class *>(element);
+      }
+   }
+   return nullptr;
+}
+
+}
+
 antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBasketDefContext *ctx)
 {
 
@@ -120,10 +164,62 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBask
    */
 
    debug(ctx,">>> visitMetaDataBasketDef()");
-   // ... to do !!!
+   MetaBasketDef *basket = new MetaBasketDef();
+   init_extendableme(basket,get_line(ctx));
+   basket->Name = ctx->basketname->getText();
+   basket->Kind = ctx->SIGN() == nullptr ? MetaBasketDef::RefSystemB : MetaBasketDef::SignB;
+   basket->Final = ctx->FINAL() != nullptr;
+   basket->MetaDataTopic = find_dataunit(visitPath(ctx->path()),get_line(ctx->path()));
+   if (ctx->metaDataBasketRef() != nullptr) {
+      basket->Super = find_meta_basket(ctx->metaDataBasketRef()->getText());
+      if (basket->Super == nullptr) {
+         Log.error("metadata basket " + ctx->metaDataBasketRef()->getText() + " not found",get_line(ctx));
+      }
+   }
+
+   bool afterTopic = false;
+   bool expectClass = false;
+   bool expectObject = false;
+   Class *objectClass = nullptr;
+   for (antlr4::tree::ParseTree *child : ctx->children) {
+      if (child == ctx->path()) {
+         afterTopic = true;
+         continue;
+      }
+      if (!afterTopic) continue;
+      string text = child->getText();
+      if (text == "OBJECTS") {
+         expectClass = true;
+         expectObject = false;
+         objectClass = nullptr;
+         continue;
+      }
+      if (text == "OF" || text == ",") continue;
+      if (text == ":") {
+         expectObject = true;
+         continue;
+      }
+      auto terminal = dynamic_cast<antlr4::tree::TerminalNode *>(child);
+      if (terminal == nullptr || terminal->getSymbol()->getType() != parser::Ili2Parser::NAME) continue;
+      if (expectClass) {
+         Package *objectPackage = basket->MetaDataTopic == nullptr
+            ? get_package_context() : basket->MetaDataTopic->ElementInPackage;
+         objectClass = find_viewable_in(objectPackage,text);
+         if (objectClass == nullptr) Log.error("viewable " + text + " not found",get_line(terminal));
+         expectClass = false;
+      }
+      else if (expectObject) {
+         MetaObjectDef *object = new MetaObjectDef();
+         init_mmobject(object,get_line(terminal));
+         object->Name = text;
+         object->Class = objectClass;
+         object->MetaBasketDef.push_back(basket);
+         basket->Members.push_back(object);
+      }
+   }
    debug(ctx,"<<< visitMetaDataBasketDef()");
 
-   return nullptr;
+   return basket;
 
 }
 
@@ -142,7 +238,7 @@ antlrcpp::Any Ili2Input::visitRunTimeParameterDef(parser::Ili2Parser::RunTimePar
 
    for (auto p : ctx->runTimeParameter()) {
       AttrOrParam *a = new AttrOrParam;
-      a->_line = get_line(ctx);
+      a->_line = get_line(p->runtimeparametername);
       a->Name = p->runtimeparametername->getText();
       a->Type = visitAttrTypeDef(p->attrTypeDef());
       get_model_context()->_runtimeparameter.push_back(a);
@@ -153,5 +249,3 @@ antlrcpp::Any Ili2Input::visitRunTimeParameterDef(parser::Ili2Parser::RunTimePar
    return nullptr;
 
 }
-
-

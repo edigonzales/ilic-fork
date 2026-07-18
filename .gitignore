@@ -1,4 +1,15 @@
 .vs/*
+
+# macOS
+.DS_Store
+
+# CMake build output
+build/macos/
+build/wasm/
+build/npm/
+packages/compiler-wasm/ilic.mjs
+packages/compiler-wasm/ilic.wasm
+
 build/bin/*
 build/vc2019/.vs/*
 build/vc2019/Debug/*

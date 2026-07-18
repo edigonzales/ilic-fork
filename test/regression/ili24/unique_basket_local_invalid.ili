@@ -1,0 +1,15 @@
+INTERLIS 2.4;
+
+MODEL UniqueBasketLocalInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  TOPIC Topic =
+    STRUCTURE Item =
+      Code : TEXT;
+    END Item;
+
+    CLASS Container =
+      Items : BAG {0..*} OF Item;
+      UNIQUE (BASKET) BasketLocal: (LOCAL) Items:Code;
+    END Container;
+  END Topic;
+END UniqueBasketLocalInvalid.

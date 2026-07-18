@@ -2,6 +2,9 @@
 #include "../util/StringUtil.h"
 #include "../util/Logger.h"
 
+#include <sstream>
+#include <cctype>
+
 using namespace util;
 using namespace metamodel;
 
@@ -20,12 +23,140 @@ namespace metamodel {
    static list <FunctionDef*> AllFunctions;
    static list <LineForm*> AllLineForms;
    static list <Graphic*> AllGraphics;
+   static Class AnyClass;
+   static Class AnyStructure;
+   static bool UniversalClassesInitialized = false;
+   struct PendingMetaAttribute {
+      string Name;
+      string Value;
+      string RawText;
+      int Line = -1;
+      int Column = 0;
+   };
+   static map<int,list<PendingMetaAttribute>> PendingMetaAttributes;
+
+   static string trim_copy(const string &value)
+   {
+      size_t first = 0;
+      while (first < value.size() && isspace(static_cast<unsigned char>(value[first]))) ++first;
+      size_t last = value.size();
+      while (last > first && isspace(static_cast<unsigned char>(value[last - 1]))) --last;
+      return value.substr(first,last - first);
+   }
+
+   static string decode_meta_value(string value)
+   {
+      value = trim_copy(value);
+      if (value.size() < 2 || value.front() != '"' || value.back() != '"') return value;
+      string decoded;
+      for (size_t i = 1; i + 1 < value.size(); ++i) {
+         if (value[i] == '\\' && i + 2 < value.size()
+             && (value[i + 1] == '\\' || value[i + 1] == '"')) {
+            decoded += value[++i];
+         }
+         else decoded += value[i];
+      }
+      return decoded;
+   }
+
+   void reset_input_state()
+   {
+      AllPackages.clear();
+      AllTypes.clear();
+      AllUnits.clear();
+      AllImports.clear();
+      AllFunctions.clear();
+      AllLineForms.clear();
+      AllGraphics.clear();
+      PendingMetaAttributes.clear();
+      UniversalClassesInitialized = false;
+      ili23 = true;
+      ili24 = true;
+      iliversion.clear();
+   }
+
+   void prepare_meta_attributes(const string &source)
+   {
+      PendingMetaAttributes.clear();
+      list<PendingMetaAttribute> pending;
+      istringstream lines(source);
+      string line;
+      int lineNumber = 0;
+      bool inBlockComment = false;
+      while (getline(lines,line)) {
+         ++lineNumber;
+         size_t first = line.find_first_not_of(" \t\r");
+         string trimmed = first == string::npos ? "" : line.substr(first);
+         if (inBlockComment) {
+            size_t end = trimmed.find("*/");
+            if (end == string::npos) continue;
+            inBlockComment = false;
+            trimmed = trim_copy(trimmed.substr(end + 2));
+            if (trimmed.empty()) continue;
+         }
+         while (trimmed.rfind("/*",0) == 0) {
+            size_t end = trimmed.find("*/",2);
+            if (end == string::npos) {
+               inBlockComment = true;
+               trimmed.clear();
+               break;
+            }
+            trimmed = trim_copy(trimmed.substr(end + 2));
+         }
+         if (trimmed.empty()) continue;
+         if (trimmed.rfind("!!@",0) == 0) {
+            string option = trim_copy(trimmed.substr(3));
+            size_t equals = option.find('=');
+            string name = equals == string::npos ? "" : trim_copy(option.substr(0,equals));
+            if (equals == string::npos || name.empty()) {
+               Log.error("invalid meta attribute; expected !!@ name=value",lineNumber,
+                  static_cast<int>(first == string::npos ? 0 : first),"ILIC-META-SYNTAX");
+               continue;
+            }
+            PendingMetaAttribute attribute;
+            attribute.Name = std::move(name);
+            attribute.Value = decode_meta_value(option.substr(equals + 1));
+            attribute.RawText = trimmed;
+            attribute.Line = lineNumber;
+            attribute.Column = static_cast<int>(first == string::npos ? 0 : first);
+            pending.push_back(std::move(attribute));
+         }
+         else if (trimmed.rfind("!!",0) != 0 && !pending.empty()) {
+            PendingMetaAttributes[lineNumber] = pending;
+            pending.clear();
+         }
+      }
+      if (!pending.empty()) {
+         const PendingMetaAttribute &attribute = pending.front();
+         Log.error("meta attribute is not followed by a model element",attribute.Line,
+            attribute.Column,"ILIC-META-DANGLING");
+      }
+   }
+
+   static void initialize_universal_classes()
+   {
+      if (UniversalClassesInitialized) {
+         return;
+      }
+      AnyClass.Name = "ANYCLASS";
+      AnyClass.Kind = Class::ClassVal;
+      AnyStructure.Name = "ANYSTRUCTURE";
+      AnyStructure.Kind = Class::Structure;
+      UniversalClassesInitialized = true;
+   }
 
    // mmobject helpers
 
    void init_mmobject(MMObject* o, int line)
    {
       o->_line = line;
+      if (line > 0 && !Log.getCurrentSource().empty()) {
+         o->_source.valid = true;
+         o->_source.uri = Log.getCurrentSource();
+         o->_source.start.line = static_cast<size_t>(line - 1);
+         o->_source.end = o->_source.start;
+         o->_source.end.character = 1;
+      }
    }
 
    // metaelement helpers
@@ -38,6 +169,21 @@ namespace metamodel {
       // list <MetaAttribute *> MetaAttribute;
 
       init_mmobject(e, line);
+      auto metadata = PendingMetaAttributes.find(line);
+      if (metadata != PendingMetaAttributes.end()) {
+         for (const auto &entry : metadata->second) {
+            MetaAttribute *attribute = new MetaAttribute();
+            init_mmobject(attribute,entry.Line);
+            attribute->_source.start.character = static_cast<size_t>(entry.Column);
+            attribute->_source.end = attribute->_source.start;
+            attribute->_source.end.character += entry.RawText.size();
+            attribute->Name = entry.Name;
+            attribute->Value = entry.Value;
+            attribute->_rawText = entry.RawText;
+            attribute->MetaElement = e;
+            e->MetaAttribute.push_back(attribute);
+         }
+      }
       MMObject *ctx = get_context();
       if (ctx == nullptr) {
          return;
@@ -217,14 +363,45 @@ namespace metamodel {
    Unit* find_unit(string name, int line)
    {
       Log.debug("find_unit " + name);
+
+      // Qualified unit references identify their declaration directly. The
+      // semantic checker separately enforces that the declaring model was
+      // imported at this lexical occurrence.
       for (Unit* u : AllUnits) {
          if (get_path(u) == name) {
             return u;
          }
-         else if (u->Name == name) {
+      }
+
+      Model *model = get_model_context();
+      auto matches = [&name](Unit *unit) {
+         return unit != nullptr && (unit->Name == name || unit->_unitname == name);
+      };
+
+      // Short unit names are resolved in the current model first and then in
+      // directly imported models. This avoids the old load-order-dependent
+      // global lookup while retaining the RefHB unit-short-name notation.
+      for (Unit *u : AllUnits) {
+         if (matches(u) && u->ElementInPackage == model) {
             return u;
          }
-         else if (u->_unitname == name) {
+      }
+      for (Import *import : get_all_imports()) {
+         if (import == nullptr || import->ImportingP != model) {
+            continue;
+         }
+         for (Unit *u : AllUnits) {
+            if (matches(u) && u->ElementInPackage == import->ImportedP) {
+               return u;
+            }
+         }
+      }
+
+      // Preserve a useful semantic "missing import" diagnostic for an
+      // otherwise uniquely named unit instead of reducing it to an unknown
+      // symbol solely because the model omitted IMPORTS.
+      for (Unit *u : AllUnits) {
+         if (matches(u)) {
             return u;
          }
       }
@@ -282,11 +459,39 @@ namespace metamodel {
       string package_path = get_path(get_package_context());
       Log.debug(">>> find_type <" + search + "> in context " + package_path);
 
+      // A class inherited through an extended topic may be addressed through
+      // the extending topic's qualified path. The element itself remains
+      // owned by the base topic, so include the corresponding base path in
+      // the lookup candidates.
+      vector<string> searches({search});
+      for (size_t index = 0; index < searches.size(); ++index) {
+         string candidate = searches[index];
+         for (Package *package : AllPackages) {
+            if (package->getClass() != "SubModel") {
+               continue;
+            }
+            SubModel *topic = static_cast<SubModel *>(package);
+            if (topic->_super == nullptr) {
+               continue;
+            }
+            string prefix = get_path(topic) + ".";
+            if (util::starts_with(candidate,prefix)) {
+               string inherited = get_path(topic->_super) + "." + candidate.substr(prefix.length());
+               if (find(searches.begin(),searches.end(),inherited) == searches.end()) {
+                  searches.push_back(inherited);
+               }
+            }
+         }
+      }
+
       Type *found = nullptr;
       for (Type* t : AllTypes) {
          string path = get_path(t);
-         if (search == path) {
-            found = t;
+         for (auto candidate : searches) {
+            if (candidate == path) {
+               found = t;
+               break;
+            }
          }
          if (path == package_path + "." + search) {
             found = t;
@@ -461,16 +666,12 @@ namespace metamodel {
       Log.debug("find_class " + name);
       Class* c;
       if (name == "ANYCLASS" || name == "INTERLIS.ANYCLASS" || name == "CLASS" || name == "INTERLIS.CLASS") {
-         // singelton, to do !!!
-         c = new Class();
-         c->Name = name;
-         c->Kind = Class::ClassVal;
+         initialize_universal_classes();
+         c = &AnyClass;
       }
       else if (name == "ANYSTRUCTURE" || name == "INTERLIS.ANYSTRUCTURE" || name == "STRUCTURE" || name == "INTERLIS.STRUCTURE") {
-         // singelton, to do !!!
-         c = new Class();
-         c->Name = name;
-         c->Kind = Class::Structure;
+         initialize_universal_classes();
+         c = &AnyStructure;
       }
       else {
          Type* t = find_type(name, line, false);
@@ -599,10 +800,10 @@ namespace metamodel {
 
    AttrOrParam* find_attribute(Class* c,string name)
    {
-      Log.debug("find_attribute " + name + " in context " + get_path(c));
       if (c == nullptr) {
          return nullptr;
       }
+      Log.debug("find_attribute " + name + " in context " + get_path(c));
       for (auto a : c->ClassAttribute) {
          if (a->Name == name) {
             return a;
@@ -619,10 +820,10 @@ namespace metamodel {
 
    Role* find_role(Class* c,string name)
    {
-      Log.debug("find_role " + name + " in context " + get_path(c) + " " + to_string(c->_roleaccess.size()));
       if (c == nullptr) {
          return nullptr;
       }
+      Log.debug("find_role " + name + " in context " + get_path(c) + " " + to_string(c->_roleaccess.size()));
       for (auto r : c->Role) {
          if (r->Name == name) {
             return r;
@@ -749,6 +950,8 @@ namespace metamodel {
    void init_expression(Expression* e, int line)
    {
       init_mmobject(e, line);
+      e->OccurrenceScope = get_context();
+      e->OccurrencePackage = get_package_context();
    }
 
    void init_factor(Factor* f, int line)

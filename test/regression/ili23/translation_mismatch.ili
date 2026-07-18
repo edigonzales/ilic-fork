@@ -1,0 +1,18 @@
+INTERLIS 2.3;
+
+MODEL BaseModel (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC BaseTopic =
+    CLASS BaseClass =
+      BaseAttribute : TEXT*10;
+    END BaseClass;
+  END BaseTopic;
+END BaseModel.
+
+MODEL TranslatedModel (fr) AT "https://example.invalid" VERSION "2"
+TRANSLATION OF BaseModel ["1"] =
+  TOPIC TranslatedTopic =
+    CLASS TranslatedClass =
+      TranslatedAttribute : TEXT*20;
+    END TranslatedClass;
+  END TranslatedTopic;
+END TranslatedModel.

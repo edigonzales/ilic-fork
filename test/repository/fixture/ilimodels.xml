@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TRANSFER>
+  <DATASECTION>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="base">
+      <Name>RepositoryBase</Name>
+      <SchemaLanguage>ili2_3</SchemaLanguage>
+      <File>RepositoryBase.ili</File>
+      <Version>2026-01-01</Version>
+      <browseOnly>false</browseOnly>
+      <md5>3c59cbb35a6f81615acafb8d2956e95d</md5>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="root">
+      <Name>RepositoryRoot</Name>
+      <SchemaLanguage>ili2_3</SchemaLanguage>
+      <File>RepositoryRoot.ili</File>
+      <Version>2026-01-02</Version>
+      <dependsOnModel>
+        <IliRepository20.ModelName_><value>RepositoryBase</value></IliRepository20.ModelName_>
+      </dependsOnModel>
+      <browseOnly>false</browseOnly>
+      <md5>e6417df1e3d336b4fa2c9701c7a576ed</md5>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+  </DATASECTION>
+</TRANSFER>

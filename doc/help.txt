@@ -1,4 +1,7 @@
 
+NOTE: This is the legacy help snapshot. The verified current CLI reference is
+      docs/cli.md.
+
 ilic 0.9.9 (builddate=2021-09-28, platform=win32)
 
    Distributed by the Coordination of Geographic Information

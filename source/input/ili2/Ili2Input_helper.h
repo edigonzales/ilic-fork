@@ -20,6 +20,7 @@ namespace input {
    const string HIDING    = "HIDING";
    const string ORDERED   = "ORDERED";
    const string EXTERNAL  = "EXTERNAL";
+   const string GENERIC   = "GENERIC";
 
    string visitString(antlr4::Token *t);
    map<string,bool> get_properties(parser::Ili2Parser::PropertiesContext *ctx,vector<string> allowed_properties);

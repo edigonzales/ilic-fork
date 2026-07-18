@@ -51,7 +51,7 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
    debug(ctx,">>> visitModelDef(" + name1 + ")");
    Log.incNestLevel();
    if (name1 != name2) {
-      Log.warning(
+      Log.error(
          "modelname " + name2 + " must match " + name1,
          ctx->modelname2->getLine()
       );
@@ -90,9 +90,10 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
       m->VersionExplanation = ctx->modelversion_expl->getText();
    }
 
-   // Topic ModelTranslation, to do !!!
-   // ctx->translationOf->getText();
-   // ctx->translationOfVersion->getText();
+   if (ctx->translationOf != nullptr) {
+      m->_translationOfName = ctx->translationOf->getText();
+      m->_translationOfVersion = visitString(ctx->translationOfVersion);
+   }
 
    if (ili24) {
       if (ctx->NOINCREMENTALTRANSFER() != nullptr) {
@@ -239,7 +240,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    Log.incNestLevel();
 
    if (name1 != name2) {
-      Log.warning(
+      Log.error(
          "topicname " + name2 + " must match " + name1,
          get_line(ctx->topicname2)
       );
@@ -288,8 +289,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
       d->Oid = find_domaintype(ctx->basketOid->getText(),get_line(ctx->basketOid));
    }
    if (ctx->topicOid != nullptr) {
-      // topicOid where???, to do !!!
-      // s->Oid = find_domaintype(ctx->topicOid->getText());
+      d->TopicOid = find_domaintype(ctx->topicOid->getText(),get_line(ctx->topicOid));
    }
 
    if (ctx->DEPENDS().size() > 0) {
@@ -311,6 +311,13 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
       }
    }
 
+   if (ctx->deferredGenerics() != nullptr) {
+      for (auto path : ctx->deferredGenerics()->path()) {
+         string name = visitPath(path);
+         s->DeferredGenerics.push_back({name,find_domaintype(name,get_line(path)),get_line(path)});
+      }
+   }
+
    // metaDataBasketDef
    // unitDecl
    // functionDef
@@ -323,28 +330,6 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    // graphicDef
    visitChildren(ctx);
    pop_context();
-   
-   if (!d->Abstract) {
-      for (auto e : s->Element) {
-         if (e->isSubClassOf("ExtendableME") && e->getClass() != "DataUnit") {
-            ExtendableME *ee = static_cast<ExtendableME *>(e);
-            if (ee->Abstract && ee->Sub.size() == 0) {
-               Log.error("concrete topic " + s->Name + " can not contain abstract element " + e->Name + " without concrete extension (1)",e->_line);
-            }
-         }
-      }
-      if (s->_super != nullptr) {
-         for (auto e : s->_super->Element) {
-            if (e->isSubClassOf("ExtendableME") && e->getClass() != "DataUnit") {
-               ExtendableME* ee = static_cast<ExtendableME*>(e);
-               if (ee->Abstract && ee->Sub.size() == 0) {
-// to do !!!
-//                  Log.error("concrete topic " + s->Name + " can not contain abstract element " + e->Name + " without concrete extension (2)", s->_line);
-               }
-            }
-         }
-      }
-   }
    
    Log.decNestLevel();
    debug(ctx,"<<< visitTopicDef(" + name1 + ")");

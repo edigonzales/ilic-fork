@@ -1,0 +1,15 @@
+INTERLIS 2.4;
+
+MODEL GenericDeferredMissingInvalid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Position (GENERIC) = COORD NUMERIC, NUMERIC;
+    PositionA = COORD 0 .. 100, 0 .. 100;
+    PositionB = COORD 200 .. 300, 200 .. 300;
+  CONTEXT default =
+    Position = PositionA OR PositionB;
+  TOPIC Data =
+    CLASS Item =
+      position: Position;
+    END Item;
+  END Data;
+END GenericDeferredMissingInvalid.

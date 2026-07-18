@@ -1,0 +1,15 @@
+INTERLIS 2.4;
+
+MODEL GenericDeferredUnusedInvalid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Position (GENERIC) = COORD NUMERIC, NUMERIC;
+    Concrete = COORD 0 .. 100, 0 .. 100;
+  CONTEXT default =
+    Position = Concrete;
+  TOPIC Data =
+    DEFERRED GENERICS Position;
+    CLASS Item =
+      position: Concrete;
+    END Item;
+  END Data;
+END GenericDeferredUnusedInvalid.

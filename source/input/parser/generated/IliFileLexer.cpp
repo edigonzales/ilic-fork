@@ -1,5 +1,5 @@
 
-// Generated from ..\..\..\..\source\c\ilic\input\parser\generated\IliFileLexer.l4 by ANTLR 4.7.1
+// Generated from IliFileLexer.l4 by ANTLR 4.7.1
 
 
 #include "IliFileLexer.h"
@@ -63,7 +63,7 @@ std::vector<uint16_t> IliFileLexer::_serializedATN;
 std::vector<std::string> IliFileLexer::_ruleNames = {
   u8"INTERLIS", u8"DOT", u8"COMMA", u8"SEMI", u8"TRANSFER", u8"MODEL", u8"TRANSLATION", 
   u8"OF", u8"IMPORTS", u8"UNQUALIFIED", u8"NAME", u8"DIGIT", u8"LETTER", 
-  u8"WS", u8"SL_COMMENT", u8"ILI_DOC", u8"ILI_BLOCKCOMMENT", u8"ERRORCHAR"
+  u8"WS", u8"SL_COMMENT", u8"ILI_DOC", u8"ILI_BLOCKCOMMENT", u8"ANYCHAR"
 };
 
 std::vector<std::string> IliFileLexer::_channelNames = {
@@ -83,7 +83,7 @@ std::vector<std::string> IliFileLexer::_symbolicNames = {
   "", u8"INTERLIS", u8"DOT", u8"COMMA", u8"SEMI", u8"TRANSFER", u8"MODEL", 
   u8"TRANSLATION", u8"OF", u8"IMPORTS", u8"UNQUALIFIED", u8"NAME", u8"DIGIT", 
   u8"LETTER", u8"WS", u8"SL_COMMENT", u8"ILI_DOC", u8"ILI_BLOCKCOMMENT", 
-  u8"ERRORCHAR"
+  u8"ANYCHAR"
 };
 
 dfa::Vocabulary IliFileLexer::_vocabulary(_literalNames, _symbolicNames);

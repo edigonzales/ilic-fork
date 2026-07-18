@@ -1,0 +1,12 @@
+INTERLIS 2.3;
+
+MODEL TransientAbstractWithoutDerivation (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC T (ABSTRACT) =
+    CLASS A (ABSTRACT) =
+      value (ABSTRACT, TRANSIENT) : TEXT;
+    END A;
+  END T;
+
+END TransientAbstractWithoutDerivation.

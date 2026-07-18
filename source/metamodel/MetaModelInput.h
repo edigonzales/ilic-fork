@@ -14,12 +14,14 @@ namespace metamodel {
    extern bool ili23;
    extern bool ili24;
    extern string iliversion;
+   void reset_input_state();
 
    // mmobject helpers
    void init_mmobject(MMObject *o, int line);
    
    // metaelement helpers
    void init_metaelement(MetaElement *e, int line);
+   void prepare_meta_attributes(const string &source);
    void init_extendableme(ExtendableME *e, int line);
 
    // package helpers

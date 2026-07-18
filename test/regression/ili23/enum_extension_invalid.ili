@@ -1,0 +1,16 @@
+INTERLIS 2.3;
+
+MODEL EnumExtensionInvalid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Duplicate = (red, blue, red);
+    BaseColor = (red, green);
+    InvalidColor EXTENDS BaseColor = (red);
+
+  CLASS Base (ABSTRACT) =
+    value: (one, two);
+  END Base;
+
+  CLASS Invalid (ABSTRACT) EXTENDS Base =
+    value (EXTENDED): (one);
+  END Invalid;
+END EnumExtensionInvalid.

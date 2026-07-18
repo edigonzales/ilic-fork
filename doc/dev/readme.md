@@ -1,5 +1,9 @@
 # ilic Developer Documentation
 
+> The current user and embedding documentation is maintained in
+> [`../../docs/README.md`](../../docs/README.md). The pages in this directory
+> remain as historical implementation notes.
+
 ## Introduction
 Welcome to the ilic developer documentation. ilic is an INTERLIS compiler written in c++. 
 ilic was completely built from scratch, this is no c++ port of the 
@@ -30,3 +34,5 @@ a Java based utility a Java Runtime or JDK must be present on the development ma
 + [general api](./general_api.md)
 + [input module api](./input_api.md)
 + [output module api](./output_api.md)
++ [semantic conformance and translation validation](./conformance.md)
++ [native C ABI, JSON protocol and WebAssembly embedding](./embedding.md)

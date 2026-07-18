@@ -1,0 +1,6 @@
+INTERLIS 2.3;
+
+MODEL BaseModel (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC BaseTopic =
+  END BaseTopic;
+END BaseModel.

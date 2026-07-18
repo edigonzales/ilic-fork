@@ -1,0 +1,10 @@
+INTERLIS 2.3;
+
+MODEL LineOverlapInvalid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Point = COORD 0.000 .. 100.000, 0.000 .. 100.000;
+
+  CLASS SurfaceObject (ABSTRACT) =
+    geometry: SURFACE WITH (STRAIGHTS) VERTEX Point WITHOUT OVERLAPS > 0.0001;
+  END SurfaceObject;
+END LineOverlapInvalid.

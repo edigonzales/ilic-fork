@@ -1,0 +1,14 @@
+INTERLIS 2.4;
+
+MODEL ExpressionArithmeticValid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC T =
+    CLASS A =
+      number : 0 .. 100;
+      MANDATORY CONSTRAINT (number + 2 * 3 - 1 / 1) > 0;
+      MANDATORY CONSTRAINT (number > 0) => #true;
+    END A;
+  END T;
+
+END ExpressionArithmeticValid.

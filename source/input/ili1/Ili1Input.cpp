@@ -48,6 +48,8 @@ void input::parseIli1(string input)
 
    antlr4::ANTLRInputStream inputstream(util::load_filtered_string_from_file(input));
    input_file = input;
+   Log.setCurrentSource(input);
+   Log.setCategory("parser");
    int errors = Log.getErrorCount();
 
    Log.debug("creating ili1 lexer ...");

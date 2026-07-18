@@ -1,0 +1,5 @@
+INTERLIS 2.3;
+
+MODEL TranslatedModel (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF MissingBase ["1"] =
+END TranslatedModel.

@@ -1,0 +1,20 @@
+INTERLIS 2.3;
+
+MODEL ClassSpecializationValid AT "https://example.invalid" VERSION "1" =
+
+  TOPIC BaseTopic =
+    CLASS Base =
+    END Base;
+  END BaseTopic;
+
+  TOPIC ExtendedTopic EXTENDS BaseTopic =
+    CLASS Base (EXTENDED) =
+    END Base;
+  END ExtendedTopic;
+
+  TOPIC SpecializedTopic EXTENDS BaseTopic =
+    CLASS Specialized EXTENDS BaseTopic.Base =
+    END Specialized;
+  END SpecializedTopic;
+
+END ClassSpecializationValid.

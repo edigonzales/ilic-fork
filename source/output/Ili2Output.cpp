@@ -14,7 +14,7 @@ static string ili_file;
 static string model_version;
 static TextWriter ili2;
 
-static string get_properties(metamodel::Type* t)
+static string get_properties(metamodel::ExtendableME* t)
 {
    string properties = "";
    if (t->Abstract) {
@@ -388,7 +388,29 @@ static void write_type(Type *t)
          // to do !!!
       }
       else if (t->getClass() == "AttributeRefType") {
+         AttributeRefType *attributeRef = static_cast<AttributeRefType *>(t);
          ili2.write(0,"ATTRIBUTE");
+         if (attributeRef->AttrRestriction != nullptr) {
+            ili2.write(0," OF ");
+            write_expression(&ili2,attributeRef->AttrRestriction);
+         }
+         if (!attributeRef->TypeRestriction.empty()) {
+            ili2.write(0," RESTRICTION (");
+            bool separator = false;
+            for (Type *restriction : attributeRef->TypeRestriction) {
+               if (separator) {
+                  ili2.write(0," : ");
+               }
+               if (restriction->ElementInPackage != nullptr) {
+                  ili2.write(0,get_path(restriction));
+               }
+               else {
+                  write_type(static_cast<DomainType *>(restriction));
+               }
+               separator = true;
+            }
+            ili2.write(0,")");
+         }
       }
       else if (t->getClass() == "ClassRefType") {
          ili2.write(0,"CLASS");
@@ -463,7 +485,12 @@ void Ili2Output::preVisitModel(Model *m)
    ili2.writeln(0,"MODEL " + m->Name + " (" + m->Language + ")");
    ili2.incNestLevel();
    ili2.writeln("AT \"" + m->At + "\"");
-   ili2.writeln("VERSION \"" + m->Version + "\" =");
+   ili2.write("VERSION \"" + m->Version + "\"");
+   if (!m->_translationOfName.empty()) {
+      ili2.write(" TRANSLATION OF " + m->_translationOfName
+         + " [\"" + m->_translationOfVersion + "\"]");
+   }
+   ili2.writeln(" =");
    
    Model *act_model = m;
 
@@ -596,6 +623,19 @@ void Ili2Output::preVisitSubModel(SubModel *s)
    }
 
    ili2.incNestLevel();
+
+   if (!s->DeferredGenerics.empty()) {
+      ili2.write("DEFERRED GENERICS ");
+      bool comma = false;
+      for (const SubModel::DeferredGenericRef &reference : s->DeferredGenerics) {
+         if (comma) {
+            ili2.write(0,", ");
+         }
+         ili2.write(0,reference.Domain == nullptr ? reference.Name : get_path(reference.Domain));
+         comma = true;
+      }
+      ili2.writeln(0,";");
+   }
 
 }
 
@@ -813,6 +853,11 @@ void Ili2Output::visitSimpleConstraint(metamodel::SimpleConstraint *c)
       enum {Equal, LessEqual, GreaterEqual} _percentage_operation = Equal;
    */
 
+   // Domain constraints are emitted inline by visitDomainType.
+   if (c->toDomain != nullptr) {
+      return;
+   }
+
    switch (c->Kind) {
       case SimpleConstraint::MandC:
          ili2.writeln("MANDATORY CONSTRAINT");
@@ -878,6 +923,14 @@ void Ili2Output::visitUniqueConstraint(metamodel::UniqueConstraint *c)
 
    ili2.decNestLevel();
    ili2.write("UNIQUE ");
+
+   if (c->PerBasket) {
+      ili2.write(0,"(BASKET) ");
+   }
+
+   if (!c->Name.empty()) {
+      ili2.write(0,c->Name + ": ");
+   }
    
    if (c->Kind == UniqueConstraint::LocalU) {
       ili2.write(0,"(LOCAL) ");
@@ -941,7 +994,7 @@ void Ili2Output::visitAttrOrParam(AttrOrParam *a)
             ili2.write(a->Name + " (EXTENDED): ");
          }
          else {
-            ili2.write(a->Name + " " + get_properties(t) + ": ");
+            ili2.write(a->Name + " " + get_properties(a) + ": ");
          }
          if (t->Mandatory) {
             ili2.write(0,"MANDATORY ");
@@ -954,6 +1007,17 @@ void Ili2Output::visitAttrOrParam(AttrOrParam *a)
          }
          else {
             write_type(t);
+         }
+         if (!a->Derivates.empty()) {
+            ili2.write(0," := ");
+            bool comma = false;
+            for (Expression *derivate : a->Derivates) {
+               if (comma) {
+                  ili2.write(0,", ");
+               }
+               write_expression(&ili2,derivate);
+               comma = true;
+            }
          }
          ili2.writeln(0,";");
       }
@@ -1080,16 +1144,57 @@ void Ili2Output::visitDomainType(metamodel::DomainType* t)
       return;
    }
 
+   string declaration = t->Name + get_properties(t);
    if (t->Super != nullptr) {
-      ili2.write(t->Name + " EXTENDS " + get_path(t->Super) + " = ");
+      ili2.write(declaration + " EXTENDS " + get_path(t->Super) + " = ");
    }
    else {
-      ili2.write(t->Name + " = ");
+      ili2.write(declaration + " = ");
    }
 
    write_type(t);
+   if (!t->Constraint.empty()) {
+      ili2.write(0," CONSTRAINTS ");
+      bool comma = false;
+      for (Constraint *constraint : t->Constraint) {
+         SimpleConstraint *simple = dynamic_cast<SimpleConstraint *>(constraint);
+         if (simple == nullptr) {
+            continue;
+         }
+         if (comma) {
+            ili2.write(0,", ");
+         }
+         ili2.write(0,simple->Name + ": ");
+         write_expression(&ili2,simple->LogicalExpression);
+         comma = true;
+      }
+   }
    ili2.writeln(0,";");
 
+}
+
+void Ili2Output::visitContext(metamodel::Context *context)
+{
+   ili2.writeln("");
+   ili2.writeln("CONTEXT " + context->Name + " =");
+   ili2.incNestLevel();
+   for (GenericDef *definition : context->GenericDefinitions) {
+      if (definition == nullptr || definition->GenericDomain.empty()) {
+         continue;
+      }
+      ili2.write(get_path(definition->GenericDomain.front()) + " = ");
+      bool separator = false;
+      for (DomainType *concrete : definition->ConcreteDomain) {
+         if (separator) {
+            ili2.write(0," OR ");
+         }
+         ili2.write(0,get_path(concrete));
+         separator = true;
+      }
+      ili2.writeln(0,";");
+   }
+   ili2.decNestLevel();
+   ignoreVisit();
 }
 
 void Ili2Output::visitFunctionDef(metamodel::FunctionDef* f)

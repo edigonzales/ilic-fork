@@ -231,6 +231,23 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
       Log.warning("multiple declarations of " + EXTERNAL,line);
       properties[EXTERNAL] = true;
    }
+
+   // GENERIC
+   if (ctx == nullptr || ctx->GENERIC().empty()) {
+      properties[GENERIC] = false;
+   }
+   else if (ctx->GENERIC().size() == 1) {
+      if (find_string(allowed_properties,GENERIC)) {
+         properties[GENERIC] = true;
+      }
+      else {
+         Log.error("property " + GENERIC + " not allowed",line);
+      }
+   }
+   else {
+      Log.warning("multiple declarations of " + GENERIC,line);
+      properties[GENERIC] = true;
+   }
    
    if (properties[ABSTRACT] && properties[FINAL]) {
       Log.error(ABSTRACT + " and " + FINAL + " can not be used at the same time",line);
@@ -242,11 +259,19 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
 
 void input::check_references(Class *c,string name,int line)
 {
+   if (c == nullptr) {
+      return;
+   }
    
    Log.debug(">>> check_references() " + get_path(c));
    Log.incNestLevel();
    
    for (auto a: c->ClassAttribute) {
+      // Name resolution errors are reported while building the attribute. A
+      // later semantic pass must tolerate the unresolved edge.
+      if (a == nullptr || a->Type == nullptr) {
+         continue;
+      }
       int l = line;
       if (line == 0) {
          l = a->_line;
@@ -268,13 +293,25 @@ void input::check_references(Class *c,string name,int line)
             classrestriction = t->_classrestriction;            
          }
          for (auto c: classrestriction) {
-            if (get_package_context() != c->ElementInPackage && !t->External) {
+            auto sourceTopic = dynamic_cast<SubModel *>(get_package_context());
+            auto targetTopic = c == nullptr ? nullptr :
+               dynamic_cast<SubModel *>(c->ElementInPackage);
+            bool targetIsBaseTopic = false;
+            for (SubModel *scope = sourceTopic; scope != nullptr;
+                 scope = dynamic_cast<SubModel *>(scope->_super)) {
+               if (scope == targetTopic) {
+                  targetIsBaseTopic = true;
+                  break;
+               }
+            }
+            if (sourceTopic != nullptr && targetTopic != nullptr &&
+                !targetIsBaseTopic && !t->External) {
                Log.error("reference to other topic must be declared EXTERNAL",l);
                break;
             }
          }
          for (auto c: classrestriction) {
-            if (!depends_on(c->ElementInPackage)) {
+            if (c != nullptr && !depends_on(c->ElementInPackage)) {
                Log.error(n + " requires topic dependency on " + get_path(t->_baseclass->ElementInPackage),l);
                break;
             }
@@ -283,11 +320,15 @@ void input::check_references(Class *c,string name,int line)
       else if (a->Type->getClass() == "MultiValue") {
          MultiValue *t = static_cast<MultiValue *>(a->Type);
          if (t->TypeRestriction.size() == 0) {
-            check_references(static_cast<Class *>(t->BaseType),n,l);
+            if (t->BaseType != nullptr && t->BaseType->getClass() == "Class") {
+               check_references(static_cast<Class *>(t->BaseType),n,l);
+            }
          }
          else {
             for (auto c: t->TypeRestriction) {
-               check_references(static_cast<Class *>(c),n,l);
+               if (c != nullptr && c->getClass() == "Class") {
+                  check_references(static_cast<Class *>(c),n,l);
+               }
             }
          }
       }

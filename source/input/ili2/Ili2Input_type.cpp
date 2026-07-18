@@ -78,13 +78,26 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
    DomainType *t = nullptr;
    if (ctx->type() != nullptr) {
       Type *tt = visitType(ctx->type());
+
+      if (tt == nullptr) {
+         basetype = nullptr;
+         Log.decNestLevel();
+         debug(ctx,"<<< visitDomainType(" + name + ") unresolved type");
+         return nullptr;
+      }
       
       if (tt->getClass() == "Class") {
          Class* ct = static_cast<Class*>(tt);
          ct->isDomainType = true;
       }
 
-      t = static_cast<DomainType *>(tt);
+      t = dynamic_cast<DomainType *>(tt);
+      if (t == nullptr) {
+         Log.error("domain " + name + " requires a domain type",get_line(ctx));
+         basetype = nullptr;
+         Log.decNestLevel();
+         return static_cast<DomainType *>(nullptr);
+      }
    }
    else {
       t = static_cast<DomainType *>(basetype->clone());
@@ -94,11 +107,33 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
    t->Name = name;
    t->Super = basetype;
       
-   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,FINAL}));
+   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,GENERIC,FINAL}));
    t->Abstract = properties[ABSTRACT];
+   t->Generic = properties[GENERIC];
    t->Final = properties[FINAL];
    if (ctx->MANDATORY() != nullptr) {
       t->Mandatory = true;
+   }
+
+   // INTERLIS 2.4 domain constraints are semantic model elements. Keeping the
+   // lexical domain on both the constraint and its expression makes THIS
+   // resolvable after all models have been loaded.
+   auto domainExpressions = ctx->expression();
+   auto domainNames = ctx->NAME();
+   if (!domainExpressions.empty()) {
+      push_context(t);
+      for (size_t index = 0; index < domainExpressions.size(); ++index) {
+         SimpleConstraint *constraint = new SimpleConstraint();
+         init_constraint(constraint,get_line(domainExpressions[index]));
+         constraint->Kind = SimpleConstraint::MandC;
+         constraint->toDomain = t;
+         if (index + 1 < domainNames.size()) {
+            constraint->Name = domainNames[index + 1]->getText();
+         }
+         constraint->LogicalExpression = visitExpression(domainExpressions[index]);
+         t->Constraint.push_back(constraint);
+      }
+      pop_context();
    }
 
    add_type(t);
@@ -109,6 +144,58 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
 
    return t;
 
+}
+
+antlrcpp::Any Ili2Input::visitContextDef(parser::Ili2Parser::ContextDefContext *ctx)
+{
+   return visitChildren(ctx);
+}
+
+antlrcpp::Any Ili2Input::visitContextBlock(parser::Ili2Parser::ContextBlockContext *ctx)
+{
+   Context *context = new Context();
+   init_metaelement(context,get_line(ctx->name));
+   context->Name = ctx->name->getText();
+
+   push_context(context);
+   for (auto declaration : ctx->contextDecl()) {
+      visitContextDecl(declaration);
+   }
+   pop_context();
+   return context;
+}
+
+antlrcpp::Any Ili2Input::visitContextDecl(parser::Ili2Parser::ContextDeclContext *ctx)
+{
+   Context *context = dynamic_cast<Context *>(get_context());
+   if (context == nullptr) {
+      return static_cast<GenericDef *>(nullptr);
+   }
+
+   vector<parser::Ili2Parser::PathContext *> paths = ctx->path();
+   if (paths.size() < 2) {
+      return static_cast<GenericDef *>(nullptr);
+   }
+
+   GenericDef *definition = new GenericDef();
+   init_mmobject(definition,get_line(ctx));
+   definition->Context = context;
+
+   DomainType *generic = find_domaintype(visitPath(paths.front()),get_line(paths.front()));
+   if (generic != nullptr) {
+      definition->GenericDomain.push_back(generic);
+      if (generic->GenericDef == nullptr) {
+         generic->GenericDef = definition;
+      }
+   }
+   for (size_t index = 1; index < paths.size(); ++index) {
+      DomainType *concrete = find_domaintype(visitPath(paths[index]),get_line(paths[index]));
+      if (concrete != nullptr) {
+         definition->ConcreteDomain.push_back(concrete);
+      }
+   }
+   context->GenericDefinitions.push_back(definition);
+   return definition;
 }
 
 antlrcpp::Any Ili2Input::visitType(parser::Ili2Parser::TypeContext *ctx)
@@ -196,6 +283,9 @@ antlrcpp::Any Ili2Input::visitBaseType(parser::Ili2Parser::BaseTypeContext *ctx)
          FormattedType *tt = visitFormattedType(ctx->formattedType());
          t = tt;
       }
+      else if (ctx->dateTimeType() != nullptr) {
+         t = visitDateTimeType(ctx->dateTimeType());
+      }
       else if (ctx->coordinateType() != nullptr) {
          CoordType *tt = visitCoordinateType(ctx->coordinateType());
          t = tt;
@@ -230,6 +320,28 @@ antlrcpp::Any Ili2Input::visitBaseType(parser::Ili2Parser::BaseTypeContext *ctx)
    }
    return t;
 
+}
+
+antlrcpp::Any Ili2Input::visitDateTimeType(parser::Ili2Parser::DateTimeTypeContext *ctx)
+{
+   string predefined;
+   if (ctx->DATE() != nullptr) {
+      predefined = "INTERLIS.XMLDate";
+   }
+   else if (ctx->TIMEOFDAY() != nullptr) {
+      predefined = "INTERLIS.XMLTime";
+   }
+   else {
+      predefined = "INTERLIS.XMLDateTime";
+   }
+
+   Type *base = find_type(predefined,get_line(ctx));
+   if (base == nullptr) {
+      return static_cast<Type *>(nullptr);
+   }
+   Type *type = static_cast<Type *>(base->clone());
+   type->Super = base;
+   return type;
 }
 
 antlrcpp::Any Ili2Input::visitTextType(parser::Ili2Parser::TextTypeContext *ctx)
@@ -490,6 +602,25 @@ antlrcpp::Any Ili2Input::visitAttributePathType(parser::Ili2Parser::AttributePat
    debug(ctx,">>> visitAttributePathType()");
    AttributeRefType *t = new AttributeRefType();
    init_domaintype(t,ctx->start->getLine());
+   if (ctx->attributePath() != nullptr) {
+      PathOrInspFactor *restriction = visitAttributePath(ctx->attributePath());
+      t->AttrRestriction = restriction;
+
+      AttrOrParam *terminal = nullptr;
+      if (restriction != nullptr && !restriction->PathEls.empty()) {
+         terminal = dynamic_cast<AttrOrParam *>(restriction->PathEls.back()->Ref);
+      }
+      if (terminal == nullptr || terminal->Type == nullptr ||
+          terminal->Type->getClass() != "ClassRefType") {
+         Log.error("ATTRIBUTE OF restriction must end at a CLASS attribute",get_line(ctx->attributePath()));
+      }
+   }
+   for (auto restriction : ctx->attrTypeDef()) {
+      Type *type = visitAttrTypeDef(restriction);
+      if (type != nullptr) {
+         t->TypeRestriction.push_back(type);
+      }
+   }
    debug(ctx,"<<< visitAttributePathType()");
 
    return t;
@@ -570,13 +701,18 @@ antlrcpp::Any Ili2Input::visitNumericType(parser::Ili2Parser::NumericTypeContext
    }
    if (ctx->CLOCKWISE() != nullptr) {
       t->Clockwise = true;
+      t->Direction = NumType::ClockwiseDirection;
    }
    if (ctx->COUNTERCLOCKWISE() != nullptr) {
-      // ???
-      // t->Counterclockwise = true;
+      t->Direction = NumType::CounterclockwiseDirection;
    }
    if (ctx->refSys() != nullptr) {
-      // ???
+      NumsRefSys *ref = visitRefSys(ctx->refSys());
+      if (ref != nullptr) {
+         t->RefSys = ref->RefSys;
+         t->RefSysName = ctx->refSys()->refsys == nullptr ? "" : ctx->refSys()->refsys->getText();
+         t->RefSysAxis = ref->AxisInd;
+      }
    }
 
    Log.decNestLevel();
@@ -834,6 +970,11 @@ antlrcpp::Any Ili2Input::visitBagOrListType(parser::Ili2Parser::BagOrListTypeCon
 
    if (ctx->attrType() != nullptr) {
       Type *t = visitAttrType(ctx->attrType());
+      if (t == nullptr) {
+         Log.decNestLevel();
+         debug(ctx,"<<< visitBagOrListType() unresolved base type");
+         return m;
+      }
       if (t->getClass() == "RestrictedRef") {
          RestrictedRef* rr = dynamic_cast<RestrictedRef *>(t);
          m->BaseType = rr->_baseclass;
@@ -844,7 +985,7 @@ antlrcpp::Any Ili2Input::visitBagOrListType(parser::Ili2Parser::BagOrListTypeCon
       else if (t->getClass() == "MultiValue") {
          MultiValue* mv = dynamic_cast<MultiValue *>(t);
          m->BaseType = mv->BaseType;
-         m->TypeRestriction == mv->TypeRestriction;
+         m->TypeRestriction = mv->TypeRestriction;
       }
       else {
          m->BaseType = t;
@@ -1184,7 +1325,11 @@ antlrcpp::Any Ili2Input::visitClassRefType(parser::Ili2Parser::ClassRefTypeConte
       c = find_class("ANYSTRUCTURE", get_line(ctx->STRUCTURE()->getSymbol())); // restriction, to do !!!
    }
    
-   // assign c to r, to do !!!
+   r->_baseclass = c;
+   if (ctx->restriction() != nullptr) {
+      list<Class *> restrictions = visitRestriction(ctx->restriction());
+      r->_classrestriction = restrictions;
+   }
 
    Log.decNestLevel();
    debug(ctx,"<<< visitClassRefType()");
@@ -1202,8 +1347,15 @@ antlrcpp::Any Ili2Input::visitRefSys(parser::Ili2Parser::RefSysContext *ctx)
    */
 
    debug(ctx,">>> visitRefSys()");
+   NumsRefSys *result = new NumsRefSys();
+   init_mmobject(result,get_line(ctx));
+   if (ctx->coord != nullptr) {
+      result->RefSys = dynamic_cast<MetaElement *>(find_type(visitPath(ctx->coord),get_line(ctx->coord)));
+   }
+   if (ctx->axis != nullptr) {
+      result->AxisInd = stoi(ctx->axis->getText());
+   }
    debug(ctx,"<<< visitRefSys()");
-   return nullptr;
+   return result;
 
 }
-

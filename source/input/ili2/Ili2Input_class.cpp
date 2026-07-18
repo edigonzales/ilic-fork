@@ -73,7 +73,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    }
 
    if (name1 != name2) {
-      Log.warning(
+      Log.error(
          "classname " + name2 + " must match " + name1,
          get_line(ctx->classname2)
       );
@@ -137,7 +137,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
       // DomainType *Oid; // RESTRICTION(TextType; NumType; AnyOIDType), to do !!!
    }
    else if (ctx->NO()) {
-      // to do !!!
+      c->NoOid = true;
    }
 
    // role from ASSOCIATION DerivedAssoc
@@ -264,7 +264,8 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
    }
 
    for (auto cctx : ctx->classOrStructureDef()->constraintDef()) {
-      visitConstraintDef(cctx);
+      Constraint *constraint = visitConstraintDef(cctx);
+      c->Constraints.push_back(constraint);
    }
 
    for (auto pctx : ctx->classOrStructureDef()->parameterDef()) {
@@ -452,6 +453,8 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
 
    push_context(a);
    a->Type = visitAttrTypeDef(ctx->attrTypeDef());
+   a->TypeExplicitlyDefined = ctx->attrTypeDef()->attrType() != nullptr ||
+                              ctx->attrTypeDef()->bagOrListType() != nullptr;
    pop_context();
 
    if (aa != nullptr && aa->AttrParent != get_class_context()) {
@@ -476,14 +479,22 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
       a->SubdivisionKind = AttrOrParam::NoSubDiv;
    }
 
-   a->Transient = false; // to do !!!
+   a->Transient = properties[TRANSIENT];
 
    // ASSOCIATION ClassAttr
    a->AttrParent = get_class_context();
    get_class_context()->ClassAttribute.push_back(a);
-   
+
+   // RefHB 2.3 3.8: an abstract transient attribute may defer its factor to a
+   // concrete extension. This matches ili2c's attributeDef validation.
+   if (a->Transient && !a->Abstract && ctx->factor().empty()) {
+      Log.error("TRANSIENT attribute " + name + " requires an assignment of a factor",get_line(ctx));
+   }
    for (auto fctx : ctx->factor()) {
-      // to do !!!
+      Factor *factor = visitFactor(fctx);
+      if (factor != nullptr) {
+         a->Derivates.push_back(factor);
+      }
    }
    
    Log.decNestLevel();
@@ -659,7 +670,7 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
             mv->Multiplicity.Min = 0;
             mv->Multiplicity.Max = 1;
             mv->BaseType = tt;
-            mv->Super == nullptr;
+            mv->Super = nullptr;
             t = mv;
          }
          else {
@@ -686,7 +697,7 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
       for (auto r : r->_classrestriction) {
          mv->TypeRestriction.push_back(r);
       }
-      mv->Super == nullptr;
+      mv->Super = nullptr;
       t = mv;
    }
 
@@ -766,5 +777,3 @@ antlrcpp::Any Ili2Input::visitReferenceAttr(parser::Ili2Parser::ReferenceAttrCon
    return t;
 
 }
-
-

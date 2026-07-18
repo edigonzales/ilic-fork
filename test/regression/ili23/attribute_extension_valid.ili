@@ -1,0 +1,16 @@
+INTERLIS 2.3;
+
+MODEL AttributeExtensionValid AT "https://example.invalid" VERSION "1" =
+  STRUCTURE Item =
+  END Item;
+
+  CLASS Base (ABSTRACT) =
+    name (ABSTRACT, TRANSIENT): MTEXT*40 := "base";
+    item: LIST {0..10} OF Item;
+  END Base;
+
+  CLASS Specialized (ABSTRACT) EXTENDS Base =
+    name (EXTENDED, TRANSIENT): MTEXT*20 := "specialized";
+    item (EXTENDED): LIST {1..5} OF Item;
+  END Specialized;
+END AttributeExtensionValid.

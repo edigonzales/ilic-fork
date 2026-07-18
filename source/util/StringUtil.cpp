@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include "Logger.h"
+#include "../../include/ilic/SourceManager.h"
 
 bool util::starts_with(std::string const &value, std::string const &start)
 {
@@ -41,27 +42,20 @@ bool util::compare_case_insensitive(string s1, string s2)
    );
 }
 
-static void filter_string(basic_string<char>& s) 
+string util::load_string(string fname)
 {
-   for (basic_string<char>::iterator p = s.begin();p != s.end(); ++p) {
-      if (int(*p) < 0 || int(*p) > 127) {
-         *p = '?';
-      }
+   if (ilic::activeSourceManager() != nullptr) {
+      const ilic::SourceBuffer *source = ilic::activeSourceManager()->get(fname);
+      if (source != nullptr) return source->text;
    }
-}
-
-string util::load_filtered_string_from_file(string fname) 
-{
-   ifstream in(fname);
+   ifstream in(fname, ios::binary);
    if (!in.is_open()) {
       return "";
    }
-   string buffer;
-   string result = "";
-   while (getline(in, buffer)) {
-      filter_string(buffer);
-      result += buffer + "\n";
-   }
-   in.close();
-   return result;
+   return string((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+}
+
+string util::load_filtered_string_from_file(string fname)
+{
+   return load_string(std::move(fname));
 }

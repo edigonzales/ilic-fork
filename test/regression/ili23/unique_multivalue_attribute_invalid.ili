@@ -1,0 +1,15 @@
+INTERLIS 2.3;
+
+MODEL UniqueMultivalueAttributeInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  TOPIC Topic =
+    STRUCTURE Item =
+      Code : TEXT;
+    END Item;
+
+    CLASS Container =
+      Items : LIST {0..*} OF Item;
+      UNIQUE Items->Code;
+    END Container;
+  END Topic;
+END UniqueMultivalueAttributeInvalid.

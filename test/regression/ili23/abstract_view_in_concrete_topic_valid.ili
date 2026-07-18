@@ -1,0 +1,22 @@
+INTERLIS 2.3;
+
+MODEL AbstractViewInConcreteTopicValid AT "https://example.invalid" VERSION "1" =
+
+  TOPIC Data =
+    CLASS Concrete =
+      value: TEXT*20;
+    END Concrete;
+  END Data;
+
+  TOPIC Views =
+    DEPENDS ON Data;
+
+    VIEW AbstractProjection (ABSTRACT)
+      PROJECTION OF source ~ Data.Concrete;
+    =
+      ATTRIBUTE
+        ALL OF source;
+    END AbstractProjection;
+  END Views;
+
+END AbstractViewInConcreteTopicValid.

@@ -1,0 +1,23 @@
+INTERLIS 2.3;
+
+MODEL PathParentInArea (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC T =
+    DOMAIN
+      Point = COORD 0.000 .. 100.000, 0.000 .. 100.000;
+
+    CLASS A =
+      area : AREA WITH (STRAIGHTS) VERTEX Point WITHOUT OVERLAPS > 0.100;
+      name : TEXT;
+    END A;
+
+    VIEW AreaInspection
+      AREA INSPECTION OF A~A->area;
+      =
+      ATTRIBUTE
+        invalid : TEXT := PARENT->name;
+    END AreaInspection;
+  END T;
+
+END PathParentInArea.

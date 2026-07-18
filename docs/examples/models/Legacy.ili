@@ -1,0 +1,16 @@
+TRANSFER Legacy;
+
+MODEL Legacy
+  TOPIC Data =
+    TABLE Item =
+      Identifier : TEXT*40;
+      NO IDENT
+    END Item;
+  END Data.
+END Legacy.
+
+FORMAT FREE;
+CODE
+  BLANK = DEFAULT, UNDEFINED = DEFAULT, CONTINUE = DEFAULT;
+  TID = ANY;
+END.

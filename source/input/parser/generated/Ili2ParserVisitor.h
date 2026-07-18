@@ -1,5 +1,5 @@
 
-// Generated from ..\..\..\..\source\c\ilic\input\parser\generated\Ili2Parser.g4 by ANTLR 4.7.1
+// Generated from Ili2Parser.g4 by ANTLR 4.7.1
 
 #pragma once
 
@@ -35,6 +35,8 @@ public:
     virtual antlrcpp::Any visitTopicDef(Ili2Parser::TopicDefContext *context) = 0;
 
     virtual antlrcpp::Any visitTopicPath(Ili2Parser::TopicPathContext *context) = 0;
+
+    virtual antlrcpp::Any visitDeferredGenerics(Ili2Parser::DeferredGenericsContext *context) = 0;
 
     virtual antlrcpp::Any visitClassDef(Ili2Parser::ClassDefContext *context) = 0;
 
@@ -112,6 +114,8 @@ public:
 
     virtual antlrcpp::Any visitContextDef(Ili2Parser::ContextDefContext *context) = 0;
 
+    virtual antlrcpp::Any visitContextBlock(Ili2Parser::ContextBlockContext *context) = 0;
+
     virtual antlrcpp::Any visitContextDecl(Ili2Parser::ContextDeclContext *context) = 0;
 
     virtual antlrcpp::Any visitCoordinateType(Ili2Parser::CoordinateTypeContext *context) = 0;
@@ -122,13 +126,13 @@ public:
 
     virtual antlrcpp::Any visitBlackboxType(Ili2Parser::BlackboxTypeContext *context) = 0;
 
-    virtual antlrcpp::Any visitClassType(Ili2Parser::ClassTypeContext *context) = 0;
+    virtual antlrcpp::Any visitClassRefType(Ili2Parser::ClassRefTypeContext *context) = 0;
 
     virtual antlrcpp::Any visitAttributePathType(Ili2Parser::AttributePathTypeContext *context) = 0;
 
     virtual antlrcpp::Any visitClassConst(Ili2Parser::ClassConstContext *context) = 0;
 
-    virtual antlrcpp::Any visitAttributeConst(Ili2Parser::AttributeConstContext *context) = 0;
+    virtual antlrcpp::Any visitAttributePathConst(Ili2Parser::AttributePathConstContext *context) = 0;
 
     virtual antlrcpp::Any visitLineType(Ili2Parser::LineTypeContext *context) = 0;
 
@@ -148,6 +152,8 @@ public:
 
     virtual antlrcpp::Any visitComposedUnit(Ili2Parser::ComposedUnitContext *context) = 0;
 
+    virtual antlrcpp::Any visitComposedUnitExpr(Ili2Parser::ComposedUnitExprContext *context) = 0;
+
     virtual antlrcpp::Any visitMetaDataBasketDef(Ili2Parser::MetaDataBasketDefContext *context) = 0;
 
     virtual antlrcpp::Any visitMetaDataBasketRef(Ili2Parser::MetaDataBasketRefContext *context) = 0;
@@ -159,6 +165,8 @@ public:
     virtual antlrcpp::Any visitProperties(Ili2Parser::PropertiesContext *context) = 0;
 
     virtual antlrcpp::Any visitRunTimeParameterDef(Ili2Parser::RunTimeParameterDefContext *context) = 0;
+
+    virtual antlrcpp::Any visitRunTimeParameter(Ili2Parser::RunTimeParameterContext *context) = 0;
 
     virtual antlrcpp::Any visitConstraintDef(Ili2Parser::ConstraintDefContext *context) = 0;
 
@@ -175,6 +183,8 @@ public:
     virtual antlrcpp::Any visitUniqueEl(Ili2Parser::UniqueElContext *context) = 0;
 
     virtual antlrcpp::Any visitLocalUniqueness(Ili2Parser::LocalUniquenessContext *context) = 0;
+
+    virtual antlrcpp::Any visitLocalUniqueEl(Ili2Parser::LocalUniqueElContext *context) = 0;
 
     virtual antlrcpp::Any visitSetConstraint(Ili2Parser::SetConstraintContext *context) = 0;
 
@@ -204,9 +214,7 @@ public:
 
     virtual antlrcpp::Any visitPathEl(Ili2Parser::PathElContext *context) = 0;
 
-    virtual antlrcpp::Any visitAssociationPath(Ili2Parser::AssociationPathContext *context) = 0;
-
-    virtual antlrcpp::Any visitAttributeRef(Ili2Parser::AttributeRefContext *context) = 0;
+    virtual antlrcpp::Any visitObjectRef(Ili2Parser::ObjectRefContext *context) = 0;
 
     virtual antlrcpp::Any visitFunctionCall(Ili2Parser::FunctionCallContext *context) = 0;
 

@@ -1,0 +1,28 @@
+INTERLIS 2.3;
+
+MODEL TopicDependenciesValid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC Source =
+    CLASS Object =
+      Value : TEXT;
+    END Object;
+  END Source;
+
+  TOPIC Consumer =
+    DEPENDS ON Source;
+
+    CLASS ReferencingObject =
+      Value : TEXT;
+      EXISTENCE CONSTRAINT Value REQUIRED IN Source.Object:Value;
+    END ReferencingObject;
+
+    VIEW Projection PROJECTION OF Source.Object;
+    =
+    END Projection;
+
+    GRAPHIC Drawing BASED ON Source.Object =
+    END Drawing;
+  END Consumer;
+
+END TopicDependenciesValid.

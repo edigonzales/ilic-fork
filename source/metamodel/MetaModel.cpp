@@ -5,6 +5,15 @@ using namespace util;
 
 namespace metamodel {
 
+   MetaElement *MetaElement::getTranslationOfRoot()
+   {
+      MetaElement *element = this;
+      while (element->_translationOf != nullptr) {
+         element = element->_translationOf;
+      }
+      return element;
+   }
+
    // global variables
 
    static list <DataUnit*> AllDataUnits;
@@ -13,11 +22,23 @@ namespace metamodel {
    static list <Dependency*> AllDependencies;
    static list <AxisSpec*> AllAxisSpecs;
    static Class* class_context;
+   static list<MetaElement*> context;
 
    // helper functions
 
    void init(string version)
    {
+   }
+
+   void reset()
+   {
+      AllDataUnits.clear();
+      AllModels.clear();
+      AllImports.clear();
+      AllDependencies.clear();
+      AllAxisSpecs.clear();
+      context.clear();
+      class_context = nullptr;
    }
 
    // model helpers
@@ -99,6 +120,11 @@ namespace metamodel {
    
    bool depends_on(Package *p)
    {
+      // Predefined universal types such as ANYCLASS and model-level elements do
+      // not belong to a topic and therefore require no topic dependency.
+      if (p == nullptr) {
+         return true;
+      }
       if (p->getClass() != "SubModel") {
          return true;
       }
@@ -242,8 +268,6 @@ namespace metamodel {
 
    // context helpers
 
-   static list<MetaElement*> context;
-   
    static string get_context_string()
    {
       string cstring = "";
@@ -728,6 +752,7 @@ namespace metamodel {
 Log.message(">>> clone topic");
       clone_init_package(clone,org);
       clone->_dataunit = org->_dataunit;
+      clone->DeferredGenerics = org->DeferredGenerics;
    }
 
    static void clone_init_type(Type *clone,Type *org)
@@ -756,7 +781,6 @@ Log.message(">>> clone topic");
    {
 
       clone_init_metaelement(clone,org);
-
       clone->toDomain = org->toDomain;
       clone->ToClass = org->ToClass;
 
@@ -797,6 +821,7 @@ Log.message(">>> clone topic");
       clone->Derivates = org->Derivates;
       clone->AttrParent = org->AttrParent;
       clone->Type = org->Type;
+      clone->TypeExplicitlyDefined = org->TypeExplicitlyDefined;
 
    }
 
@@ -846,6 +871,7 @@ Log.message(">>> clone topic");
       clone->Strongness = org->Strongness;
       clone->Ordered = org->Ordered;
       clone->Multiplicity = org->Multiplicity;
+      clone->MultiplicityDefined = org->MultiplicityDefined;
       clone->Derivates = org->Derivates;
       clone->EmbeddedTransfer = org->EmbeddedTransfer;
       clone->Association = org->Association;
@@ -928,7 +954,7 @@ Log.message(">>> clone topic");
    {
 
       clone_init_metaelement(clone,org);
-
+      clone->GenericDefinitions = org->GenericDefinitions;
 
    }
 
@@ -939,6 +965,8 @@ Log.message(">>> clone topic");
 
       clone->OID = org->OID;
       clone->Context = org->Context;
+      clone->GenericDomain = org->GenericDomain;
+      clone->ConcreteDomain = org->ConcreteDomain;
 
    }
 
@@ -1101,6 +1129,7 @@ Log.message(">>> clone topic");
       clone_init_domaintype(clone,org);
 
       clone->Of = org->Of;
+      clone->AttrRestriction = org->AttrRestriction;
 
    }
 
@@ -1230,6 +1259,9 @@ Log.message(">>> clone topic");
       clone_init_mmobject(clone,org);
 
       clone->_type = org->_type;
+      clone->ResolvedType = org->ResolvedType;
+      clone->OccurrenceScope = org->OccurrenceScope;
+      clone->OccurrencePackage = org->OccurrencePackage;
 
    }
 
@@ -1426,6 +1458,9 @@ Log.message(">>> clone topic");
       clone_init_constraint(clone,org);
 
       clone->Kind = org->Kind;
+      clone->PerBasket = org->PerBasket;
+      clone->Where = org->Where;
+      clone->UniqueDef = org->UniqueDef;
 
    }
 
@@ -1434,6 +1469,8 @@ Log.message(">>> clone topic");
 
       clone_init_constraint(clone,org);
 
+      clone->Where = org->Where;
+      clone->PerBasket = org->PerBasket;
       clone->Constraint = org->Constraint;
 
    }

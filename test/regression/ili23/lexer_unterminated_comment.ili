@@ -1,0 +1,8 @@
+INTERLIS 2.3;
+
+MODEL LexerUnterminatedComment (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  /* unterminated comment
+
+END LexerUnterminatedComment.

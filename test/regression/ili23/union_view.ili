@@ -1,0 +1,19 @@
+INTERLIS 2.3;
+
+MODEL UnionRegression AT "https://example.invalid/ilic/tests" VERSION "1" =
+  TOPIC Topic =
+    CLASS First =
+      Value : TEXT*10;
+    END First;
+
+    CLASS Second =
+      Value : TEXT*10;
+    END Second;
+
+    VIEW Combined
+      UNION OF A~First, B~Second;
+    =
+      Value : TEXT*10 := A->Value, B->Value;
+    END Combined;
+  END Topic;
+END UnionRegression.

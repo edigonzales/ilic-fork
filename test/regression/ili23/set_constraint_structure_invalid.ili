@@ -1,0 +1,11 @@
+INTERLIS 2.3;
+
+MODEL SetConstraintStructureInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  TOPIC Topic =
+    STRUCTURE Value =
+      Text : TEXT;
+      SET CONSTRAINT #true;
+    END Value;
+  END Topic;
+END SetConstraintStructureInvalid.

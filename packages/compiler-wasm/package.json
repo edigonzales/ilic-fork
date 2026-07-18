@@ -1,0 +1,52 @@
+{
+  "name": "@ilic/compiler-wasm",
+  "version": "0.9.9",
+  "description": "INTERLIS compiler and formatter for Node.js, browsers and Web Workers, compiled to WebAssembly.",
+  "author": "edigonzales",
+  "license": "MIT",
+  "keywords": [
+    "interlis",
+    "compiler",
+    "formatter",
+    "wasm",
+    "webassembly",
+    "lsp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edigonzales/ilic-fork.git",
+    "directory": "packages/compiler-wasm"
+  },
+  "homepage": "https://github.com/edigonzales/ilic-fork#readme",
+  "bugs": {
+    "url": "https://github.com/edigonzales/ilic-fork/issues"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./worker": "./worker.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "index.js",
+    "index.d.ts",
+    "worker.js",
+    "ilic.mjs",
+    "ilic.wasm"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

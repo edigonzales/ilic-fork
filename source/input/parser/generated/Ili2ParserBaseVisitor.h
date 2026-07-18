@@ -1,5 +1,5 @@
 
-// Generated from ..\..\..\..\source\c\ilic\input\parser\generated\Ili2Parser.g4 by ANTLR 4.7.1
+// Generated from Ili2Parser.g4 by ANTLR 4.7.1
 
 #pragma once
 
@@ -46,6 +46,10 @@ public:
   }
 
   virtual antlrcpp::Any visitTopicPath(Ili2Parser::TopicPathContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitDeferredGenerics(Ili2Parser::DeferredGenericsContext *ctx) override {
     return visitChildren(ctx);
   }
 
@@ -201,6 +205,10 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual antlrcpp::Any visitContextBlock(Ili2Parser::ContextBlockContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual antlrcpp::Any visitContextDecl(Ili2Parser::ContextDeclContext *ctx) override {
     return visitChildren(ctx);
   }
@@ -221,7 +229,7 @@ public:
     return visitChildren(ctx);
   }
 
-  virtual antlrcpp::Any visitClassType(Ili2Parser::ClassTypeContext *ctx) override {
+  virtual antlrcpp::Any visitClassRefType(Ili2Parser::ClassRefTypeContext *ctx) override {
     return visitChildren(ctx);
   }
 
@@ -233,7 +241,7 @@ public:
     return visitChildren(ctx);
   }
 
-  virtual antlrcpp::Any visitAttributeConst(Ili2Parser::AttributeConstContext *ctx) override {
+  virtual antlrcpp::Any visitAttributePathConst(Ili2Parser::AttributePathConstContext *ctx) override {
     return visitChildren(ctx);
   }
 
@@ -273,6 +281,10 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual antlrcpp::Any visitComposedUnitExpr(Ili2Parser::ComposedUnitExprContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual antlrcpp::Any visitMetaDataBasketDef(Ili2Parser::MetaDataBasketDefContext *ctx) override {
     return visitChildren(ctx);
   }
@@ -294,6 +306,10 @@ public:
   }
 
   virtual antlrcpp::Any visitRunTimeParameterDef(Ili2Parser::RunTimeParameterDefContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitRunTimeParameter(Ili2Parser::RunTimeParameterContext *ctx) override {
     return visitChildren(ctx);
   }
 
@@ -326,6 +342,10 @@ public:
   }
 
   virtual antlrcpp::Any visitLocalUniqueness(Ili2Parser::LocalUniquenessContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitLocalUniqueEl(Ili2Parser::LocalUniqueElContext *ctx) override {
     return visitChildren(ctx);
   }
 
@@ -385,11 +405,7 @@ public:
     return visitChildren(ctx);
   }
 
-  virtual antlrcpp::Any visitAssociationPath(Ili2Parser::AssociationPathContext *ctx) override {
-    return visitChildren(ctx);
-  }
-
-  virtual antlrcpp::Any visitAttributeRef(Ili2Parser::AttributeRefContext *ctx) override {
+  virtual antlrcpp::Any visitObjectRef(Ili2Parser::ObjectRefContext *ctx) override {
     return visitChildren(ctx);
   }
 

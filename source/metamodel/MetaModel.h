@@ -4,6 +4,8 @@
 
 #include <string>
 #include <list>
+#include <vector>
+#include "../../include/ilic/Diagnostic.h"
 
 using namespace std;
 
@@ -42,12 +44,14 @@ namespace metamodel {
    class GenericDef;
    class DomainType;
    class Constraint;
+   struct PathOrInspFactor;
 
    // general
 
    class MMObject { // ABSTRACT
    public:
       int _line = -1;
+      ilic::SourceRange _source;
       virtual string getClass() { return "MMObject"; };
       virtual string getBaseClass() { return ""; };
       virtual bool isAbstract() { return true; };
@@ -70,6 +74,7 @@ namespace metamodel {
    public:
       string Name = "";
       string Value = "";
+      string _rawText = "";
       // ROLE from ASSOCIATION MetaAttributes
       MetaElement *MetaElement = nullptr;
       virtual string getClass() { return "MetaAttribute"; }
@@ -85,6 +90,10 @@ namespace metamodel {
       list <MetaAttribute *> MetaAttribute;
       // ROLE from ASSOCIATION PackageElements
       Package *ElementInPackage = nullptr;
+      // Corresponding element in the directly preceding language version.
+      // This is intentionally not part of the IlisMeta16 transfer model.
+      MetaElement *_translationOf = nullptr;
+      MetaElement *getTranslationOfRoot();
       virtual string getClass() { return "MetaElement"; }
       virtual string getBaseClass() { return "MMObject"; };
       virtual bool isAbstract() { return true; }
@@ -149,6 +158,8 @@ namespace metamodel {
       string At = "";
       string Version = "";
       string VersionExplanation = "";
+      string _translationOfName = "";
+      string _translationOfVersion = "";
       bool NoIncrementalTransfer = true; // 2.4
       string CharSetIANAName = ""; // 2.4
       string xmlns = ""; // 2.4
@@ -164,6 +175,12 @@ namespace metamodel {
       // MetaElement.Name := TopicName as defined in the INTERLIS-Model
    public:
       DataUnit *_dataunit = nullptr;
+      struct DeferredGenericRef {
+         string Name;
+         DomainType *Domain = nullptr;
+         int Line = -1;
+      };
+      vector<DeferredGenericRef> DeferredGenerics;
       virtual string getClass() { return "SubModel"; }
       virtual string getBaseClass() { return "Package"; };
    };
@@ -228,6 +245,8 @@ namespace metamodel {
       bool ili1OptionalTable = false;
       bool Mandatory = false;
       bool isDomainType = false;
+      bool OidProperty = false;
+      bool NoOid = false;
       // role from ASSOCIATION ClassAttr
       list<metamodel::AttrOrParam *> ClassAttribute;
       // role from ASSOCIATION ClassParam
@@ -280,6 +299,9 @@ namespace metamodel {
       // ROLE from ASSOCIATION AttrOrParamType
       Type *Type = nullptr;
       AttrOrParam* Extending = nullptr;
+      // False for the shorthand "MANDATORY" on an extended attribute, where
+      // the base type is inherited instead of redefined.
+      bool TypeExplicitlyDefined = true;
       bool _visible = true;
       virtual string getClass() { return "AttrOrParam"; }
       virtual string getBaseClass() { return "ExtendableME"; };
@@ -343,8 +365,12 @@ namespace metamodel {
       enum { Assoc, Aggr, Comp } Strongness = Assoc;
       bool Ordered = false;
       Multiplicity Multiplicity;
+      // An omitted cardinality and an explicit {*} both use {-1,-1}; keep the
+      // syntactic distinction so extensions can inherit only when omitted.
+      bool MultiplicityDefined = false;
       list<Expression *> Derivates; // LIST
       bool EmbeddedTransfer = false;
+      bool Hiding = false;
       // role from ASSOCIATION AssocRole
       Class *Association = nullptr;
       // role from ASSOCIATION AssocAccOrign
@@ -406,6 +432,7 @@ namespace metamodel {
       list <MetaBasketDef *> MetaBasketDef;
       // role from ASSOCIATION BasketOID
       DomainType *Oid = nullptr; // RESTRICTION(TextType; NumType; AnyOIDType);
+      DomainType *TopicOid = nullptr;
       virtual string getClass() { return "DataUnit"; }
       virtual string getBaseClass() { return "ExtendableME"; };
    };
@@ -430,6 +457,7 @@ namespace metamodel {
 
    class Context : public MetaElement { // 2.4
    public:
+      list<GenericDef *> GenericDefinitions;
       virtual string getClass() { return "Context"; }
       virtual string getBaseClass() { return "MetaElement"; };
    };
@@ -469,6 +497,7 @@ namespace metamodel {
       DataUnit *MetaDataTopic = nullptr;
       // role from ASSOCIATION MetaBasketMembers
       MetaObjectDef *Member = nullptr;
+      list<MetaObjectDef *> Members;
       virtual string getClass() { return "MetaBasketDef"; }
       virtual string getBaseClass() { return "ExtendableME"; };
    };
@@ -520,9 +549,13 @@ namespace metamodel {
       string Max = "";
       bool Circular = false; // undefined, to do !!!
       bool Clockwise = false; // undefined, to do !!!
+      enum { NoDirection, ClockwiseDirection, CounterclockwiseDirection } Direction = NoDirection;
       // frole from ASSOCIATION NumUnit
       Unit *Unit = nullptr;
       bool OIDType = false;
+      MetaElement *RefSys = nullptr;
+      string RefSysName = "";
+      int RefSysAxis = -1;
       virtual string getClass() { return "NumType"; }
       virtual string getBaseClass() { return "DomainType"; };
    };
@@ -549,7 +582,7 @@ namespace metamodel {
    class NumsRefSys : public MMObject { // ASSOCIATION
    public:
       NumType *NumType = nullptr;
-      MetaObjectDef *RefSys = nullptr; // MetaObjectDef OR CoordType, to do !!!
+      MetaElement *RefSys = nullptr; // MetaObjectDef OR CoordType
       int AxisInd = -1;
       virtual string getClass() { return "NumsRefSys"; }
       virtual string getBaseClass() { return "MMObject"; };
@@ -621,6 +654,10 @@ namespace metamodel {
    public:
       // role from ASSOCIATION ARefOf
       Class *Of = nullptr; // Class OR AttrOrParam OR Argument, to do !!!
+      // Optional ATTRIBUTE OF object path. This cannot be represented by Of,
+      // whose legacy C++ type only permits Class pointers.
+      PathOrInspFactor *AttrRestriction = nullptr;
+      list<Type *> TypeRestriction;
       virtual string getClass() { return "AttributeRefType"; }
       virtual string getBaseClass() { return "DomainType"; };
    };
@@ -716,6 +753,12 @@ namespace metamodel {
                           // Inspection: Attributepath
       Expression *Where = nullptr;
       bool Transient = false;
+      int _orNullCount = 0;
+      list<string> _formationPaths;
+      // Root viewable of a normal/area inspection. PARENT resolves to this
+      // viewable, while the generated base alias points to the decomposed
+      // structure.
+      Class *_inspectionParent = nullptr;
       // role from ASSOCIATION BaseViewDef
       // list<RenamedBaseView *> RenamedBaseView;
       // role from ASSOCIATION DerivedAssoc
@@ -738,9 +781,42 @@ namespace metamodel {
 
    // Expressions, factors
 
+   enum class ExpressionTypeKind {
+      Unknown,
+      Undefined,
+      Boolean,
+      Numeric,
+      Text,
+      Formatted,
+      Enumeration,
+      EnumTreeValue,
+      Coordinate,
+      Oid,
+      ClassReference,
+      AttributeReference,
+      Object,
+      Structure
+   };
+
+   struct ExpressionTypeDescriptor {
+      ExpressionTypeKind Kind = ExpressionTypeKind::Unknown;
+      // The canonical declared type distinguishes independently declared
+      // enumerations while still allowing primitive type families.
+      Type *DeclaredType = nullptr;
+      Class *Viewable = nullptr;
+   };
+
    struct Expression : public MMObject { // ABSTRACT
    public:
       string _type;
+      ExpressionTypeDescriptor ResolvedType;
+      // Lexical occurrence, required for domain THIS and later visibility
+      // checks. It is deliberately independent of the parser context stack.
+      MetaElement *OccurrenceScope = nullptr;
+      // Package at the textual occurrence. OccurrenceScope may deliberately
+      // point at a base viewable while a constraint is declared in an
+      // extending topic, so it cannot represent dependency visibility.
+      Package *OccurrencePackage = nullptr;
       virtual string getClass() { return "Expression"; }
       virtual string getBaseClass() { return "MMObject"; };
       virtual bool isAbstract() { return true; }
@@ -922,6 +998,7 @@ namespace metamodel {
    public:
       list<Expression *> Where;
       enum {GlobalU, LocalU} Kind;
+      bool PerBasket = false;
       list<PathOrInspFactor *> UniqueDef;
       virtual string getClass() { return "UniqueConstraint"; }
       virtual string getBaseClass() { return "Constraint"; };
@@ -930,6 +1007,7 @@ namespace metamodel {
    class SetConstraint : public Constraint {
    public:
       list<Expression *> Where;
+      bool PerBasket = false;
       Expression *Constraint = nullptr;
       virtual string getClass() { return "SetConstraint"; }
       virtual string getBaseClass() { return "Constraint"; };
@@ -1008,6 +1086,7 @@ namespace metamodel {
 
    // initialization
    void init(string version);
+   void reset();
 
    // model helpers
    void add_dataunit(DataUnit* u);

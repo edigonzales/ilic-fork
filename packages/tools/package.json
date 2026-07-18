@@ -1,0 +1,59 @@
+{
+  "name": "@ilic/tools",
+  "version": "0.9.9",
+  "description": "INTERLIS repository resolution and caching for Node.js and browsers.",
+  "author": "edigonzales",
+  "license": "MIT",
+  "keywords": [
+    "interlis",
+    "repository",
+    "cache",
+    "compiler",
+    "wasm",
+    "lsp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edigonzales/ilic-fork.git",
+    "directory": "packages/tools"
+  },
+  "homepage": "https://github.com/edigonzales/ilic-fork#readme",
+  "bugs": {
+    "url": "https://github.com/edigonzales/ilic-fork/issues"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./node": {
+      "types": "./node.d.ts",
+      "default": "./node.js"
+    },
+    "./browser": {
+      "types": "./browser.d.ts",
+      "default": "./browser.js"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "index.js",
+    "index.d.ts",
+    "node.js",
+    "node.d.ts",
+    "browser.js",
+    "browser.d.ts"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

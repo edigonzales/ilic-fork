@@ -75,7 +75,7 @@ topicDef
      (BASKET OID AS basketOid=path SEMI)?
      (OID AS topicOid=path SEMI)?
      (DEPENDS ON topicPath (COMMA topicPath)* SEMI)*
-     ({ili24}? DEFERRED GENERICS genericref=path (COMMA genericref=path)* SEMI)?
+     ({ili24}? deferredGenerics)?
      (metaDataBasketDef
      |unitDecl
      |functionDef
@@ -92,6 +92,10 @@ topicDef
    
 topicPath
    : path
+   ;
+
+deferredGenerics
+   : DEFERRED GENERICS path (COMMA path)* SEMI
    ;
    
 classDef
@@ -313,7 +317,11 @@ formattedConst
    ;
 
 contextDef
-   : CONTEXT name=NAME EQUAL (contextDecl SEMI)*
+   : CONTEXT contextBlock+
+   ;
+
+contextBlock
+   : name=NAME EQUAL (contextDecl SEMI)*
    ;
 
 contextDecl

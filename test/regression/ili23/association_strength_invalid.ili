@@ -1,0 +1,24 @@
+INTERLIS 2.3;
+
+MODEL AssociationStrengthInvalid AT "https://example.invalid" VERSION "1" =
+  TOPIC T =
+    CLASS A =
+    END A;
+    CLASS B =
+    END B;
+
+    ASSOCIATION TooManyWholes =
+      a -<> A;
+      b -<#> B;
+    END TooManyWholes;
+
+    ASSOCIATION Base =
+      whole -<> A;
+      part -- B;
+    END Base;
+
+    ASSOCIATION Weaker EXTENDS Base =
+      whole (EXTENDED) -- A;
+    END Weaker;
+  END T;
+END AssociationStrengthInvalid.

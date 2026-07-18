@@ -1,0 +1,16 @@
+INTERLIS 2.3;
+
+MODEL AttributeCardinalityInvalid AT "https://example.invalid" VERSION "1" =
+  STRUCTURE Item =
+  END Item;
+
+  CLASS Base (ABSTRACT) =
+    text: MANDATORY TEXT*20;
+    item: Item;
+  END Base;
+
+  CLASS Wider (ABSTRACT) EXTENDS Base =
+    text (EXTENDED): TEXT*20;
+    item (EXTENDED): LIST {1..*} OF Item;
+  END Wider;
+END AttributeCardinalityInvalid.

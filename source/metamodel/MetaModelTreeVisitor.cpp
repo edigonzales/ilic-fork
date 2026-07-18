@@ -12,6 +12,7 @@ static void visitModel(MetaModelTreeVisitor *visitor, Model *m);
 static void visitSubModel(MetaModelTreeVisitor *visitor, SubModel *m);
 static void visitConstraint(MetaModelTreeVisitor *visitor, Constraint *c);
 static void visitContext(MetaModelTreeVisitor *visitor, Context *c);
+static void visitGenericDef(MetaModelTreeVisitor *visitor, GenericDef *d);
 static void visitMetaObjectDef(MetaModelTreeVisitor *visitor, MetaObjectDef *d);
 static void visitFunctionDef(MetaModelTreeVisitor *visitor, FunctionDef *f);
 static void visitArgument(MetaModelTreeVisitor *visitor, Argument *a);
@@ -1045,10 +1046,23 @@ static void visitContext(MetaModelTreeVisitor *visitor, Context *t)
    */
 
    visitMetaElement(visitor,t);
+   bool visitDefinitions = true;
    if (visitor->visitContextOverride()) {
       debug1(t,"Context");
-      visitor->visitContext(t);
+      try {
+         visitor->visitContext(t);
+      }
+      catch (string e) {
+         accept_exception(e,"ignoreVisit");
+         visitDefinitions = false;
+      }
       debug2(t,"Context");
+   }
+
+   if (visitDefinitions) {
+      for (auto definition : t->GenericDefinitions) {
+         visitGenericDef(visitor,definition);
+      }
    }
 
 }

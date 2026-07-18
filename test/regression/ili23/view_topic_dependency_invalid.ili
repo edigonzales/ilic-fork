@@ -1,0 +1,17 @@
+INTERLIS 2.3;
+
+MODEL ViewTopicDependencyInvalid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC Source =
+    CLASS Object =
+    END Object;
+  END Source;
+
+  TOPIC Consumer =
+    VIEW Projection PROJECTION OF Source.Object;
+    =
+    END Projection;
+  END Consumer;
+
+END ViewTopicDependencyInvalid.

@@ -1,0 +1,6 @@
+INTERLIS 2.3;
+
+MODEL TopicEndNameInvalid AT "https://example.invalid" VERSION "1" =
+  TOPIC Topic =
+  END DifferentTopicName;
+END TopicEndNameInvalid.

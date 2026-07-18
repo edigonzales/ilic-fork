@@ -1,0 +1,9 @@
+INTERLIS 2.4;
+
+MODEL ScalarListRegression AT "https://example.invalid/ilic/tests" VERSION "1" =
+  TOPIC Topic =
+    CLASS Item =
+      Values : LIST {0..*} OF TEXT*20;
+    END Item;
+  END Topic;
+END ScalarListRegression.

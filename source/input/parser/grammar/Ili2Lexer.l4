@@ -17,7 +17,7 @@ ILI_OPTION
    ;
   
 ILI_BLOCKCOMMENT
-    : '/*' .*? '*/' -> skip
+    : '/*' (ILI_BLOCKCOMMENT | .)*? '*/' -> skip
     ;
     
 WS
@@ -793,7 +793,7 @@ DEC
    : NUMBER DOT POSNUMBER SCALING?
    ;
 
-SCALING
+fragment SCALING
    : ('E'|'e') NUMBER
    ;
 

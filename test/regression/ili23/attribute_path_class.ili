@@ -1,0 +1,13 @@
+INTERLIS 2.3;
+
+MODEL AttributePathClass (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC T =
+    STRUCTURE S =
+      objectClass : CLASS;
+      attributePath : ATTRIBUTE OF objectClass;
+    END S;
+  END T;
+
+END AttributePathClass.

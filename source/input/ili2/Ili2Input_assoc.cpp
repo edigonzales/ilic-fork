@@ -129,12 +129,11 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    }
    
    if (properties[OID]) {
-      // to do !!!
+      c->OidProperty = true;
    }
    
    if (ctx->DERIVED() != nullptr) {
-      // from view
-      // to do !!!
+      c->View = find_view(visitPath(ctx->renamedViewableRef()->path()),get_line(ctx->renamedViewableRef()));
    }
 
    // role from ASSOCIATION LocalType
@@ -144,6 +143,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
       DomainType *t = find_domaintype(ctx->assocoid->getText(),get_line(ctx->assocoid));
       c->Oid = t;
    }
+   c->NoOid = ctx->NO() != nullptr;
 
    // role from ASSOCIATION DerivedAssoc
    // View *View;
@@ -176,7 +176,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    }
    
    if (ctx->CARDINALITY() != nullptr) {
-      // to do !!!
+      c->Multiplicity = visitCardinality(ctx->cardinality());
    }
 
    for (auto *actx : ctx->attributeDef()) {
@@ -194,11 +194,20 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
             else if (r2->Extended) {
                continue;
             }
+            // RefHB 3.7: an inherited target receives new association accesses
+            // only after it is explicitly EXTENDED in the current topic.
+            else if (r1->_baseclass->ElementInPackage != c->ElementInPackage) {
+               continue;
+            }
             if (find_attribute(r1->_baseclass,r2->Name)) {
                Log.error("attribute with name " + r2->Name + " already exists in " + get_path(r1->_baseclass),r2->_line); 
             }
-            else if (find_role(r1->_baseclass,r2->Name)) {
-               Log.error("role or roleaccess with name " + r2->Name + " already exists in " + get_path(r1->_baseclass),r2->_line); 
+            else if (Role *existing = find_role(r1->_baseclass,r2->Name)) {
+               // A ternary self-association reaches the same access through
+               // more than one opposite role; that is one access, not a clash.
+               if (existing != r2) {
+                  Log.error("role or roleaccess with name " + r2->Name + " already exists in " + get_path(r1->_baseclass),r2->_line);
+               }
             }
             else {
                r1->_baseclass->_roleaccess.push_back(r2);
@@ -293,7 +302,7 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
    r->Ordered = properties[ORDERED];
    r->Extended = properties[EXTENDED];
    r->External = properties[EXTERNAL];
-   // HIDING ???
+   r->Hiding = properties[HIDING];
 
    if (r->Extended) {
       Class* c = get_class_context();
@@ -327,6 +336,7 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
    
    if (ctx->cardinality() != nullptr) {
       r->Multiplicity = visitCardinality(ctx->cardinality());
+      r->MultiplicityDefined = true;
    }
 
    for (auto rr : ctx->restrictedRef()) {

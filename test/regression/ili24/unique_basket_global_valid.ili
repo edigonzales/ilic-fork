@@ -1,0 +1,11 @@
+INTERLIS 2.4;
+
+MODEL UniqueBasketGlobalValid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+  TOPIC Topic =
+    CLASS Object =
+      Code : TEXT;
+      UNIQUE (BASKET) BasketCode: Code;
+    END Object;
+  END Topic;
+END UniqueBasketGlobalValid.

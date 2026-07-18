@@ -1,0 +1,10 @@
+INTERLIS 2.3;
+
+TYPE MODEL LexerScalingName (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  DOMAIN
+    d1 = 0.1e2 .. 0.2e2;
+    e1 = 0.1000e2 .. 0.1999e2;
+
+END LexerScalingName.
