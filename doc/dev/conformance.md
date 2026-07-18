@@ -74,6 +74,49 @@ changes only the Ili2 lexer and the Ili2 parser's generated token vocabulary;
 improves from 468 to 470 conformant cases, with 95 invalid models still accepted
 and six valid models still rejected. No previously conformant case regresses.
 
+### Attribute derivations and contextual object paths
+
+This cause covers the five invalid cases
+`ili23.attributes.attribute-path-type-non-class-type-attr-path-restriction-fail`,
+`ili23.attributes.transient-attribute-without-afactor-fail`,
+`ili23.expressions.expressions-parent-element-in-area-view-fail`,
+`ili23.expressions.expressions-this-area-in-non-area-view-fail`, and
+`ili23.expressions.expressions-that-area-in-non-area-view-fail`, plus the valid
+case
+`ili23.expressions.expressions-accepting-extended-object-with-role-of-class`.
+The failures shared one omission: parsed derivations and `ATTRIBUTE OF` paths
+were discarded, while object paths resolved names only against their declared
+base class and not against extensions visible at the path's lexical occurrence.
+
+Reference-manual section 3.6 requires a factor for a concrete `TRANSIENT`
+attribute. An abstract transient attribute may leave that factor to a concrete
+extension; the 2.3 and 2.4 `ili2c` `attributeDef` productions enforce exactly
+that distinction. Section 3.8 defines an `ATTRIBUTE OF` restriction as an
+attribute path whose terminal value is a class-valued attribute. Sections 3.13
+and 3.15 restrict `PARENT` to ordinary inspections and `THISAREA`/`THATAREA` to
+area inspections. The `ili2c` path production additionally passes the lexical
+container into `Viewable.findAttributeInExtendedClass`, so an attribute added
+by a class extension in the current topic is visible after navigation through
+a role or reference.
+
+ilic now stores every derivation factor, rejects only concrete transient
+attributes without a factor, stores and validates `ATTRIBUTE OF` paths, and
+resolves contextual attributes in the current model/topic scope. More than one
+visible contextual match is diagnosed as ambiguous. The stored data is also
+preserved by cloning, translation comparison, and INTERLIS output. Both LSP
+grammars recognize the same path keywords and derivation syntax but do not
+encode these context-sensitive restrictions; consequently no grammar change
+was made.
+
+Nine local tests cover both outcomes of `ATTRIBUTE OF`, concrete transient
+attributes with and without a factor, the abstract exception, the three
+inspection keywords, and contextual extension lookup. All 31 local CTests pass.
+The complete corpus improves from 470 to 476 conformant cases: 90 invalid
+models remain accepted, five valid models remain rejected, and no previously
+conformant case regresses. The recorded result was produced by the cause commit
+containing this section (the report's candidate commit is verified after the
+commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -143,12 +186,12 @@ ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes |
-| --- | ---: | ---: | ---: |
-| conformant | 268 | 468 | 470 |
-| candidate accepts invalid | 280 | 95 | 95 |
-| candidate rejects valid | 12 | 8 | 6 |
-| infrastructure error | 11 | 0 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes |
+| --- | ---: | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 | 476 |
+| candidate accepts invalid | 280 | 95 | 95 | 90 |
+| candidate rejects valid | 12 | 8 | 6 | 5 |
+| infrastructure error | 11 | 0 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The

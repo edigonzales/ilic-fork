@@ -482,9 +482,17 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    // ASSOCIATION ClassAttr
    a->AttrParent = get_class_context();
    get_class_context()->ClassAttribute.push_back(a);
-   
+
+   // RefHB 2.3 3.8: an abstract transient attribute may defer its factor to a
+   // concrete extension. This matches ili2c's attributeDef validation.
+   if (a->Transient && !a->Abstract && ctx->factor().empty()) {
+      Log.error("TRANSIENT attribute " + name + " requires an assignment of a factor",get_line(ctx));
+   }
    for (auto fctx : ctx->factor()) {
-      // to do !!!
+      Factor *factor = visitFactor(fctx);
+      if (factor != nullptr) {
+         a->Derivates.push_back(factor);
+      }
    }
    
    Log.decNestLevel();

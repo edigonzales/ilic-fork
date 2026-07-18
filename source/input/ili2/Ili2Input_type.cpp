@@ -522,6 +522,19 @@ antlrcpp::Any Ili2Input::visitAttributePathType(parser::Ili2Parser::AttributePat
    debug(ctx,">>> visitAttributePathType()");
    AttributeRefType *t = new AttributeRefType();
    init_domaintype(t,ctx->start->getLine());
+   if (ctx->attributePath() != nullptr) {
+      PathOrInspFactor *restriction = visitAttributePath(ctx->attributePath());
+      t->AttrRestriction = restriction;
+
+      AttrOrParam *terminal = nullptr;
+      if (restriction != nullptr && !restriction->PathEls.empty()) {
+         terminal = dynamic_cast<AttrOrParam *>(restriction->PathEls.back()->Ref);
+      }
+      if (terminal == nullptr || terminal->Type == nullptr ||
+          terminal->Type->getClass() != "ClassRefType") {
+         Log.error("ATTRIBUTE OF restriction must end at a CLASS attribute",get_line(ctx->attributePath()));
+      }
+   }
    for (auto restriction : ctx->attrTypeDef()) {
       Type *type = visitAttrTypeDef(restriction);
       if (type != nullptr) {

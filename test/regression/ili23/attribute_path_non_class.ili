@@ -1,0 +1,21 @@
+INTERLIS 2.3;
+
+MODEL AttributePathNonClass (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC T =
+    CLASS A =
+    END A;
+
+    CLASS B =
+    END B;
+
+    ASSOCIATION AB =
+      a -- A;
+      b -- B;
+      objectClass : TEXT;
+      attributePath : ATTRIBUTE OF objectClass;
+    END AB;
+  END T;
+
+END AttributePathNonClass.

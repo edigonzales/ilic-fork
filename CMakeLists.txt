@@ -159,6 +159,33 @@ if(BUILD_TESTING)
     add_ilic_regression_test(ilic_regression_lexer_malformed_scaling FALSE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/lexer_malformed_scaling.ili"
     )
+    add_ilic_regression_test(ilic_regression_attribute_path_non_class FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/attribute_path_non_class.ili"
+    )
+    add_ilic_regression_test(ilic_regression_attribute_path_class TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/attribute_path_class.ili"
+    )
+    add_ilic_regression_test(ilic_regression_transient_without_derivation FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/transient_without_derivation.ili"
+    )
+    add_ilic_regression_test(ilic_regression_transient_with_derivation TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/transient_with_derivation.ili"
+    )
+    add_ilic_regression_test(ilic_regression_transient_abstract_without_derivation TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/transient_abstract_without_derivation.ili"
+    )
+    add_ilic_regression_test(ilic_regression_path_parent_in_area FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/path_parent_in_area.ili"
+    )
+    add_ilic_regression_test(ilic_regression_path_thisarea_in_normal FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/path_thisarea_in_normal.ili"
+    )
+    add_ilic_regression_test(ilic_regression_path_thatarea_in_normal FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/path_thatarea_in_normal.ili"
+    )
+    add_ilic_regression_test(ilic_regression_path_contextual_extension TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/path_contextual_extension.ili"
+    )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_complete.ili"

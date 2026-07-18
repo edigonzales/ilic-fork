@@ -1,0 +1,29 @@
+INTERLIS 2.3;
+
+MODEL PathContextualExtension (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC Base =
+    CLASS A =
+    END A;
+
+    CLASS B =
+    END B;
+
+    ASSOCIATION =
+      a -- {1} A;
+      b -- B;
+    END;
+  END Base;
+
+  TOPIC Extended EXTENDS Base =
+    CLASS A (EXTENDED) =
+      name : TEXT;
+    END A;
+
+    CONSTRAINTS OF B =
+      MANDATORY CONSTRAINT a->name == "expected";
+    END;
+  END Extended;
+
+END PathContextualExtension.

@@ -173,6 +173,7 @@ namespace {
 struct PathResolutionState {
    Class *current = nullptr;
    View *enclosingView = nullptr;
+   Package *scope = nullptr;
 };
 
 Class *path_target(Type *type)
@@ -210,7 +211,58 @@ AttrOrParam *view_alias(View *view,string name = "")
    return nullptr;
 }
 
-MetaElement *resolve_through_view_bases(View *view,string name,Class *&target,int line)
+bool is_defined_in_scope(Class *candidate,Package *scope)
+{
+   if (candidate == nullptr || scope == nullptr) {
+      return false;
+   }
+   if (candidate->ElementInPackage == scope) {
+      return true;
+   }
+   // A topic is also allowed to see contextual extensions defined at model
+   // level, matching ili2c's Viewable.isDefinedIn behaviour.
+   return scope->getClass() == "SubModel" &&
+          candidate->ElementInPackage == scope->ElementInPackage;
+}
+
+void find_contextual_attributes(Class *base,Package *scope,const string &name,
+                                list<AttrOrParam *> &matches)
+{
+   if (base == nullptr) {
+      return;
+   }
+   for (ExtendableME *extension : base->Sub) {
+      Class *extendedClass = dynamic_cast<Class *>(extension);
+      if (extendedClass == nullptr) {
+         continue;
+      }
+      if (is_defined_in_scope(extendedClass,scope)) {
+         AttrOrParam *attribute = find_attribute(extendedClass,name);
+         if (attribute != nullptr && attribute->AttrParent == extendedClass) {
+            matches.push_back(attribute);
+         }
+      }
+      find_contextual_attributes(extendedClass,scope,name,matches);
+   }
+}
+
+AttrOrParam *find_contextual_attribute(Class *base,Package *scope,const string &name,int line)
+{
+   AttrOrParam *attribute = find_attribute(base,name);
+   if (attribute != nullptr) {
+      return attribute;
+   }
+
+   list<AttrOrParam *> matches;
+   find_contextual_attributes(base,scope,name,matches);
+   if (matches.size() > 1) {
+      Log.error("ambiguous contextual attribute " + name + " from " + get_path(base),line);
+      return nullptr;
+   }
+   return matches.empty() ? nullptr : matches.front();
+}
+
+MetaElement *resolve_through_view_bases(View *view,Package *scope,string name,Class *&target,int line)
 {
    MetaElement *found = nullptr;
    target = nullptr;
@@ -225,7 +277,7 @@ MetaElement *resolve_through_view_bases(View *view,string name,Class *&target,in
 
       MetaElement *candidate = find_role(base,name);
       if (candidate == nullptr) {
-         candidate = find_attribute(base,name);
+         candidate = find_contextual_attribute(base,scope,name,line);
       }
       if (candidate == nullptr) {
          continue;
@@ -329,7 +381,7 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
    }
 
    View *currentView = dynamic_cast<View *>(state.current);
-   AttrOrParam *attribute = find_attribute(state.current,name);
+   AttrOrParam *attribute = find_contextual_attribute(state.current,state.scope,name,get_line(ctx));
    Role *role = find_role(state.current,name);
 
    if (currentView != nullptr && attribute != nullptr &&
@@ -358,7 +410,7 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
 
    if (currentView != nullptr) {
       Class *target = nullptr;
-      MetaElement *throughBase = resolve_through_view_bases(currentView,name,target,get_line(ctx));
+      MetaElement *throughBase = resolve_through_view_bases(currentView,state.scope,name,target,get_line(ctx));
       if (throughBase != nullptr) {
          element->Ref = throughBase;
          element->Kind = throughBase->getClass() == "Role" ? PathEl::Role : PathEl::Attribute;
@@ -414,6 +466,7 @@ antlrcpp::Any Ili2Input::visitObjectOrAttributePath(parser::Ili2Parser::ObjectOr
       state.current = get_class_context();
    }
    state.enclosingView = dynamic_cast<View *>(state.current);
+   state.scope = get_package_context();
 
    for (auto p : ctx->pathEl()) {
       f->PathEls.push_back(resolve_path_element(p,state));
@@ -477,6 +530,7 @@ antlrcpp::Any Ili2Input::visitPathEl(parser::Ili2Parser::PathElContext *ctx)
    PathResolutionState state;
    state.current = get_class_context();
    state.enclosingView = dynamic_cast<View *>(state.current);
+   state.scope = get_package_context();
    return resolve_path_element(ctx,state);
 
 }

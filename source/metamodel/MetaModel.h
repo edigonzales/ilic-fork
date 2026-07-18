@@ -42,6 +42,7 @@ namespace metamodel {
    class GenericDef;
    class DomainType;
    class Constraint;
+   struct PathOrInspFactor;
 
    // general
 
@@ -636,6 +637,9 @@ namespace metamodel {
    public:
       // role from ASSOCIATION ARefOf
       Class *Of = nullptr; // Class OR AttrOrParam OR Argument, to do !!!
+      // Optional ATTRIBUTE OF object path. This cannot be represented by Of,
+      // whose legacy C++ type only permits Class pointers.
+      PathOrInspFactor *AttrRestriction = nullptr;
       list<Type *> TypeRestriction;
       virtual string getClass() { return "AttributeRefType"; }
       virtual string getBaseClass() { return "DomainType"; };

@@ -1115,6 +1115,7 @@ Log.message(">>> clone topic");
       clone_init_domaintype(clone,org);
 
       clone->Of = org->Of;
+      clone->AttrRestriction = org->AttrRestriction;
 
    }
 

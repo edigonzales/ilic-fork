@@ -455,6 +455,9 @@ private:
       if (auto aref = dynamic_cast<AttributeRefType *>(translated)) {
          AttributeRefType *base_aref = static_cast<AttributeRefType *>(base);
          ref(translated,base,"attribute path restriction",aref->Of,base_aref->Of);
+         if (!same_expression(aref->AttrRestriction,base_aref->AttrRestriction)) {
+            mismatch(translated,base,"ATTRIBUTE OF restriction");
+         }
          vector<Type *> actual = as_vector(aref->TypeRestriction);
          vector<Type *> expected = as_vector(base_aref->TypeRestriction);
          for (size_t i = 0; i < min(actual.size(),expected.size()); ++i) {

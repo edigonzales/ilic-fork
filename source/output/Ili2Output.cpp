@@ -388,7 +388,29 @@ static void write_type(Type *t)
          // to do !!!
       }
       else if (t->getClass() == "AttributeRefType") {
+         AttributeRefType *attributeRef = static_cast<AttributeRefType *>(t);
          ili2.write(0,"ATTRIBUTE");
+         if (attributeRef->AttrRestriction != nullptr) {
+            ili2.write(0," OF ");
+            write_expression(&ili2,attributeRef->AttrRestriction);
+         }
+         if (!attributeRef->TypeRestriction.empty()) {
+            ili2.write(0," RESTRICTION (");
+            bool separator = false;
+            for (Type *restriction : attributeRef->TypeRestriction) {
+               if (separator) {
+                  ili2.write(0," : ");
+               }
+               if (restriction->ElementInPackage != nullptr) {
+                  ili2.write(0,get_path(restriction));
+               }
+               else {
+                  write_type(static_cast<DomainType *>(restriction));
+               }
+               separator = true;
+            }
+            ili2.write(0,")");
+         }
       }
       else if (t->getClass() == "ClassRefType") {
          ili2.write(0,"CLASS");
@@ -959,6 +981,17 @@ void Ili2Output::visitAttrOrParam(AttrOrParam *a)
          }
          else {
             write_type(t);
+         }
+         if (!a->Derivates.empty()) {
+            ili2.write(0," := ");
+            bool comma = false;
+            for (Expression *derivate : a->Derivates) {
+               if (comma) {
+                  ili2.write(0,", ");
+               }
+               write_expression(&ili2,derivate);
+               comma = true;
+            }
          }
          ili2.writeln(0,";");
       }
