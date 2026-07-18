@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(ilic VERSION 0.9.9 LANGUAGES CXX)
+project(ilic VERSION 0.9.9 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -138,6 +138,32 @@ if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(ilic_docs_cpp_example docs/examples/cpp-session.cpp)
+    target_link_libraries(ilic_docs_cpp_example PRIVATE ilic-core)
+    add_test(NAME ilic_docs_cpp_example COMMAND ilic_docs_cpp_example)
+
+    add_executable(ilic_docs_c_example docs/examples/c-api.c)
+    set_target_properties(ilic_docs_c_example PROPERTIES LINKER_LANGUAGE CXX)
+    target_link_libraries(ilic_docs_c_example PRIVATE ilic-capi)
+    add_test(NAME ilic_docs_c_example COMMAND ilic_docs_c_example)
+
+    if(UNIX)
+        add_test(NAME ilic_docs_cli_examples
+            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples/cli.sh"
+                "$<TARGET_FILE:ilic>"
+                "$<TARGET_FILE:ilic-format>"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+                "${CMAKE_CURRENT_BINARY_DIR}/docs-example-output")
+    endif()
+
+    find_program(ILIC_NODE_EXECUTABLE node)
+    if(ILIC_NODE_EXECUTABLE)
+        add_test(NAME ilic_docs_links
+            COMMAND "${ILIC_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/test/docs/DocumentationTest.mjs"
+                "${CMAKE_CURRENT_SOURCE_DIR}")
+    endif()
+
     add_executable(ilic_capi_test test/abi/CapiTest.cpp)
     target_link_libraries(ilic_capi_test PRIVATE ilic-capi)
     add_test(NAME ilic_capi COMMAND ilic_capi_test)

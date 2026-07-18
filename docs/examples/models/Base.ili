@@ -1,0 +1,6 @@
+INTERLIS 2.3;
+
+MODEL Base AT "https://example.invalid/ilic/docs" VERSION "1" =
+  DOMAIN
+    Identifier = TEXT*40;
+END Base.

@@ -1,5 +1,8 @@
 # Native C ABI, JSON protocol and WebAssembly
 
+> Current, tested documentation is available in
+> [Native APIs](../../docs/native-api.md) and [WASM](../../docs/wasm.md).
+
 The compiler core is exposed through the C header `include/ilic/capi.h`. The
 same ABI is linked natively by `ilic-capi` and exported from the Emscripten
 module. This keeps compilation and formatting semantics independent of the

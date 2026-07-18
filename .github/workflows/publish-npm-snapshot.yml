@@ -1,0 +1,86 @@
+name: Publish npm snapshot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-npm-snapshot
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build, test and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout selected branch or tag
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install OIDC-capable npm
+        run: npm install --global npm@11.18.0
+
+      - name: Install pinned Emscripten SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          emscripten_version=$(tr -d '[:space:]' < .emscripten-version)
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$emscripten_version"
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$emscripten_version"
+
+      - name: Build WebAssembly package
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ./scripts/build-wasm.sh
+
+      - name: Test source packages and staging logic
+        run: |
+          npm test --prefix packages/tools
+          npm test --prefix packages/compiler-wasm
+          node --test test/npm/PrepareNpmSnapshotTest.mjs
+
+      - name: Stage snapshot packages
+        id: stage
+        run: node scripts/prepare-npm-snapshot.mjs --github-output "$GITHUB_OUTPUT"
+
+      - name: Verify packed and installed packages
+        run: node scripts/test-npm-packages.mjs
+
+      - name: Publish @ilic/tools
+        run: npm publish "${{ steps.stage.outputs.tools_directory }}" --access public --tag snapshot
+
+      - name: Publish @ilic/compiler-wasm
+        run: npm publish "${{ steps.stage.outputs.compiler_wasm_directory }}" --access public --tag snapshot
+
+      - name: Write publication summary
+        if: success()
+        env:
+          BASE_VERSION: ${{ steps.stage.outputs.base_version }}
+          SNAPSHOT_VERSION: ${{ steps.stage.outputs.snapshot_version }}
+        shell: bash
+        run: |
+          {
+            printf '## npm snapshot published\n\n'
+            printf -- '- Git ref: `%s`\n' "$GITHUB_REF"
+            printf -- '- Git commit: `%s`\n' "$GITHUB_SHA"
+            printf -- '- Base version: `%s`\n' "$BASE_VERSION"
+            printf -- '- Snapshot version: `%s`\n\n' "$SNAPSHOT_VERSION"
+            printf -- '- [@ilic/tools](https://www.npmjs.com/package/@ilic/tools/v/%s)\n' "$SNAPSHOT_VERSION"
+            printf -- '- [@ilic/compiler-wasm](https://www.npmjs.com/package/@ilic/compiler-wasm/v/%s)\n' "$SNAPSHOT_VERSION"
+          } >> "$GITHUB_STEP_SUMMARY"

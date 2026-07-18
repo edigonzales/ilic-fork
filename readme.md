@@ -78,9 +78,13 @@ for object-path resolution in graphics and views.
 
 ## Documentation
 
-+ for users: 
-  - read the [help](./doc/help.txt) file for more information about ilic command line options
-  - consult the [changelog](./doc/changelog.txt) for the latest information on new features and bug fixes
++ current user and developer documentation (German):
+  - start with the [documentation index](./docs/README.md)
+  - use the verified [CLI reference](./docs/cli.md) for command line options
+  - see the [native APIs](./docs/native-api.md) and [WASM SDK](./docs/wasm.md) for embedding
+  - see [npm snapshot publication](./docs/npm-publikation.md) for package builds and authentication
++ reference material:
+  - consult the [changelog](./doc/changelog.txt) for historical changes
+  - INTERLIS manuals and legacy documentation remain in `doc/`
 
-+ for developers:
-  - development documentation can be found [here](./doc/dev/readme.md)
++ historical developer notes can be found [here](./doc/dev/readme.md)

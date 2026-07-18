@@ -1,0 +1,14 @@
+INTERLIS 2.3;
+
+!! A normal INTERLIS comment remains in the formatted output.
+!!@ displayName = "Documentation example"
+MODEL Example AT "https://example.invalid/ilic/docs" VERSION "1" =
+  IMPORTS Base;
+
+  TOPIC Data =
+    CLASS Item =
+      Id : MANDATORY Base.Identifier;
+      Description : TEXT*200;
+    END Item;
+  END Data;
+END Example.

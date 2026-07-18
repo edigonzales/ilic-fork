@@ -1,5 +1,9 @@
 # ilic Developer Documentation
 
+> The current user and embedding documentation is maintained in
+> [`../../docs/README.md`](../../docs/README.md). The pages in this directory
+> remain as historical implementation notes.
+
 ## Introduction
 Welcome to the ilic developer documentation. ilic is an INTERLIS compiler written in c++. 
 ilic was completely built from scratch, this is no c++ port of the 

@@ -6,6 +6,7 @@
 # CMake build output
 build/macos/
 build/wasm/
+build/npm/
 packages/compiler-wasm/ilic.mjs
 packages/compiler-wasm/ilic.wasm
 
