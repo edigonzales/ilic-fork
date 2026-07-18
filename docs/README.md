@@ -29,6 +29,9 @@ build/macos/ilic -silent \
 
 Den WASM-Compiler bauen und das geprüfte Node-Beispiel ausführen:
 
+Auf einem neuen Entwicklungsrechner zuerst das
+[Emscripten SDK installieren und aktivieren](build-und-installation.md#emscripten-sdk-einmalig-installieren).
+
 ```sh
 source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh

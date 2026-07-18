@@ -8,6 +8,10 @@ neu implementiert.
 
 ## Build
 
+Für einen neuen Entwicklungsrechner zuerst das
+[Emscripten SDK installieren und aktivieren](build-und-installation.md#emscripten-sdk-einmalig-installieren).
+Danach genügt in jedem neuen Terminal:
+
 ```sh
 source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh

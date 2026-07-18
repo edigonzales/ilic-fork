@@ -41,7 +41,9 @@ setzen. Das ist für diese Vorabversionen nicht erwünscht. Siehe
 ## Lokales Erzeugen und Prüfen
 
 Zuerst muss der WASM-Build mit der in `.emscripten-version` festgelegten
-Emscripten-Version erstellt werden:
+Emscripten-Version erstellt werden. Die vollständige Erstinstallation ist unter
+[Emscripten SDK einmalig installieren](build-und-installation.md#emscripten-sdk-einmalig-installieren)
+dokumentiert:
 
 ```sh
 source /pfad/zu/emsdk/emsdk_env.sh
