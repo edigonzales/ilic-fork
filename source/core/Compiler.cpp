@@ -126,6 +126,12 @@ bool CompilerSession::removeSource(const std::string &uri) { return sources_.rem
 SourceManager &CompilerSession::sources() { return sources_; }
 const SourceManager &CompilerSession::sources() const { return sources_; }
 
+SyntaxSnapshot CompilerSession::parse(const std::string &uri)
+{
+   std::lock_guard<std::mutex> lock(compilerMutex);
+   return parseSyntax(sources_,uri);
+}
+
 CompilationResult CompilerSession::compile(const CompilationRequest &request)
 {
    std::lock_guard<std::mutex> lock(compilerMutex);

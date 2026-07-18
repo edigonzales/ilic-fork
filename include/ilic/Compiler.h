@@ -2,6 +2,7 @@
 
 #include "SourceManager.h"
 #include "Diagnostic.h"
+#include "Syntax.h"
 
 #include <string>
 #include <vector>
@@ -56,6 +57,7 @@ public:
    bool removeSource(const std::string &uri);
    SourceManager &sources();
    const SourceManager &sources() const;
+   SyntaxSnapshot parse(const std::string &uri);
    CompilationResult compile(const CompilationRequest &request);
 
 private:

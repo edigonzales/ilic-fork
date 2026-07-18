@@ -16,12 +16,19 @@ test("compiles and formats through the real WASM ABI", {
 !! kept
 MODEL WasmModel AT "https://example.invalid/ilic/tests" VERSION "1" =
 END WasmModel.
-`);
+`, 7);
   const result = session.compile({ roots: [uri] });
   assert.equal(result.success, true, JSON.stringify(result.diagnostics));
   assert.ok(result.models.some(model => model.name === "WasmModel"));
   assert.equal(result.schemaVersion, 1);
   assert.equal(result.abiVersion, 1);
+
+  const syntax = session.parse(uri);
+  assert.equal(syntax.kind, "syntax");
+  assert.equal(syntax.documentVersion, 7);
+  assert.equal(syntax.iliVersion, "2.3");
+  assert.ok(syntax.tokens.length > 0);
+  assert.ok(syntax.nodes.some(node => node.kind === "modelDef"));
 
   const formatted = session.format(uri);
   assert.equal(formatted.success, true);

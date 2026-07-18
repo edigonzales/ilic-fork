@@ -2,12 +2,12 @@
 
 [Dokumentationsindex](README.md) · [Diagnostik](diagnostik-und-logging.md) · [WASM](wasm.md)
 
-Die native Bibliothek hat drei C++-Oberflächen und eine stabile C-Grenze:
+Die native Bibliothek hat editorfähige C++-Oberflächen und eine stabile C-Grenze:
 
 - `ilic::CompilerSession` kompiliert virtuelle oder native Quellen;
 - `ilic::Formatter` formatiert INTERLIS 2.3/2.4;
 - `ilic::RepositoryManager` beschafft Modell-Workspaces;
-- `ilic/capi.h` transportiert Compile- und Format-Requests als JSON v1.
+- `ilic/capi.h` transportiert Parse-, Compile- und Format-Requests als JSON v1.
 
 ## C++: virtuelle Compiler-Session
 
@@ -29,6 +29,12 @@ if (!result.success) {
       std::cerr << diagnostic.code << ": " << diagnostic.message << '\n';
 }
 ```
+
+`session.parse(uri)` verwendet direkt die produktive ANTLR-Grammatik und
+liefert Tokens, einen normalisierten flachen Parsebaum, relevante
+Editor-Kontexte, Imports und Syntaxdiagnostik. Alle Ranges enthalten URI,
+UTF-16-Positionen und UTF-8-Byteoffsets; der Snapshot trägt die registrierte
+Dokumentversion.
 
 `putSource` kopiert URI und UTF-8-Inhalt. Derselbe URI kann mit einem neuen
 Dokumentstand ersetzt werden; `removeSource` entfernt ihn. Die Versionsnummer
@@ -146,7 +152,7 @@ Das vollständige Beispiel ist [`examples/c-api.c`](examples/c-api.c).
 1. `ilic_session_create` erzeugt einen Session-Handle.
 2. `ilic_session_put_source` kopiert URI und Source; die Caller-Buffer dürfen
    unmittelbar danach freigegeben werden.
-3. `ilic_compile` oder `ilic_format` erzeugt einen Result-Handle.
+3. `ilic_parse`, `ilic_compile` oder `ilic_format` erzeugt einen Result-Handle.
 4. `ilic_result_json` liefert einen nicht nullterminierungsabhängigen Pointer
    plus Länge. Er bleibt bis `ilic_result_destroy` gültig.
 5. Jeder Result- und Session-Handle muss genau einmal zerstört werden.

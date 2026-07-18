@@ -45,6 +45,13 @@ END AbiModel.
    assert(compilation.find("\"success\":true") != std::string::npos);
    assert(compilation.find("\"displayName\"") != std::string::npos);
 
+   const std::string parseRequest =
+      R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili"})json";
+   std::string syntax = resultJson(ilic_parse(session,parseRequest.data(),parseRequest.size()));
+   assert(syntax.find("\"kind\":\"syntax\"") != std::string::npos);
+   assert(syntax.find("\"documentVersion\":1") != std::string::npos);
+   assert(syntax.find("\"modelDef\"") != std::string::npos);
+
    const std::string formatRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili","options":{"indentSize":2}})json";
    std::string formatting = resultJson(ilic_format(session,formatRequest.data(),formatRequest.size()));

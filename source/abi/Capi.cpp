@@ -175,6 +175,32 @@ Value compileResult(const ilic::CompilationResult &result)
    };
 }
 
+Value syntaxResult(const ilic::SyntaxSnapshot &result)
+{
+   Value::Array tokens;
+   for (const auto &token : result.tokens) {
+      tokens.push_back(Value::Object{{"kind",token.kind},{"text",token.text},
+         {"channel",token.channel},{"range",range(token.range)}});
+   }
+   Value::Array nodes;
+   for (const auto &node : result.nodes) {
+      nodes.push_back(Value::Object{{"id",node.id},
+         {"parent",node.hasParent ? Value(node.parent) : Value(nullptr)},
+         {"kind",node.kind},{"range",range(node.range)}});
+   }
+   Value::Array contexts;
+   for (const auto &context : result.contexts)
+      contexts.push_back(Value::Object{{"kind",context.kind},{"range",range(context.range)}});
+   Value::Array imports;
+   for (const auto &model : result.imports) imports.emplace_back(model);
+   return Value::Object{{"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
+      {"kind","syntax"},{"success",result.success},{"uri",result.uri},
+      {"documentVersion",static_cast<double>(result.documentVersion)},
+      {"iliVersion",result.iliVersion},{"tokens",std::move(tokens)},
+      {"nodes",std::move(nodes)},{"contexts",std::move(contexts)},
+      {"imports",std::move(imports)},{"diagnostics",diagnostics(result.diagnostics)}};
+}
+
 } // namespace
 
 extern "C" {
@@ -226,6 +252,26 @@ std::uint32_t ilic_compile(std::uint32_t session,const char *requestJson,std::si
    }
    catch (const std::exception &error) {
       return store(errorResult("compilation",error.what()));
+   }
+}
+
+std::uint32_t ilic_parse(std::uint32_t session,const char *requestJson,std::size_t requestLength)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return store(errorResult("syntax","invalid session handle"));
+   if (requestJson == nullptr) return store(errorResult("syntax","request JSON is null"));
+   try {
+      Value json = ilic::json::parse(std::string(requestJson,requestLength));
+      if (!json.isObject()) throw std::runtime_error("parse request must be an object");
+      if (!json.get("schemaVersion").isNumber() ||
+         static_cast<int>(json.get("schemaVersion").number()) != 1)
+         throw std::runtime_error("unsupported schemaVersion");
+      if (!json.get("uri").isString() || json.get("uri").string().empty())
+         throw std::runtime_error("uri must be a non-empty string");
+      return store(syntaxResult(value->parse(json.get("uri").string())));
+   }
+   catch (const std::exception &error) {
+      return store(errorResult("syntax",error.what()));
    }
 }
 

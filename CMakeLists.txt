@@ -27,6 +27,7 @@ set(ILIC_CORE_SOURCES
     source/core/Compiler.cpp
     source/core/Formatter.cpp
     source/core/SourceManager.cpp
+    source/core/Syntax.cpp
 
     source/input/ili1/Ili1Input.cpp
     source/input/ili1/Ili1Input_package.cpp
@@ -114,7 +115,7 @@ if(EMSCRIPTEN)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sWASM_BIGINT=1"
         "-sASSERTIONS=1"
-        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_compile','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
+        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_parse','_ilic_compile','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
     )
     set_target_properties(ilic-wasm PROPERTIES OUTPUT_NAME "ilic" SUFFIX ".mjs")
 endif()
@@ -170,6 +171,9 @@ if(BUILD_TESTING)
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core)
     add_test(NAME ilic_core_session COMMAND ilic_core_session_test)
+    add_executable(ilic_syntax_snapshot_test test/core/SyntaxSnapshotTest.cpp)
+    target_link_libraries(ilic_syntax_snapshot_test PRIVATE ilic-core)
+    add_test(NAME ilic_syntax_snapshot COMMAND ilic_syntax_snapshot_test)
     add_executable(ilic_formatter_test test/core/FormatterTest.cpp)
     target_link_libraries(ilic_formatter_test PRIVATE ilic-core)
     add_test(NAME ilic_formatter COMMAND ilic_formatter_test)

@@ -44,6 +44,24 @@ export interface CompilationResult {
   diagnostics: Diagnostic[];
   logs: LogEvent[];
 }
+export interface SyntaxToken { kind: string; text: string; channel: number; range: SourceRange; }
+export interface SyntaxNode { id: number; parent: number | null; kind: string; range: SourceRange; }
+export interface SyntaxContext { kind: string; range: SourceRange; }
+export interface SyntaxSnapshot {
+  schemaVersion: 1;
+  abiVersion: 1;
+  compilerVersion: string;
+  kind: "syntax";
+  success: boolean;
+  uri: string;
+  documentVersion: number;
+  iliVersion: "1.0" | "2.3" | "2.4";
+  tokens: SyntaxToken[];
+  nodes: SyntaxNode[];
+  contexts: SyntaxContext[];
+  imports: string[];
+  diagnostics: Diagnostic[];
+}
 export interface FormatResult {
   schemaVersion: 1;
   abiVersion: 1;
@@ -70,6 +88,7 @@ export interface EmscriptenIlicModule {
     source: number, sourceLength: number, version: bigint): number;
   _ilic_session_remove_source(session: number, uri: number, uriLength: number): number;
   _ilic_compile(session: number, request: number, requestLength: number): number;
+  _ilic_parse(session: number, request: number, requestLength: number): number;
   _ilic_format(session: number, request: number, requestLength: number): number;
   _ilic_result_json(result: number, resultLength: number): number;
   _ilic_result_destroy(result: number): void;
@@ -80,6 +99,7 @@ export class CompilerSession {
   putWorkspace(workspace: ResolvedWorkspace): void;
   removeSource(uri: string): boolean;
   compile(request: CompilationRequest): CompilationResult;
+  parse(uri: string): SyntaxSnapshot;
   format(uri: string, options?: { indentSize?: number; requireValidSyntax?: boolean }): FormatResult;
   dispose(): void;
 }

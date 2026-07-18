@@ -93,7 +93,7 @@ worker.onmessage = ({ data }) => console.log(data);
 ```
 
 Unterstützt werden `createSession`, `disposeSession`, `putSource`,
-`removeSource`, `compile` und `format`. Für produktiven Einsatz sollte der Host
+`removeSource`, `parse`, `compile` und `format`. Für produktiven Einsatz sollte der Host
 Requests über `id` Promise-basiert korrelieren.
 
 ## Browser und Bundler
