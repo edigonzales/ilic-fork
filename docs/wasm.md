@@ -171,7 +171,7 @@ await call("disposeSession",sessionId);
 ```
 
 Unterstützte Methoden sind `createSession`, `disposeSession`, `putSource`,
-`removeSource`, `parse`, `compile` und `format`. Session-IDs sind UUIDs.
+`removeSource`, `parse`, `analyze`, `compile` und `format`. Session-IDs sind UUIDs.
 `worker.js`, `ilic.mjs` und `ilic.wasm` müssen im Deployment so kopiert werden,
 dass der relative Import und die WASM-Lokalisierung des Workers erhalten
 bleiben. Der konkrete Asset-Pfad ist eine Entscheidung des verwendeten Bundlers.

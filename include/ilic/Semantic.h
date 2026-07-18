@@ -1,0 +1,95 @@
+#pragma once
+
+#include "Compiler.h"
+
+#include <cstdint>
+#include <map>
+#include <string>
+#include <vector>
+
+namespace ilic {
+
+struct SemanticSymbol {
+   std::string id;
+   std::string name;
+   std::string qualifiedName;
+   std::string kind;
+   std::string containerId;
+   SourceRange range;
+   bool abstract = false;
+};
+
+struct SemanticReference {
+   std::string sourceId;
+   std::string targetId;
+   std::string kind;
+   SourceRange range;
+};
+
+struct SemanticDependency {
+   std::string sourceUri;
+   std::string targetUri;
+   std::string model;
+};
+
+struct DiagramMember {
+   std::string name;
+   std::string type;
+   bool inherited = false;
+};
+
+struct DiagramNode {
+   std::string id;
+   std::string containerId;
+   std::string label;
+   std::string kind;
+   bool abstract = false;
+   SourceRange range;
+   std::vector<DiagramMember> members;
+};
+
+struct DiagramEdge {
+   std::string id;
+   std::string sourceId;
+   std::string targetId;
+   std::string kind;
+   std::string label;
+   std::string cardinality;
+};
+
+struct DiagramProjection {
+   std::vector<DiagramNode> nodes;
+   std::vector<DiagramEdge> edges;
+};
+
+struct DocumentationSection {
+   std::string id;
+   std::string title;
+   std::string kind;
+   std::string text;
+   int level = 1;
+};
+
+struct DocumentationProjection {
+   std::string title;
+   std::vector<DocumentationSection> sections;
+};
+
+struct SemanticSnapshot {
+   bool success = false;
+   bool cancelled = false;
+   std::vector<std::string> roots;
+   std::map<std::string,std::uint64_t> documentVersions;
+   std::vector<SemanticSymbol> symbols;
+   std::vector<SemanticReference> references;
+   std::vector<SemanticDependency> dependencies;
+   DiagramProjection diagram;
+   DocumentationProjection documentation;
+   std::vector<Diagnostic> diagnostics;
+   std::vector<LogEvent> logs;
+};
+
+SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
+   const CompilationRequest &request,const CompilationResult &compilation);
+
+} // namespace ilic

@@ -36,6 +36,12 @@ Editor-Kontexte, Imports und Syntaxdiagnostik. Alle Ranges enthalten URI,
 UTF-16-Positionen und UTF-8-Byteoffsets; der Snapshot trägt die registrierte
 Dokumentversion.
 
+`session.analyze(request)` kompiliert denselben virtuellen Workspace und
+liefert zusätzlich einen serialisierbaren Semantic Snapshot: stabile Symbole,
+Definition-/Typ-/Vererbungsreferenzen, Modellabhängigkeiten sowie gemeinsame
+Diagramm- und Dokumentationsprojektionen. Die Projektionen stammen damit aus
+derselben Semantik wie Diagnostics und Navigation.
+
 `putSource` kopiert URI und UTF-8-Inhalt. Derselbe URI kann mit einem neuen
 Dokumentstand ersetzt werden; `removeSource` entfernt ihn. Die Versionsnummer
 wird gespeichert, beeinflusst aber die Semantik nicht und ist für editornahe
@@ -152,7 +158,7 @@ Das vollständige Beispiel ist [`examples/c-api.c`](examples/c-api.c).
 1. `ilic_session_create` erzeugt einen Session-Handle.
 2. `ilic_session_put_source` kopiert URI und Source; die Caller-Buffer dürfen
    unmittelbar danach freigegeben werden.
-3. `ilic_parse`, `ilic_compile` oder `ilic_format` erzeugt einen Result-Handle.
+3. `ilic_parse`, `ilic_analyze`, `ilic_compile` oder `ilic_format` erzeugt einen Result-Handle.
 4. `ilic_result_json` liefert einen nicht nullterminierungsabhängigen Pointer
    plus Länge. Er bleibt bis `ilic_result_destroy` gültig.
 5. Jeder Result- und Session-Handle muss genau einmal zerstört werden.

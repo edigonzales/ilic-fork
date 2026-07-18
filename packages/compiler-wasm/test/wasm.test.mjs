@@ -30,6 +30,12 @@ END WasmModel.
   assert.ok(syntax.tokens.length > 0);
   assert.ok(syntax.nodes.some(node => node.kind === "modelDef"));
 
+  const semantic = session.analyze({ roots: [uri] });
+  assert.equal(semantic.kind, "semantic");
+  assert.equal(semantic.success, true, JSON.stringify(semantic.diagnostics));
+  assert.ok(semantic.symbols.some(symbol => symbol.qualifiedName === "WasmModel"));
+  assert.equal(semantic.documentVersions[uri], 7);
+
   const formatted = session.format(uri);
   assert.equal(formatted.success, true);
   assert.match(formatted.text, /!! kept/);
