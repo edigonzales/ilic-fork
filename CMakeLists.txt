@@ -23,6 +23,7 @@ target_include_directories(antlr4-runtime
 
 set(ILIC_CORE_SOURCES
     source/core/Compiler.cpp
+    source/core/Formatter.cpp
     source/core/SourceManager.cpp
 
     source/input/ili1/Ili1Input.cpp
@@ -82,10 +83,16 @@ target_link_libraries(ilic-core PUBLIC antlr4-runtime)
 add_executable(ilic source/main/ilic.cpp)
 target_link_libraries(ilic PRIVATE ilic-core)
 
+add_executable(ilic-format source/main/ilic_format.cpp)
+target_link_libraries(ilic-format PRIVATE ilic-core)
+
 if(BUILD_TESTING)
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core)
     add_test(NAME ilic_core_session COMMAND ilic_core_session_test)
+    add_executable(ilic_formatter_test test/core/FormatterTest.cpp)
+    target_link_libraries(ilic_formatter_test PRIVATE ilic-core)
+    add_test(NAME ilic_formatter COMMAND ilic_formatter_test)
 
     function(add_ilic_regression_test name expected_success)
         set(options)
