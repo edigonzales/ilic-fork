@@ -1,0 +1,14 @@
+INTERLIS 2.3;
+
+MODEL ExpressionBooleanValid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC T =
+    CLASS A =
+      enabled : BOOLEAN;
+      MANDATORY CONSTRAINT enabled AND (#true OR #false);
+      MANDATORY CONSTRAINT NOT (enabled);
+    END A;
+  END T;
+
+END ExpressionBooleanValid.

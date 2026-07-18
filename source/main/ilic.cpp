@@ -13,6 +13,7 @@
 #include "../input/ili2/InterlisModel.h"
 
 #include "../metamodel/MetaModelInput.h"
+#include "../metamodel/SemanticChecker.h"
 #include "../metamodel/TranslationChecker.h"
 
 #include "../output/Ili1Output.h"
@@ -794,6 +795,7 @@ int main(int argc, char* argv[])
       }
    }
 
+   check_model_semantics();
    check_model_translations();
    
    // list all models

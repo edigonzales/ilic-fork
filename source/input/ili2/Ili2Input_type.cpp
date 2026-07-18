@@ -91,7 +91,13 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
          ct->isDomainType = true;
       }
 
-      t = static_cast<DomainType *>(tt);
+      t = dynamic_cast<DomainType *>(tt);
+      if (t == nullptr) {
+         Log.error("domain " + name + " requires a domain type",get_line(ctx));
+         basetype = nullptr;
+         Log.decNestLevel();
+         return static_cast<DomainType *>(nullptr);
+      }
    }
    else {
       t = static_cast<DomainType *>(basetype->clone());
@@ -106,6 +112,27 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
    t->Final = properties[FINAL];
    if (ctx->MANDATORY() != nullptr) {
       t->Mandatory = true;
+   }
+
+   // INTERLIS 2.4 domain constraints are semantic model elements. Keeping the
+   // lexical domain on both the constraint and its expression makes THIS
+   // resolvable after all models have been loaded.
+   auto domainExpressions = ctx->expression();
+   auto domainNames = ctx->NAME();
+   if (!domainExpressions.empty()) {
+      push_context(t);
+      for (size_t index = 0; index < domainExpressions.size(); ++index) {
+         SimpleConstraint *constraint = new SimpleConstraint();
+         init_constraint(constraint,get_line(domainExpressions[index]));
+         constraint->Kind = SimpleConstraint::MandC;
+         constraint->toDomain = t;
+         if (index + 1 < domainNames.size()) {
+            constraint->Name = domainNames[index + 1]->getText();
+         }
+         constraint->LogicalExpression = visitExpression(domainExpressions[index]);
+         t->Constraint.push_back(constraint);
+      }
+      pop_context();
    }
 
    add_type(t);

@@ -824,6 +824,7 @@ namespace metamodel {
    void init_expression(Expression* e, int line)
    {
       init_mmobject(e, line);
+      e->OccurrenceScope = get_context();
    }
 
    void init_factor(Factor* f, int line)

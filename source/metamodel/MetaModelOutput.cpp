@@ -111,8 +111,8 @@ void write_expression(TextWriter *tw,Expression *e)
          Class *Class = nullptr;
       */
       ClassConst *c = dynamic_cast<ClassConst *>(e);
-      tw->write(0, "#"); // ???
-      tw->write(0,c->Class->Name);
+      tw->write(0, ">");
+      tw->write(0,c->Class == nullptr ? "???" : get_path(c->Class));
    }
    else if (e->getClass() == "AttributeConst") {
       /* struct AttributeConst : public Factor {
@@ -120,8 +120,8 @@ void write_expression(TextWriter *tw,Expression *e)
          AttrOrParam *Attribute = nullptr;
       */
       AttributeConst *c = dynamic_cast<AttributeConst *>(e);
-      tw->write(0, "#"); // ???
-      tw->write(0,c->Attribute->Name);
+      tw->write(0, ">>");
+      tw->write(0,c->Attribute == nullptr ? "???" : c->Attribute->Name);
    }
    else if (e->getClass() == "UnitRef") {
       /* struct UnitRef : public Factor {
@@ -298,4 +298,3 @@ void write_enumtype(TextWriter *tw,EnumType *t)
 }
 
 } // namespace metamodel
-

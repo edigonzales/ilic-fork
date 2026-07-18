@@ -209,6 +209,10 @@ private:
          link_list(cls->Constraints,base_class->Constraints,translated,"constraints");
          link_list(cls->Constraint,base_class->Constraint,translated,"external constraints");
       }
+      if (auto domain = dynamic_cast<DomainType *>(translated)) {
+         link_list(domain->Constraint,static_cast<DomainType *>(base)->Constraint,
+            translated,"domain constraints");
+      }
       if (auto attribute = dynamic_cast<AttrOrParam *>(translated)) {
          link_type(attribute->Type,static_cast<AttrOrParam *>(base)->Type);
       }
@@ -634,6 +638,13 @@ private:
          for (Role *role : cls->Role) if (role->_translationOf) compare_element(role,role->_translationOf);
          for (Constraint *constraint : cls->Constraints) if (constraint != nullptr && constraint->_translationOf) compare_element(constraint,constraint->_translationOf);
          for (Constraint *constraint : cls->Constraint) if (constraint != nullptr && constraint->_translationOf) compare_element(constraint,constraint->_translationOf);
+      }
+      if (auto domain = dynamic_cast<DomainType *>(translated)) {
+         for (Constraint *constraint : domain->Constraint) {
+            if (constraint != nullptr && constraint->_translationOf != nullptr) {
+               compare_element(constraint,constraint->_translationOf);
+            }
+         }
       }
       if (auto attribute = dynamic_cast<AttrOrParam *>(translated)) {
          if (attribute->Type != nullptr && attribute->Type->_translationOf != nullptr) compare_element(attribute->Type,attribute->Type->_translationOf);

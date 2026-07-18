@@ -126,6 +126,7 @@ antlrcpp::Any Ili2Input::visitTerm1(parser::Ili2Parser::Term1Context *ctx)
    }
    else {
       CompoundExpr *ce = new CompoundExpr();
+      init_expression(ce,get_line(ctx));
       if (ctx->operator1().front()->OR() != nullptr) {
          ce->Operation = CompoundExpr_OperationType::Or;
          ce->_type = "BooleanType";
@@ -178,6 +179,7 @@ antlrcpp::Any Ili2Input::visitTerm2(parser::Ili2Parser::Term2Context *ctx)
    }
    else {
       CompoundExpr *ce = new CompoundExpr();
+      init_expression(ce,get_line(ctx));
       if (ctx->operator2().front()->AND() != nullptr) {
          ce->Operation = CompoundExpr_OperationType::And;
          ce->_type = "BooleanType";
@@ -302,7 +304,7 @@ antlrcpp::Any Ili2Input::visitTerm3(parser::Ili2Parser::Term3Context *ctx)
          Expression *SubExpression = nullptr;
       */
       UnaryExpr *u = new UnaryExpr();
-      init_mmobject(u,ctx->start->getLine());
+      init_expression(u,get_line(ctx));
       u->Operation = UnaryExpr::None;
       u->SubExpression = visitTerm(ctx->t1);
       if (u->SubExpression != nullptr) {
@@ -326,7 +328,7 @@ antlrcpp::Any Ili2Input::visitTerm3(parser::Ili2Parser::Term3Context *ctx)
       };
       */
       CompoundExpr *c = new CompoundExpr();
-      init_mmobject(c,ctx->start->getLine());
+      init_expression(c,get_line(ctx));
       c->Operation = static_cast<CompoundExpr_OperationType>(visitRelation(ctx->relation()));
       Expression *e1 = visitTerm(ctx->t1);
       if (e1 != nullptr) {
@@ -383,7 +385,7 @@ antlrcpp::Any Ili2Input::visitTerm(parser::Ili2Parser::TermContext *ctx)
       };
       */
       UnaryExpr *u = new UnaryExpr();
-      init_mmobject(u,ctx->start->getLine());
+      init_expression(u,get_line(ctx));
       if (ctx->NOT() != nullptr) {
          u->Operation = UnaryExpr::Not;
       }
@@ -404,6 +406,7 @@ antlrcpp::Any Ili2Input::visitTerm(parser::Ili2Parser::TermContext *ctx)
       public:
       */
       UnaryExpr *u = new UnaryExpr();
+      init_expression(u,get_line(ctx));
       u->Operation = UnaryExpr::Defined;
       Factor *f = visitFactor(ctx->factor());
       if (ctx->DEFINED() != nullptr) {
@@ -522,7 +525,7 @@ antlrcpp::Any Ili2Input::visitFactor(parser::Ili2Parser::FactorContext *ctx)
    }
    else if (ctx->PARAMETER() != nullptr) {
       RuntimeParamRef *r = new RuntimeParamRef;
-      r->_line = get_line(ctx->parampath);
+      init_factor(r,get_line(ctx->parampath));
       r->RuntimeParam = nullptr;
       string name = ctx->parampath->getText();
       for (auto p : get_model_context()->_runtimeparameter) {
@@ -537,7 +540,7 @@ antlrcpp::Any Ili2Input::visitFactor(parser::Ili2Parser::FactorContext *ctx)
       f = r;
    }
    else if (ctx->constant() != nullptr) {
-      Constant *c = visitConstant(ctx->constant());
+      Factor *c = visitConstant(ctx->constant());
       f = c;
    }
 
@@ -569,30 +572,37 @@ antlrcpp::Any Ili2Input::visitConstant(parser::Ili2Parser::ConstantContext *ctx)
    debug(ctx,">>> visitConstant()");
    Log.incNestLevel();
    
-   Constant *c = nullptr;
+   Factor *c = nullptr;
    
    if (ctx->UNDEFINED() != nullptr) {
       c = new Constant();
-      c->Kind = Constant::Undefined;
+      init_factor(c,get_line(ctx));
+      static_cast<Constant *>(c)->Kind = Constant::Undefined;
       c->_type = "UNDEFINED";
    }
    else if (ctx->numericConst() != nullptr) {
-      c = visitNumericConst(ctx->numericConst());
+      Constant *constant = visitNumericConst(ctx->numericConst());
+      c = constant;
    }
    else if (ctx->textConst() != nullptr) {
-      c = visitTextConst(ctx->textConst());
+      Constant *constant = visitTextConst(ctx->textConst());
+      c = constant;
    }
    else if (ctx->formattedConst() != nullptr) {
-      c = visitFormattedConst(ctx->formattedConst());
+      Constant *constant = visitFormattedConst(ctx->formattedConst());
+      c = constant;
    }
    else if (ctx->enumConst() != nullptr) {
-      c = visitEnumConst(ctx->enumConst());
+      Constant *constant = visitEnumConst(ctx->enumConst());
+      c = constant;
    }
    else if (ctx->classConst() != nullptr) {
-      c = visitClassConst(ctx->classConst());
+      ClassConst *constant = visitClassConst(ctx->classConst());
+      c = constant;
    }
    else if (ctx->attributePathConst() != nullptr) {
-      c = visitAttributePathConst(ctx->attributePathConst());
+      AttributeConst *constant = visitAttributePathConst(ctx->attributePathConst());
+      c = constant;
    }
    
    Log.decNestLevel();
@@ -615,6 +625,7 @@ antlrcpp::Any Ili2Input::visitDecConst(parser::Ili2Parser::DecConstContext *ctx)
    Log.incNestLevel();
    
    Constant *c = new Constant();
+   init_factor(c,get_line(ctx));
    c->Kind = Constant::Numeric;
    c->_type = "NumType";
    
@@ -671,6 +682,7 @@ antlrcpp::Any Ili2Input::visitTextConst(parser::Ili2Parser::TextConstContext *ct
    Log.incNestLevel();
 
    Constant *c = new Constant();
+   init_factor(c,get_line(ctx));
    c->Kind = Constant::Text;
    c->_type = "TextType";
    c->Value = visitString(ctx->textconst);
@@ -693,6 +705,7 @@ antlrcpp::Any Ili2Input::visitEnumConst(parser::Ili2Parser::EnumConstContext *ct
    Log.incNestLevel();
 
    Constant *c = new Constant();
+   init_factor(c,get_line(ctx));
    c->Kind = Constant::Enumeration;
    c->_type = "EnumType";
    c->Value = "";
@@ -705,7 +718,8 @@ antlrcpp::Any Ili2Input::visitEnumConst(parser::Ili2Parser::EnumConstContext *ct
       }
    }
    
-   if (c->Value == "true" || c->Value == "INTERLIS.true") {
+   if (c->Value == "true" || c->Value == "false" ||
+       c->Value == "INTERLIS.true" || c->Value == "INTERLIS.false") {
       c->_type = "BooleanType";
    }
 
@@ -725,18 +739,13 @@ antlrcpp::Any Ili2Input::visitClassConst(parser::Ili2Parser::ClassConstContext *
    debug(ctx,">>> visitClassConst()");
    Log.incNestLevel();
 
-   Constant *c = new Constant();
-   c->Kind = Constant::Enumeration;
-   c->_type = "EnumType";
-   string val = visitPath(ctx->path());
-   c->Value = val;
-   
-   if (find_class(c->Value,get_line(ctx)) == nullptr) {
-      Log.error("class " + c->Value + " not found",ctx->start->getLine());
-   }
+   ClassConst *c = new ClassConst();
+   init_factor(c,get_line(ctx));
+   c->_type = "ClassRefType";
+   c->Class = find_class(visitPath(ctx->path()),get_line(ctx));
 
    Log.decNestLevel();
-   debug(ctx,"<<< visitClassConst(" + c->Value + ")");
+   debug(ctx,"<<< visitClassConst()");
    return c;
    
 }
@@ -751,19 +760,23 @@ antlrcpp::Any Ili2Input::visitAttributePathConst(parser::Ili2Parser::AttributePa
    debug(ctx,">>> visitAttributePathConst()");
    Log.incNestLevel();
 
-   Constant *c = new Constant();
-   c->Kind = Constant::Text; // ???
-   c->_type = "TextType";
+   AttributeConst *c = new AttributeConst();
+   init_factor(c,get_line(ctx));
+   c->_type = "AttributeRefType";
    if (ctx->path() != nullptr) {
       string path = visitPath(ctx->path());
-      c->Value = path + "->" + ctx->NAME()->getSymbol()->getText();
+      Class *owner = find_class(path,get_line(ctx));
+      c->Attribute = owner == nullptr ? nullptr : find_attribute(owner,ctx->NAME()->getText());
    }
    else {
-      c->Value = ctx->NAME()->getText();
+      c->Attribute = find_attribute(get_class_context(),ctx->NAME()->getText());
+   }
+   if (c->Attribute == nullptr) {
+      Log.error("attribute " + ctx->NAME()->getText() + " not found",get_line(ctx));
    }
 
    Log.decNestLevel();
-   debug(ctx,"<<< visitAttributePathConst(" + c->Value + ")");
+   debug(ctx,"<<< visitAttributePathConst()");
    return c;
    
 }
@@ -779,6 +792,7 @@ antlrcpp::Any Ili2Input::visitFormattedConst(parser::Ili2Parser::FormattedConstC
    Log.incNestLevel();
 
    Constant *c = new Constant();
+   init_factor(c,get_line(ctx));
    c->Kind = Constant::Text;
    c->_type = "TextType";
    c->Value = visitString(ctx->formattedconst);
@@ -788,4 +802,3 @@ antlrcpp::Any Ili2Input::visitFormattedConst(parser::Ili2Parser::FormattedConstC
    return c;
    
 }
-

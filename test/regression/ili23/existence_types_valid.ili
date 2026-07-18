@@ -1,0 +1,17 @@
+INTERLIS 2.3;
+
+MODEL ExistenceTypesValid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC T =
+    CLASS Source =
+      code : TEXT;
+    END Source;
+
+    CLASS Target =
+      code : TEXT;
+      EXISTENCE CONSTRAINT code REQUIRED IN Source:code;
+    END Target;
+  END T;
+
+END ExistenceTypesValid.

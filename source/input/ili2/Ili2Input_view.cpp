@@ -9,6 +9,60 @@ using namespace input;
 using namespace parser;
 using namespace metamodel;
 
+namespace {
+
+Type *clone_expression_type(Factor *factor,int line)
+{
+   Type *source = nullptr;
+   if (auto path = dynamic_cast<PathOrInspFactor *>(factor)) {
+      if (!path->PathEls.empty()) {
+         if (auto attribute = dynamic_cast<AttrOrParam *>(path->PathEls.back()->Ref)) {
+            source = attribute->Type;
+         }
+         else if (auto role = dynamic_cast<Role *>(path->PathEls.back()->Ref)) {
+            ObjectType *object = new ObjectType();
+            init_type(object,line);
+            object->_baseclass = role->_baseclass;
+            return object;
+         }
+      }
+   }
+   else if (auto function = dynamic_cast<FunctionCall *>(factor)) {
+      source = function->Function == nullptr ? nullptr : function->Function->ResultType;
+   }
+   else if (auto parameter = dynamic_cast<RuntimeParamRef *>(factor)) {
+      source = parameter->RuntimeParam == nullptr ? nullptr : parameter->RuntimeParam->Type;
+   }
+   if (source != nullptr) {
+      Type *type = static_cast<Type *>(source->clone());
+      type->Super = source;
+      type->ElementInPackage = nullptr;
+      return type;
+   }
+
+   Type *type = nullptr;
+   if (auto constant = dynamic_cast<Constant *>(factor)) {
+      if (constant->Kind == Constant::Numeric) type = new NumType();
+      else if (constant->Kind == Constant::Text) type = new TextType();
+      else if (constant->Kind == Constant::Enumeration) type = new EnumType();
+   }
+   else if (auto classConstant = dynamic_cast<ClassConst *>(factor)) {
+      ClassRefType *reference = new ClassRefType();
+      reference->_baseclass = classConstant->Class;
+      type = reference;
+   }
+   else if (dynamic_cast<AttributeConst *>(factor) != nullptr) {
+      type = new AttributeRefType();
+   }
+   if (type == nullptr) {
+      type = new TextType();
+   }
+   init_type(type,line);
+   return type;
+}
+
+}
+
 antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
 {
 
@@ -441,7 +495,7 @@ antlrcpp::Any Ili2Input::visitViewAttribute(parser::Ili2Parser::ViewAttributeCon
          a->Derivates.push_back(f);
       }
       
-      Type *t = new TextType; // to do !!!
+      Type *t = clone_expression_type(f,get_line(ctx));
       if (properties[ABSTRACT]) {
          t->Abstract = true;
       }

@@ -840,6 +840,11 @@ void Ili2Output::visitSimpleConstraint(metamodel::SimpleConstraint *c)
       enum {Equal, LessEqual, GreaterEqual} _percentage_operation = Equal;
    */
 
+   // Domain constraints are emitted inline by visitDomainType.
+   if (c->toDomain != nullptr) {
+      return;
+   }
+
    switch (c->Kind) {
       case SimpleConstraint::MandC:
          ili2.writeln("MANDATORY CONSTRAINT");
@@ -1126,6 +1131,22 @@ void Ili2Output::visitDomainType(metamodel::DomainType* t)
    }
 
    write_type(t);
+   if (!t->Constraint.empty()) {
+      ili2.write(0," CONSTRAINTS ");
+      bool comma = false;
+      for (Constraint *constraint : t->Constraint) {
+         SimpleConstraint *simple = dynamic_cast<SimpleConstraint *>(constraint);
+         if (simple == nullptr) {
+            continue;
+         }
+         if (comma) {
+            ili2.write(0,", ");
+         }
+         ili2.write(0,simple->Name + ": ");
+         write_expression(&ili2,simple->LogicalExpression);
+         comma = true;
+      }
+   }
    ili2.writeln(0,";");
 
 }

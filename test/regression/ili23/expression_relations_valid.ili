@@ -1,0 +1,23 @@
+INTERLIS 2.3;
+
+MODEL ExpressionRelationsValid (en)
+  AT "https://example.com/ilic/regression" VERSION "1" =
+
+  TOPIC T =
+    DOMAIN
+      OrderedValues = (a, b, c) ORDERED;
+
+    CLASS A =
+      number : 0 .. 10;
+      text : TEXT;
+      value : OrderedValues;
+      date : INTERLIS.XMLDate;
+      MANDATORY CONSTRAINT number == 1;
+      MANDATORY CONSTRAINT text != "other";
+      MANDATORY CONSTRAINT number <= 5;
+      MANDATORY CONSTRAINT value < #c;
+      MANDATORY CONSTRAINT date == "2020-04-23";
+    END A;
+  END T;
+
+END ExpressionRelationsValid.

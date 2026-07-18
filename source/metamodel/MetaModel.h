@@ -764,9 +764,38 @@ namespace metamodel {
 
    // Expressions, factors
 
+   enum class ExpressionTypeKind {
+      Unknown,
+      Undefined,
+      Boolean,
+      Numeric,
+      Text,
+      Formatted,
+      Enumeration,
+      EnumTreeValue,
+      Coordinate,
+      Oid,
+      ClassReference,
+      AttributeReference,
+      Object,
+      Structure
+   };
+
+   struct ExpressionTypeDescriptor {
+      ExpressionTypeKind Kind = ExpressionTypeKind::Unknown;
+      // The canonical declared type distinguishes independently declared
+      // enumerations while still allowing primitive type families.
+      Type *DeclaredType = nullptr;
+      Class *Viewable = nullptr;
+   };
+
    struct Expression : public MMObject { // ABSTRACT
    public:
       string _type;
+      ExpressionTypeDescriptor ResolvedType;
+      // Lexical occurrence, required for domain THIS and later visibility
+      // checks. It is deliberately independent of the parser context stack.
+      MetaElement *OccurrenceScope = nullptr;
       virtual string getClass() { return "Expression"; }
       virtual string getBaseClass() { return "MMObject"; };
       virtual bool isAbstract() { return true; }

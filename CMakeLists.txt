@@ -50,6 +50,7 @@ add_executable(ilic
     source/metamodel/MetaModelInput.cpp
     source/metamodel/MetaModelOutput.cpp
     source/metamodel/MetaModelTreeVisitor.cpp
+    source/metamodel/SemanticChecker.cpp
     source/metamodel/TranslationChecker.cpp
 
     source/output/GmlOutput.cpp
@@ -185,6 +186,44 @@ if(BUILD_TESTING)
     )
     add_ilic_regression_test(ilic_regression_path_contextual_extension TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/path_contextual_extension.ili"
+    )
+    add_ilic_regression_test(ilic_regression_expression_relations_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/expression_relations_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_expression_relations_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/expression_relations_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_expression_boolean_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/expression_boolean_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_expression_boolean_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/expression_boolean_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_existence_types_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/existence_types_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_existence_types_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/existence_types_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_expression_arithmetic_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/expression_arithmetic_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_expression_arithmetic_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/expression_arithmetic_invalid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_domain_constraints_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/domain_constraints_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_domain_constraints_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/domain_constraints_invalid.ili"
+    )
+    add_test(
+        NAME ilic_regression_domain_constraints_roundtrip
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC=$<TARGET_FILE:ilic>"
+            "-DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/domain_constraints_valid.ili"
+            "-DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/domain-constraints-roundtrip.ili"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_domain_roundtrip.cmake"
     )
 
     add_ilic_regression_test(ilic_regression_translation_complete TRUE

@@ -1245,6 +1245,8 @@ Log.message(">>> clone topic");
       clone_init_mmobject(clone,org);
 
       clone->_type = org->_type;
+      clone->ResolvedType = org->ResolvedType;
+      clone->OccurrenceScope = org->OccurrenceScope;
 
    }
 

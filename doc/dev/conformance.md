@@ -7,7 +7,8 @@ implementation is changed. The sources are used in this order:
 
 1. The version-specific INTERLIS reference manual is normative. For INTERLIS
    2.4, the relevant source sections are `refhb24_3_5.adoc` for models and
-   translations, `refhb24_3_13.adoc` for object paths, and
+   translations, `refhb24_3_8.adoc` for domains, `refhb24_3_12.adoc` for
+   constraints, `refhb24_3_13.adoc` for expressions and object paths, and
    `refhb24_3_15.adoc` for views and inspections in the
    `doc-interlis-refhb24` repository. The INTERLIS 2.3 manuals are also checked
    for 2.3 behaviour.
@@ -117,6 +118,99 @@ conformant case regresses. The recorded result was produced by the cause commit
 containing this section (the report's candidate commit is verified after the
 commit is created).
 
+### Type-aware expressions and domain constraints
+
+This cause covers 41 invalid models that ilic accepted. The exact case IDs are:
+
+```text
+ili23.constraints.existence-type-incompatibility
+ili23.expressions.equals-attribute-path-type-fail
+ili23.expressions.equals-class-type-fail
+ili23.expressions.equals-coord-fail
+ili23.expressions.equals-enum-all-of-const-fail
+ili23.expressions.equals-enum-const-fail
+ili23.expressions.equals-enum-extended-const-fail
+ili23.expressions.equals-enum-fail
+ili23.expressions.equals-formatted-fail
+ili23.expressions.equals-function-fail
+ili23.expressions.equals-numeric-fail
+ili23.expressions.equals-object-fail
+ili23.expressions.equals-oid-fail
+ili23.expressions.equals-struct-fail
+ili23.expressions.equals-text-fail
+ili23.expressions.greater-equals-numeric-fail
+ili23.expressions.greater-numeric-fail
+ili23.expressions.less-coord-fail
+ili23.expressions.less-enum-all-of-const-fail
+ili23.expressions.less-enum-circular-fail
+ili23.expressions.less-enum-domain-fail
+ili23.expressions.less-enum-fail
+ili23.expressions.less-enum-unordered-fail
+ili23.expressions.less-equals-numeric-fail
+ili23.expressions.less-formatted-fail
+ili23.expressions.less-numeric-fail
+ili23.expressions.logical-and-fail
+ili23.expressions.logical-or-fail
+ili23.expressions.not-equals-coord-fail
+ili23.expressions.not-equals-enum-const-fail
+ili23.expressions.not-equals-enum-fail
+ili23.expressions.not-equals-formatted-fail
+ili23.expressions.not-equals-numeric-fail
+ili23.expressions.not-equals-object-fail
+ili23.expressions.not-equals-text-fail
+ili24.domain.compile-fail
+ili24.expressions.div-numeric-fail
+ili24.expressions.implication-fail
+ili24.expressions.minus-numeric-fail
+ili24.expressions.mul-numeric-fail
+ili24.expressions.plus-numeric-fail
+```
+
+The parser previously reduced expression result types to non-semantic strings,
+and no later pass validated them. It also discarded INTERLIS 2.4 domain
+constraints. As a result, logical, arithmetic, equality, ordering, function,
+enumeration, formatted-value, and existence checks all parsed successfully but
+could not reject incompatible operands.
+
+Reference-manual section 3.13 requires every logical expression to have Boolean
+result type and defines the operand categories of logical, arithmetic, equality,
+and ordering operators. Section 3.8 defines named domain constraints and their
+domain-local `THIS` value; class, structure, and attribute-reference domains do
+not support those constraints. Section 3.12 requires the two paths in an
+existence constraint to have compatible attribute types. The implementation was
+cross-checked against `validateEqualsArgumentTypes` and
+`validateCompareArgumentTypes` in the ili2c 2.3 and 2.4 grammars, its
+`DomainConstraint` and `ExistenceConstraint` metamodel classes, and the
+corresponding ili2c tests. In particular, enum literals are resolved against the
+domain on the other side of a comparison, ordering needs an `ORDERED`
+enumeration, and formatted literals are checked against their format and range.
+
+ilic now stores a resolved semantic descriptor on every expression and runs a
+dedicated post-pass after all models have been loaded. The descriptor keeps the
+value category, declared domain, object/structure target, and lexical occurrence
+scope. The checker validates Boolean and numeric operators, equality and
+ordering, enum membership and order, formatted values, function arguments,
+domain `THIS`, and existence-path compatibility. Calculated view attributes
+derive their result type from their factor so later constraints see their real
+type. Class and attribute constants remain distinct metamodel nodes. Domain
+constraints are retained by cloning and translation linking and are emitted
+inline by the INTERLIS writer.
+
+Both LSP grammars contain the required expression, domain-constraint,
+enumeration, formatted-value, and existence-constraint syntax, but neither
+grammar can express these semantic compatibility rules. They therefore agreed
+that the failing inputs were syntactically valid and provided no basis for a
+grammar change. No generated parser file changes in this cause.
+
+Ten local model fixtures cover positive and negative relation, Boolean,
+arithmetic, existence, and domain-constraint behaviour. A separate roundtrip
+test writes a constrained domain as INTERLIS, reparses it, and checks that its
+named constraint remains present. All 42 local CTests pass. The complete frozen
+corpus improves from 476 to 517 conformant cases: 49 invalid models remain
+accepted, five valid models remain rejected, and no previously conformant case
+regresses. The recorded result was produced by the cause commit containing this
+section (the report's candidate commit is verified after the commit is created).
+
 ## Object-path context transitions
 
 Object paths are resolved one element at a time. The resolver carries the
@@ -186,12 +280,12 @@ ILI2C_SOURCE_REPO=/path/to/pinned/ili2c \
 For the 571-case corpus, measured against the same `ili2c` reference and corpus,
 the result changed as follows:
 
-| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes |
-| --- | ---: | ---: | ---: | ---: |
-| conformant | 268 | 468 | 470 | 476 |
-| candidate accepts invalid | 280 | 95 | 95 | 90 |
-| candidate rejects valid | 12 | 8 | 6 | 5 |
-| infrastructure error | 11 | 0 | 0 | 0 |
+| Result | Initial macOS baseline | Translation/crash fixes | Lexer fixes | Path fixes | Expression fixes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| conformant | 268 | 468 | 470 | 476 | 517 |
+| candidate accepts invalid | 280 | 95 | 95 | 90 | 49 |
+| candidate rejects valid | 12 | 8 | 6 | 5 | 5 |
+| infrastructure error | 11 | 0 | 0 | 0 | 0 |
 
 All 251 `TRANSLATION OF` cases are conformant, and no case that was conformant
 in baseline commit `979bf560c4eb6c6374cd436370d9af86063bc3ef` regressed. The
