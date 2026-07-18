@@ -77,8 +77,11 @@ CompilationResult CompilerSession::compile(const CompilationRequest &request)
    ActiveSourceManagerScope sourceScope(&sources_);
    CompilationResult result;
 
+   try {
    Log.reset();
    Log.setSilent(true);
+   Log.setAbortWithException(true);
+   Log.setCategory("imports");
    if (request.options.warningsAsErrors) Log.warningsAsErrors();
    util::reset_ilifiles();
    metamodel::reset();
@@ -139,8 +142,19 @@ CompilationResult CompilerSession::compile(const CompilationRequest &request)
    }
    result.errorCount = Log.getErrorCount();
    result.warningCount = Log.getWarningCount();
+   result.diagnostics = Log.getDiagnostics();
+   result.logs = Log.getLogEvents();
    result.success = result.errorCount == 0;
    return result;
+   }
+   catch (const util::CompilerAbort &error) {
+      Log.error(std::string("internal compiler failure: ") + error.what());
+      result.errorCount = Log.getErrorCount();
+      result.warningCount = Log.getWarningCount();
+      result.diagnostics = Log.getDiagnostics();
+      result.logs = Log.getLogEvents();
+      return result;
+   }
 }
 
 const char *version() { return "0.9.9"; }

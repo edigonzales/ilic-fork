@@ -83,6 +83,13 @@ namespace metamodel {
    void init_mmobject(MMObject* o, int line)
    {
       o->_line = line;
+      if (line > 0 && !Log.getCurrentSource().empty()) {
+         o->_source.valid = true;
+         o->_source.uri = Log.getCurrentSource();
+         o->_source.start.line = static_cast<size_t>(line - 1);
+         o->_source.end = o->_source.start;
+         o->_source.end.character = 1;
+      }
    }
 
    // metaelement helpers

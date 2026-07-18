@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SourceManager.h"
+#include "Diagnostic.h"
 
 #include <string>
 #include <vector>
@@ -31,6 +32,8 @@ struct CompilationResult {
    int warningCount = 0;
    std::vector<std::string> missingModels;
    std::vector<CompiledModel> models;
+   std::vector<Diagnostic> diagnostics;
+   std::vector<LogEvent> logs;
 };
 
 class CompilerSession {

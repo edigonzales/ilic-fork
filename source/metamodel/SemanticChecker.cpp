@@ -1656,8 +1656,10 @@ private:
 
 void check_model_semantics()
 {
+   Log.setCategory("semantic");
    Checker checker;
    for (Model *model : get_all_models()) {
+      Log.setCurrentSource(model->_ilifile);
       checker.check_package(model);
    }
 }

@@ -5,6 +5,7 @@
 #include <string>
 #include <list>
 #include <vector>
+#include "../../include/ilic/Diagnostic.h"
 
 using namespace std;
 
@@ -50,6 +51,7 @@ namespace metamodel {
    class MMObject { // ABSTRACT
    public:
       int _line = -1;
+      ilic::SourceRange _source;
       virtual string getClass() { return "MMObject"; };
       virtual string getBaseClass() { return ""; };
       virtual bool isAbstract() { return true; };

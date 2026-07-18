@@ -28,6 +28,7 @@ public:
    {
       validate_model_graph();
       for (Model *model : get_all_models()) {
+         Log.setCurrentSource(model->_ilifile);
          if (!model->_translationOfName.empty() && model->_translationOf == nullptr) {
             Model *base = find_model(model->_translationOfName);
             if (base != nullptr && base != model && !in_cycle(model)) {
@@ -36,6 +37,7 @@ public:
          }
       }
       for (Model *model : get_all_models()) {
+         Log.setCurrentSource(model->_ilifile);
          if (model->_translationOf != nullptr) {
             compare_element(model,model->_translationOf);
          }
@@ -64,6 +66,7 @@ private:
    void validate_model_graph()
    {
       for (Model *model : get_all_models()) {
+         Log.setCurrentSource(model->_ilifile);
          if (model->_translationOfName.empty()) {
             continue;
          }
@@ -78,6 +81,7 @@ private:
       }
 
       for (Model *start : get_all_models()) {
+         Log.setCurrentSource(start->_ilifile);
          vector<Model *> chain;
          Model *current = start;
          while (current != nullptr && !current->_translationOfName.empty()) {
@@ -725,6 +729,7 @@ private:
 
 void check_model_translations()
 {
+   Log.setCategory("semantic");
    Checker().run();
 }
 

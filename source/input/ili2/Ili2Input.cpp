@@ -37,6 +37,8 @@ void input::parseIli2(string ilifile)
          input = util::load_filtered_string_from_file(ilifile);
          input_file = ilifile;
       }
+      Log.setCurrentSource(input_file);
+      Log.setCategory("parser");
 
       antlr4::ANTLRInputStream inputstream(input);
       prepare_meta_attributes(input);
@@ -62,7 +64,7 @@ void input::parseIli2(string ilifile)
       ili2input.visit(ili2d);
 
    }
-   catch (exception e) {
+   catch (const exception &e) {
       Log.setLevel(1);
       Log.internal_error(string(e.what()),1);
    }

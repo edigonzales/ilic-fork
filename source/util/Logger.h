@@ -9,10 +9,21 @@ to do !!!
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <map>
+#include <vector>
+#include <stdexcept>
+
+#include "../../include/ilic/Diagnostic.h"
 
 using namespace std;
 
 namespace util {
+
+   class CompilerAbort : public runtime_error {
+   public:
+      CompilerAbort(string message,int code) : runtime_error(std::move(message)), code(code) {}
+      int code;
+   };
 
    class Logger {
       public:
@@ -30,6 +41,16 @@ namespace util {
          void messageNoIdent(string message);
          void warningsAsErrors();
          void reset();
+         void setCurrentSource(string uri);
+         void setCategory(string category);
+         void setAbortWithException(bool state);
+         const string &getCurrentSource() const;
+         void setLogSink(ilic::LogSink sink);
+         void setDiagnosticSink(ilic::DiagnosticSink sink);
+         const vector<ilic::Diagnostic> &getDiagnostics() const;
+         const vector<ilic::LogEvent> &getLogEvents() const;
+         void log(ilic::LogLevel level,string category,string message,
+            map<string,string> context = {});
 
          // info
          void displayInfo(bool state);
@@ -46,6 +67,7 @@ namespace util {
          void displayWarnings(bool state);
          void warning(string message);
          void warning(string message,int line);
+         void warning(string message,int line,int column,string code);
          int getWarningCount();
 
          // error
@@ -53,6 +75,7 @@ namespace util {
          void error(string message);
          void errorNoIdent(string message);
          void error(string message,int line);
+         void error(string message,int line,int column,string code = "ILIC-SEMANTIC");
          int getErrorCount();
          
          // internal_error
@@ -74,6 +97,14 @@ namespace util {
          bool display_debug = false;
          int ident_spaces = 3;
          bool warnings_as_errors = false;
+         string current_source;
+         string current_category = "compiler";
+         bool abort_with_exception = false;
+         vector<ilic::Diagnostic> diagnostics;
+         vector<ilic::LogEvent> events;
+         ilic::LogSink log_sink;
+         ilic::DiagnosticSink diagnostic_sink;
+         void recordDiagnostic(ilic::Diagnostic diagnostic);
    };
 
 };
