@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ilic.ch/schemas/compilation-result-v1.schema.json",
+  "title": "ilic compilation result v1",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "success", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "abiVersion": { "type": "integer", "minimum": 1 },
+    "compilerVersion": { "type": "string" },
+    "kind": { "const": "compilation" },
+    "success": { "type": "boolean" },
+    "cancelled": { "type": "boolean" },
+    "errorCount": { "type": "integer", "minimum": 0 },
+    "warningCount": { "type": "integer", "minimum": 0 },
+    "missingModels": { "type": "array", "items": { "type": "string" } },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "iliVersion", "uri", "metaAttributes"],
+        "properties": {
+          "name": { "type": "string" },
+          "iliVersion": { "type": "string" },
+          "uri": { "type": "string" },
+          "metaAttributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "value"],
+              "properties": {
+                "name": { "type": "string" },
+                "value": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnostics": { "$ref": "#/$defs/diagnostics" },
+    "logs": { "type": "array", "items": { "$ref": "#/$defs/log" } }
+  },
+  "$defs": {
+    "position": {
+      "type": "object",
+      "required": ["line", "character", "byteOffset"],
+      "properties": {
+        "line": { "type": "integer", "minimum": 0 },
+        "character": { "type": "integer", "minimum": 0 },
+        "byteOffset": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "range": {
+      "type": ["object", "null"],
+      "properties": {
+        "uri": { "type": "string" },
+        "start": { "$ref": "#/$defs/position" },
+        "end": { "$ref": "#/$defs/position" }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["severity", "code", "message", "range"],
+      "properties": {
+        "severity": { "enum": ["error", "warning", "information", "hint"] },
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "range": { "$ref": "#/$defs/range" },
+        "relatedInformation": { "type": "array" },
+        "notes": { "type": "array", "items": { "type": "string" } },
+        "treatedAsError": { "type": "boolean" }
+      }
+    },
+    "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } },
+    "log": {
+      "type": "object",
+      "required": ["level", "category", "message", "context"],
+      "properties": {
+        "level": { "enum": ["trace", "debug", "information", "warning", "error"] },
+        "category": { "type": "string" },
+        "message": { "type": "string" },
+        "context": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    }
+  }
+}

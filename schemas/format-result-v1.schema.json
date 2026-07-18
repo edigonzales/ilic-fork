@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ilic.ch/schemas/format-result-v1.schema.json",
+  "title": "ilic format result v1",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "success", "diagnostics"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "abiVersion": { "type": "integer", "minimum": 1 },
+    "compilerVersion": { "type": "string" },
+    "kind": { "const": "formatting" },
+    "success": { "type": "boolean" },
+    "applicable": { "type": "boolean" },
+    "changed": { "type": "boolean" },
+    "text": { "type": "string" },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "code", "message", "range"],
+        "properties": {
+          "severity": { "enum": ["error", "warning", "information", "hint"] },
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "range": { "type": ["object", "null"] },
+          "relatedInformation": { "type": "array" },
+          "notes": { "type": "array", "items": { "type": "string" } },
+          "treatedAsError": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

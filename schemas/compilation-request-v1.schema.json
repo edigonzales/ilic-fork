@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ilic.ch/schemas/compilation-request-v1.schema.json",
+  "title": "ilic compilation request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "roots"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "roots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "autoSearch": { "type": "boolean", "default": true },
+        "warningsAsErrors": { "type": "boolean", "default": false },
+        "modelDirectories": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": []
+        }
+      }
+    },
+    "externalMetaAttributes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["element", "name", "value"],
+        "properties": {
+          "element": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "value": { "type": "string" }
+        }
+      },
+      "default": []
+    }
+  }
+}

@@ -5,6 +5,9 @@
 
 # CMake build output
 build/macos/
+build/wasm/
+packages/compiler-wasm/ilic.mjs
+packages/compiler-wasm/ilic.wasm
 
 build/bin/*
 build/vc2019/.vs/*

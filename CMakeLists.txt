@@ -82,11 +82,42 @@ target_include_directories(ilic-core
 )
 target_link_libraries(ilic-core PUBLIC antlr4-runtime)
 
+add_library(ilic-capi STATIC
+    source/abi/Capi.cpp
+    source/abi/Json.cpp
+)
+add_library(ilic::capi ALIAS ilic-capi)
+target_include_directories(ilic-capi
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+target_link_libraries(ilic-capi PUBLIC ilic-core)
+
 add_executable(ilic source/main/ilic.cpp)
 target_link_libraries(ilic PRIVATE ilic-core)
 
 add_executable(ilic-format source/main/ilic_format.cpp)
 target_link_libraries(ilic-format PRIVATE ilic-core)
+
+if(EMSCRIPTEN)
+    add_executable(ilic-wasm
+        source/abi/Capi.cpp
+        source/abi/Json.cpp
+    )
+    target_include_directories(ilic-wasm PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_link_libraries(ilic-wasm PRIVATE ilic-core)
+    target_link_options(ilic-wasm PRIVATE
+        "--no-entry"
+        "-sMODULARIZE=1"
+        "-sEXPORT_ES6=1"
+        "-sENVIRONMENT=web,worker,node"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sWASM_BIGINT=1"
+        "-sASSERTIONS=1"
+        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_compile','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
+    )
+    set_target_properties(ilic-wasm PROPERTIES OUTPUT_NAME "ilic" SUFFIX ".mjs")
+endif()
 
 if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
     find_package(CURL REQUIRED)
@@ -107,6 +138,9 @@ if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(ilic_capi_test test/abi/CapiTest.cpp)
+    target_link_libraries(ilic_capi_test PRIVATE ilic-capi)
+    add_test(NAME ilic_capi COMMAND ilic_capi_test)
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core)
     add_test(NAME ilic_core_session COMMAND ilic_core_session_test)

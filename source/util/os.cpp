@@ -8,6 +8,8 @@ string util::get_platform()
    const string os = "win";
 #elif __APPLE__
    const string os = "macos";
+#elif __EMSCRIPTEN__
+   const string os = "wasm";
 #elif __linux__
    const string os = "linux";
 #elif __unix__

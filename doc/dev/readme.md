@@ -31,3 +31,4 @@ a Java based utility a Java Runtime or JDK must be present on the development ma
 + [input module api](./input_api.md)
 + [output module api](./output_api.md)
 + [semantic conformance and translation validation](./conformance.md)
++ [native C ABI, JSON protocol and WebAssembly embedding](./embedding.md)

@@ -1,0 +1,22 @@
+{
+  "name": "@ilic/compiler-wasm",
+  "version": "0.9.9",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./worker": "./worker.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "worker.js",
+    "ilic.mjs",
+    "ilic.wasm"
+  ]
+}
