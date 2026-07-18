@@ -8,6 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
+option(ILIC_ENABLE_NATIVE_REPOSITORY "Build native HTTP and filesystem repository support" ON)
+
 file(GLOB_RECURSE ANTLR_RUNTIME_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/include/*.cpp"
 )
@@ -86,6 +88,24 @@ target_link_libraries(ilic PRIVATE ilic-core)
 add_executable(ilic-format source/main/ilic_format.cpp)
 target_link_libraries(ilic-format PRIVATE ilic-core)
 
+if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
+    find_package(CURL REQUIRED)
+    find_package(LibXml2 REQUIRED)
+    add_library(ilic-repository STATIC
+        source/repository/Md5.cpp
+        source/repository/Repository.cpp
+    )
+    add_library(ilic::repository ALIAS ilic-repository)
+    target_include_directories(ilic-repository
+        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_link_libraries(ilic-repository
+        PUBLIC ilic-core CURL::libcurl LibXml2::LibXml2
+    )
+    target_link_libraries(ilic PRIVATE ilic-repository)
+    target_compile_definitions(ilic PRIVATE ILIC_NATIVE_REPOSITORY=1)
+endif()
+
 if(BUILD_TESTING)
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core)
@@ -93,6 +113,15 @@ if(BUILD_TESTING)
     add_executable(ilic_formatter_test test/core/FormatterTest.cpp)
     target_link_libraries(ilic_formatter_test PRIVATE ilic-core)
     add_test(NAME ilic_formatter COMMAND ilic_formatter_test)
+    if(TARGET ilic-repository)
+        add_executable(ilic_repository_test test/repository/RepositoryTest.cpp)
+        target_link_libraries(ilic_repository_test PRIVATE ilic-repository)
+        add_test(NAME ilic_repository COMMAND ilic_repository_test
+            "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture")
+        add_test(NAME ilic_repository_cli COMMAND ilic -silent
+            -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
+            -models RepositoryRoot)
+    endif()
 
     function(add_ilic_regression_test name expected_success)
         set(options)

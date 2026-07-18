@@ -1,6 +1,7 @@
 #include "stdio.h"
 #include <iostream>
 #include <list>
+#include <memory>
 
 #include "../util/os.h"
 #include "../util/StringMap.h"
@@ -23,6 +24,9 @@
 #include "../output/GmlOutput.h"
 
 #include "ilic.h"
+#ifdef ILIC_NATIVE_REPOSITORY
+#include "ilic/Repository.h"
+#endif
 //#include "Gui.h"
 
 using namespace std;
@@ -86,6 +90,12 @@ static void display_options() {
    Log.message("   list of directories to search for .ili files separated by semicolons.");
    Log.message("-no_auto|-no-auto");
    Log.message("   don't search automatically for missing models.");
+#ifdef ILIC_NATIVE_REPOSITORY
+   Log.message("-repositories uri1;uri2");
+   Log.message("   ordered local or HTTP(S) INTERLIS model repositories.");
+   Log.message("-models model1,model2");
+   Log.message("   resolve root models from the configured repositories.");
+#endif
 
    Log.message("");
    Log.message("output options:");
@@ -279,6 +289,9 @@ static void check_arguments(StringMap arguments)
          continue;
       }
       else if (arg == "ilidirs") {
+         continue;
+      }
+      else if (arg == "repositories" || arg == "models") {
          continue;
       }
       else if (arg == "silent") {
@@ -535,6 +548,8 @@ int main(int argc, char* argv[])
    bool gml = false;
    string gml_output = "output.gml";
    string ilidirs = "";
+   string repositories = "";
+   string requested_models = "";
    bool log_silent = false;
    bool log_info = true;
    bool log_warnings = true;
@@ -604,6 +619,12 @@ int main(int argc, char* argv[])
       }
       else if (arg == "ilidirs") {
          ilidirs = value;
+      }
+      else if (arg == "repositories") {
+         repositories = value;
+      }
+      else if (arg == "models") {
+         requested_models = value;
       }
       else if (arg == "silent") {
          log_silent = true;
@@ -686,6 +707,37 @@ int main(int argc, char* argv[])
    Log.incNestLevel();
    set_autosearch(!no_auto);
    set_ilidirs(ilidirs);
+#ifdef ILIC_NATIVE_REPOSITORY
+   std::unique_ptr<ilic::RepositoryManager> repository_manager;
+   if (!repositories.empty()) {
+      ilic::RepositoryOptions repository_options;
+      string remaining = repositories;
+      while (!remaining.empty()) {
+         size_t delimiter = remaining.find_first_of(";,");
+         string repository = delimiter == string::npos ? remaining : remaining.substr(0,delimiter);
+         if (!repository.empty()) repository_options.repositories.push_back(repository);
+         if (delimiter == string::npos) break;
+         remaining = remaining.substr(delimiter + 1);
+      }
+      repository_manager = std::make_unique<ilic::RepositoryManager>(repository_options);
+      if (!requested_models.empty()) {
+         vector<string> models;
+         string names = requested_models;
+         while (!names.empty()) {
+            size_t delimiter = names.find(',');
+            models.push_back(delimiter == string::npos ? names : names.substr(0,delimiter));
+            if (delimiter == string::npos) break;
+            names = names.substr(delimiter + 1);
+         }
+         ilic::RepositoryResult resolved = repository_manager->resolve(models,"");
+         if (!resolved.success) {
+            for (const auto &diagnostic : resolved.diagnostics) Log.error(diagnostic.message);
+            abort(1);
+         }
+         for (const auto &model : resolved.models) load_ilifiles_by_file(model.localPath.string());
+      }
+   }
+#endif
    for (auto arg : arguments.getKeys()) {
       string value = arguments.get(arg);
       if (arg.find("ilifile") == 0) {
@@ -723,6 +775,20 @@ int main(int argc, char* argv[])
             Log.info("searching for model " + modelname + " ...");
             Log.incNestLevel();
             IliFile *f = load_ilifiles_by_model(modelname,iliversion);
+#ifdef ILIC_NATIVE_REPOSITORY
+            if (f == nullptr && repository_manager) {
+               const string schema = iliversion == "1.0" ? "ili1" :
+                  (iliversion == "2.4" ? "ili2_4" : "ili2_3");
+               ilic::RepositoryResult resolved = repository_manager->resolve(modelname,schema);
+               if (resolved.success) {
+                  for (const auto &model : resolved.models) load_ilifiles_by_file(model.localPath.string());
+                  f = load_ilifiles_by_model(modelname,iliversion);
+               }
+               else {
+                  for (const auto &diagnostic : resolved.diagnostics) Log.error(diagnostic.message);
+               }
+            }
+#endif
             if (f == nullptr) {
                Log.info("not found.");
                abort(1);

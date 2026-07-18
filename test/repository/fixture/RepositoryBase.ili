@@ -1,0 +1,5 @@
+INTERLIS 2.3;
+
+MODEL RepositoryBase AT "https://example.invalid/ilic/tests" VERSION "1" =
+  DOMAIN Identifier = TEXT*20;
+END RepositoryBase.
