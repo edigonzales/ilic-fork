@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Ili2Output.h"
-#include "../metamodel/Metamodel.h"
+#include "../metamodel/MetaModel.h"
 #include "../metamodel/MetaModelOutput.h"
 #include "../util/TextWriter.h"
 #include "../util/Logger.h"
