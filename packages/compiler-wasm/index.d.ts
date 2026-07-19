@@ -44,6 +44,61 @@ export interface CompilationResult {
   diagnostics: Diagnostic[];
   logs: LogEvent[];
 }
+export interface SyntaxToken { kind: string; text: string; channel: number; range: SourceRange; }
+export interface SyntaxNode { id: number; parent: number | null; kind: string; range: SourceRange; }
+export interface SyntaxContext { kind: string; range: SourceRange; }
+export interface SyntaxSnapshot {
+  schemaVersion: 1;
+  abiVersion: 1;
+  compilerVersion: string;
+  kind: "syntax";
+  success: boolean;
+  uri: string;
+  documentVersion: number;
+  iliVersion: "1.0" | "2.3" | "2.4";
+  tokens: SyntaxToken[];
+  nodes: SyntaxNode[];
+  contexts: SyntaxContext[];
+  imports: string[];
+  diagnostics: Diagnostic[];
+}
+export interface SemanticSymbol {
+  id: string; name: string; qualifiedName: string; kind: string;
+  containerId: string; range: SourceRange | null; abstract: boolean;
+}
+export interface SemanticReference {
+  sourceId: string; targetId: string; kind: string; range: SourceRange | null;
+}
+export interface SemanticDependency { sourceUri: string; targetUri: string; model: string; }
+export interface DiagramMember { name: string; type: string; inherited: boolean; }
+export interface DiagramNode {
+  id: string; containerId: string; label: string; kind: string; abstract: boolean;
+  range: SourceRange | null; members: DiagramMember[];
+}
+export interface DiagramEdge {
+  id: string; sourceId: string; targetId: string; kind: string;
+  label: string; cardinality: string;
+}
+export interface DocumentationSection {
+  id: string; title: string; kind: string; text: string; level: number;
+}
+export interface SemanticSnapshot {
+  schemaVersion: 1;
+  abiVersion: 1;
+  compilerVersion: string;
+  kind: "semantic";
+  success: boolean;
+  cancelled: boolean;
+  roots: string[];
+  documentVersions: Record<string, number>;
+  symbols: SemanticSymbol[];
+  references: SemanticReference[];
+  dependencies: SemanticDependency[];
+  diagram: { nodes: DiagramNode[]; edges: DiagramEdge[] };
+  documentation: { title: string; sections: DocumentationSection[] };
+  diagnostics: Diagnostic[];
+  logs: LogEvent[];
+}
 export interface FormatResult {
   schemaVersion: 1;
   abiVersion: 1;
@@ -70,6 +125,8 @@ export interface EmscriptenIlicModule {
     source: number, sourceLength: number, version: bigint): number;
   _ilic_session_remove_source(session: number, uri: number, uriLength: number): number;
   _ilic_compile(session: number, request: number, requestLength: number): number;
+  _ilic_parse(session: number, request: number, requestLength: number): number;
+  _ilic_analyze(session: number, request: number, requestLength: number): number;
   _ilic_format(session: number, request: number, requestLength: number): number;
   _ilic_result_json(result: number, resultLength: number): number;
   _ilic_result_destroy(result: number): void;
@@ -80,6 +137,8 @@ export class CompilerSession {
   putWorkspace(workspace: ResolvedWorkspace): void;
   removeSource(uri: string): boolean;
   compile(request: CompilationRequest): CompilationResult;
+  parse(uri: string): SyntaxSnapshot;
+  analyze(request: CompilationRequest): SemanticSnapshot;
   format(uri: string, options?: { indentSize?: number; requireValidSyntax?: boolean }): FormatResult;
   dispose(): void;
 }

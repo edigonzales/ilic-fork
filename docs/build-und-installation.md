@@ -77,16 +77,58 @@ ohne eingecheckte Parserdateien zu überschreiben.
 Die unterstützte Emscripten-Version steht in `.emscripten-version` und ist
 aktuell `3.1.64`.
 
-```sh
-cd /pfad/zu/emsdk
-./emsdk install 3.1.64
-./emsdk activate 3.1.64
-source ./emsdk_env.sh
+### Emscripten SDK einmalig installieren
 
-cd /pfad/zu/ilic
+Das offizielle `emsdk` kann an einem beliebigen Ort ausserhalb dieses
+Repositories installiert werden. Im folgenden Beispiel müssen nur die beiden
+Pfade angepasst werden:
+
+```sh
+cd /pfad/zu/ilic-fork
+export ILIC_EMSDK_DIR=/pfad/zu/emsdk
+
+git clone https://github.com/emscripten-core/emsdk.git "$ILIC_EMSDK_DIR"
+
+ILIC_EMSCRIPTEN_VERSION="$(tr -d '[:space:]' < .emscripten-version)"
+"$ILIC_EMSDK_DIR/emsdk" install "$ILIC_EMSCRIPTEN_VERSION"
+"$ILIC_EMSDK_DIR/emsdk" activate "$ILIC_EMSCRIPTEN_VERSION"
+source "$ILIC_EMSDK_DIR/emsdk_env.sh"
+
+emcc --version
 ./scripts/build-wasm.sh
 npm test --prefix packages/compiler-wasm
 ```
+
+`emsdk install` lädt die gepinnte Toolchain herunter. `emsdk activate` wählt
+sie innerhalb der SDK-Installation aus. `source emsdk_env.sh` ergänzt unter
+anderem `PATH` nur für das aktuelle Terminal. In jedem neu geöffneten Terminal
+muss die Umgebung deshalb erneut geladen werden:
+
+```sh
+cd /pfad/zu/ilic-fork
+export ILIC_EMSDK_DIR=/pfad/zu/emsdk
+source "$ILIC_EMSDK_DIR/emsdk_env.sh"
+emcc --version
+```
+
+Eine dauerhaft globale Aktivierung ist nicht erforderlich. Dadurch können
+andere Projekte weiterhin eine andere Emscripten-Version verwenden.
+
+### WASM bauen
+
+Mit aktivierter Emscripten-Umgebung wird der Build aus dem Projektverzeichnis
+gestartet:
+
+```sh
+cd /pfad/zu/ilic-fork
+source /pfad/zu/emsdk/emsdk_env.sh
+
+./scripts/build-wasm.sh
+npm test --prefix packages/compiler-wasm
+```
+
+`scripts/build-wasm.sh` vergleicht `emcc --version` mit
+`.emscripten-version` und bricht ab, falls eine andere Version aktiv ist.
 
 Erzeugt werden:
 

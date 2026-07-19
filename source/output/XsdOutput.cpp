@@ -7,8 +7,9 @@
 #include "../util/StringUtil.h"
 #include "../util/Logger.h"
 
-#include <unordered_map>
+#include <climits>
 #include <regex>
+#include <unordered_map>
 
 using namespace util;
 using namespace metamodel;

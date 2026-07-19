@@ -4,7 +4,7 @@
 #include <map>
 #include <vector>
 #include "antlr4-runtime.h"
-#include "../../metamodel/metamodel.h"
+#include "../../metamodel/MetaModel.h"
 #include "../parser/generated/Ili2Parser.h"
 
 using namespace std;

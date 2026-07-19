@@ -6,6 +6,9 @@
 #include "../util/StringUtil.h"
 #include "../util/Logger.h"
 
+#include <algorithm>
+#include <climits>
+
 using namespace util;
 using namespace metamodel;
 using namespace output;

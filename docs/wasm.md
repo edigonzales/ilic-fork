@@ -8,6 +8,10 @@ neu implementiert.
 
 ## Build
 
+Für einen neuen Entwicklungsrechner zuerst das
+[Emscripten SDK installieren und aktivieren](build-und-installation.md#emscripten-sdk-einmalig-installieren).
+Danach genügt in jedem neuen Terminal:
+
 ```sh
 source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh
@@ -167,7 +171,7 @@ await call("disposeSession",sessionId);
 ```
 
 Unterstützte Methoden sind `createSession`, `disposeSession`, `putSource`,
-`removeSource`, `compile` und `format`. Session-IDs sind UUIDs.
+`removeSource`, `parse`, `analyze`, `compile` und `format`. Session-IDs sind UUIDs.
 `worker.js`, `ilic.mjs` und `ilic.wasm` müssen im Deployment so kopiert werden,
 dass der relative Import und die WASM-Lokalisierung des Workers erhalten
 bleiben. Der konkrete Asset-Pfad ist eine Entscheidung des verwendeten Bundlers.

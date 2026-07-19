@@ -1,8 +1,11 @@
 #include "stdio.h"
 #include <iostream>
+#include <iterator>
 #include <list>
 #include <memory>
 
+#include "ilic/capi.h"
+#include "../abi/Json.h"
 #include "../util/os.h"
 #include "../util/StringMap.h"
 #include "../util/StringUtil.h"
@@ -131,6 +134,8 @@ static void display_options() {
 
    Log.message("");
    Log.message("other options:");
+   Log.message("--compile-json");
+   Log.message("   read one C API compilation request as JSON from stdin and write the result to stdout.");
    Log.message("-h|-help");
    Log.message("    display this help text.");
    Log.message("-u|-usage");
@@ -146,6 +151,51 @@ static void display_options() {
 
    Log.decNestLevel();
 
+}
+
+static bool is_compile_json_request_error(const string &result)
+{
+   try {
+      const ilic::json::Value json = ilic::json::parse(result);
+      if (!json.get("diagnostics").isArray()) return true;
+      for (const auto &diagnostic : json.get("diagnostics").array()) {
+         if (diagnostic.get("code").isString() &&
+            diagnostic.get("code").string() == "ILIC-ABI-REQUEST") return true;
+      }
+      return false;
+   }
+   catch (...) {
+      return true;
+   }
+}
+
+static int compile_json()
+{
+   const string request((istreambuf_iterator<char>(cin)),istreambuf_iterator<char>());
+   if (cin.bad()) {
+      cerr << "ilic: failed to read compilation request from stdin" << endl;
+      return 2;
+   }
+
+   const uint32_t session = ilic_session_create();
+   if (session == 0) {
+      cerr << "ilic: failed to create compiler session" << endl;
+      return 2;
+   }
+   const uint32_t result = ilic_compile(session,request.data(),request.size());
+   ilic_session_destroy(session);
+
+   size_t result_length = 0;
+   const char *result_json = ilic_result_json(result,&result_length);
+   if (result_json == nullptr) {
+      cerr << "ilic: compiler did not return a JSON result" << endl;
+      ilic_result_destroy(result);
+      return 2;
+   }
+   const string output(result_json,result_length);
+   ilic_result_destroy(result);
+   cout << output << endl;
+   return is_compile_json_request_error(output) ? 2 : 0;
 }
 
 static void display_usage() {
@@ -527,6 +577,14 @@ static void generate_gml(string gml_file)
 
 int main(int argc, char* argv[])
 {
+
+   if (argc >= 2 && string(argv[1]) == "--compile-json") {
+      if (argc != 2) {
+         cerr << "ilic: --compile-json does not accept additional arguments" << endl;
+         return 2;
+      }
+      return compile_json();
+   }
 
    StringMap arguments = parse_arguments(argc,argv);
    check_arguments(arguments);

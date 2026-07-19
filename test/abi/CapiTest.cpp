@@ -1,6 +1,7 @@
 #include "ilic/capi.h"
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <string>
 
@@ -44,6 +45,18 @@ END AbiModel.
    assert(compilation.find("\"kind\":\"compilation\"") != std::string::npos);
    assert(compilation.find("\"success\":true") != std::string::npos);
    assert(compilation.find("\"displayName\"") != std::string::npos);
+
+   const std::string parseRequest =
+      R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili"})json";
+   std::string syntax = resultJson(ilic_parse(session,parseRequest.data(),parseRequest.size()));
+   assert(syntax.find("\"kind\":\"syntax\"") != std::string::npos);
+   assert(syntax.find("\"documentVersion\":1") != std::string::npos);
+   assert(syntax.find("\"modelDef\"") != std::string::npos);
+
+   std::string semantic = resultJson(ilic_analyze(session,compileRequest.data(),compileRequest.size()));
+   assert(semantic.find("\"kind\":\"semantic\"") != std::string::npos);
+   assert(semantic.find("\"qualifiedName\":\"AbiModel\"") != std::string::npos);
+   assert(semantic.find("\"title\":\"AbiModel\"") != std::string::npos);
 
    const std::string formatRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili","options":{"indentSize":2}})json";

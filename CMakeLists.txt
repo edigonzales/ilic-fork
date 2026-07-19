@@ -27,6 +27,8 @@ set(ILIC_CORE_SOURCES
     source/core/Compiler.cpp
     source/core/Formatter.cpp
     source/core/SourceManager.cpp
+    source/core/Syntax.cpp
+    source/core/Semantic.cpp
 
     source/input/ili1/Ili1Input.cpp
     source/input/ili1/Ili1Input_package.cpp
@@ -76,6 +78,17 @@ set(ILIC_CORE_SOURCES
 
 add_library(ilic-core STATIC ${ILIC_CORE_SOURCES})
 add_library(ilic::core ALIAS ilic-core)
+# The IlisMeta schema uses role names such as `Type`, `Class`, and
+# `MetaElement` that intentionally match their C++ type names. GCC 13 and
+# newer diagnose these legacy declarations as errors unless this narrowly
+# scoped compatibility diagnostic is disabled. Keep the schema-derived API
+# stable instead of renaming its public members.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
+   CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13)
+    target_compile_options(ilic-core PUBLIC
+        $<$<COMPILE_LANGUAGE:CXX>:-Wno-changes-meaning>
+    )
+endif()
 target_include_directories(ilic-core
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -94,7 +107,7 @@ target_include_directories(ilic-capi
 target_link_libraries(ilic-capi PUBLIC ilic-core)
 
 add_executable(ilic source/main/ilic.cpp)
-target_link_libraries(ilic PRIVATE ilic-core)
+target_link_libraries(ilic PRIVATE ilic-capi)
 
 add_executable(ilic-format source/main/ilic_format.cpp)
 target_link_libraries(ilic-format PRIVATE ilic-core)
@@ -114,7 +127,7 @@ if(EMSCRIPTEN)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sWASM_BIGINT=1"
         "-sASSERTIONS=1"
-        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_compile','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
+        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_parse','_ilic_analyze','_ilic_compile','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
     )
     set_target_properties(ilic-wasm PROPERTIES OUTPUT_NAME "ilic" SUFFIX ".mjs")
 endif()
@@ -170,6 +183,12 @@ if(BUILD_TESTING)
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core)
     add_test(NAME ilic_core_session COMMAND ilic_core_session_test)
+    add_executable(ilic_syntax_snapshot_test test/core/SyntaxSnapshotTest.cpp)
+    target_link_libraries(ilic_syntax_snapshot_test PRIVATE ilic-core)
+    add_test(NAME ilic_syntax_snapshot COMMAND ilic_syntax_snapshot_test)
+    add_executable(ilic_semantic_snapshot_test test/core/SemanticSnapshotTest.cpp)
+    target_link_libraries(ilic_semantic_snapshot_test PRIVATE ilic-core)
+    add_test(NAME ilic_semantic_snapshot COMMAND ilic_semantic_snapshot_test)
     add_executable(ilic_formatter_test test/core/FormatterTest.cpp)
     target_link_libraries(ilic_formatter_test PRIVATE ilic-core)
     add_test(NAME ilic_formatter COMMAND ilic_formatter_test)
@@ -206,7 +225,15 @@ if(BUILD_TESTING)
         COMMAND ilic -v
     )
     set_tests_properties(ilic_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "platform=macos64"
+        PASS_REGULAR_EXPRESSION "platform=(win|macos|wasm|linux|unix)(32|64)"
+    )
+
+    add_test(
+        NAME ilic_compile_json
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC=$<TARGET_FILE:ilic>"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/compile-json-test"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_compile_json_test.cmake"
     )
 
     add_test(

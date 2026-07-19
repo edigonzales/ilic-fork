@@ -27,6 +27,8 @@ self.onmessage = async event => {
       case "putSource": value = session(args[0]).putSource(...args.slice(1)); break;
       case "removeSource": value = session(args[0]).removeSource(...args.slice(1)); break;
       case "compile": value = session(args[0]).compile(...args.slice(1)); break;
+      case "parse": value = session(args[0]).parse(...args.slice(1)); break;
+      case "analyze": value = session(args[0]).analyze(...args.slice(1)); break;
       case "format": value = session(args[0]).format(...args.slice(1)); break;
       default: throw new Error(`unknown compiler method ${method}`);
     }

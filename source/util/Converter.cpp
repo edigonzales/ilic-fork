@@ -1,3 +1,4 @@
+#include <cstring>
 #include <string>
 
 #include "Converter.h"

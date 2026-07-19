@@ -1,4 +1,5 @@
 #include "../../include/ilic/Compiler.h"
+#include "../../include/ilic/Semantic.h"
 
 #include "../input/ili1/Ili1Input.h"
 #include "../input/ili2/Ili2Input.h"
@@ -126,9 +127,27 @@ bool CompilerSession::removeSource(const std::string &uri) { return sources_.rem
 SourceManager &CompilerSession::sources() { return sources_; }
 const SourceManager &CompilerSession::sources() const { return sources_; }
 
+SyntaxSnapshot CompilerSession::parse(const std::string &uri)
+{
+   std::lock_guard<std::mutex> lock(compilerMutex);
+   return parseSyntax(sources_,uri);
+}
+
 CompilationResult CompilerSession::compile(const CompilationRequest &request)
 {
    std::lock_guard<std::mutex> lock(compilerMutex);
+   return compileUnlocked(request);
+}
+
+SemanticSnapshot CompilerSession::analyze(const CompilationRequest &request)
+{
+   std::lock_guard<std::mutex> lock(compilerMutex);
+   const CompilationResult compilation = compileUnlocked(request);
+   return buildSemanticSnapshot(sources_,request,compilation);
+}
+
+CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &request)
+{
    ActiveSourceManagerScope sourceScope(&sources_);
    CompilationResult result;
 

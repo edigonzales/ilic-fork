@@ -76,6 +76,10 @@ die intern in C++ implementierte statische Bibliothek.
 [`wasm-session.mjs`](wasm-session.mjs) kompiliert und formatiert eine virtuelle
 Quelle über das reale WASM-Modul:
 
+Die [einmalige Installation und Aktivierung des Emscripten
+SDKs](../build-und-installation.md#emscripten-sdk-einmalig-installieren) ist in
+der Build-Dokumentation beschrieben.
+
 ```sh
 source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh

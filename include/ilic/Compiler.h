@@ -2,11 +2,14 @@
 
 #include "SourceManager.h"
 #include "Diagnostic.h"
+#include "Syntax.h"
 
 #include <string>
 #include <vector>
 
 namespace ilic {
+
+struct SemanticSnapshot;
 
 struct CompilerOptions {
    bool autoSearch = true;
@@ -56,9 +59,12 @@ public:
    bool removeSource(const std::string &uri);
    SourceManager &sources();
    const SourceManager &sources() const;
+   SyntaxSnapshot parse(const std::string &uri);
+   SemanticSnapshot analyze(const CompilationRequest &request);
    CompilationResult compile(const CompilationRequest &request);
 
 private:
+   CompilationResult compileUnlocked(const CompilationRequest &request);
    SourceManager sources_;
 };
 

@@ -6,11 +6,25 @@
 
 ```text
 ilic [Optionen] file1.ili file2.ili ...
+ilic --compile-json
 ilic-format [--check] model.ili ...
 ```
 
 Optionen akzeptieren grundsätzlich einen oder zwei Bindestriche. Namen sind
 case-sensitive. Eingabedateien müssen auf `.ili` enden.
+
+`--compile-json` ist ein separater, maschinenlesbarer Modus. Er liest genau
+einen Compilation-Request des stabilen C-API-Schemas Version 1 von `stdin` und
+schreibt genau ein Resultat-JSON nach `stdout`:
+
+```sh
+printf '%s' '{"schemaVersion":1,"roots":["docs/examples/models/Legacy.ili"],"options":{"autoSearch":true},"externalMetaAttributes":[]}' \
+  | build/macos/ilic --compile-json
+```
+
+Eine fachliche Compilerablehnung wird mit `success: false` im JSON und Exitcode
+0 ausgegeben. Exitcode 2 ist Request-, Ein-/Ausgabe- und Laufzeitfehlern
+vorbehalten. Weitere Felder sind in der [Native-API](native-api.md) beschrieben.
 
 ```sh
 build/macos/ilic -silent docs/examples/models/Legacy.ili
@@ -146,6 +160,8 @@ Programm aber ohne GUI. Es ist keine öffentliche Funktion.
 | `ilic` | `0` | Erfolg, sofern `-success` nicht gesetzt ist |
 | `ilic` | Wert von `-success` | fehlerfreie Kompilation mit konfiguriertem Erfolgsstatus |
 | `ilic` | `1` | Compiler-, Argument- oder Repositoryfehler |
+| `ilic --compile-json` | `0` | Request ausgeführt; `success` im JSON enthält das Compilerergebnis |
+| `ilic --compile-json` | `2` | ungültiger Request oder Transport-/Laufzeitfehler |
 | `ilic-format` | `0` | alle Dateien erfolgreich geprüft/formatiert |
 | `ilic-format` | `1` | mindestens eine Datei nicht lesbar, ungültig oder nicht anwendbar |
 | `ilic-format` | `2` | ungültiger Aufruf |

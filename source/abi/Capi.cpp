@@ -2,6 +2,7 @@
 
 #include "../../include/ilic/Compiler.h"
 #include "../../include/ilic/Formatter.h"
+#include "../../include/ilic/Semantic.h"
 #include "Json.h"
 
 #include <cstdlib>
@@ -175,6 +176,89 @@ Value compileResult(const ilic::CompilationResult &result)
    };
 }
 
+Value syntaxResult(const ilic::SyntaxSnapshot &result)
+{
+   Value::Array tokens;
+   for (const auto &token : result.tokens) {
+      tokens.push_back(Value::Object{{"kind",token.kind},{"text",token.text},
+         {"channel",token.channel},{"range",range(token.range)}});
+   }
+   Value::Array nodes;
+   for (const auto &node : result.nodes) {
+      nodes.push_back(Value::Object{{"id",node.id},
+         {"parent",node.hasParent ? Value(node.parent) : Value(nullptr)},
+         {"kind",node.kind},{"range",range(node.range)}});
+   }
+   Value::Array contexts;
+   for (const auto &context : result.contexts)
+      contexts.push_back(Value::Object{{"kind",context.kind},{"range",range(context.range)}});
+   Value::Array imports;
+   for (const auto &model : result.imports) imports.emplace_back(model);
+   return Value::Object{{"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
+      {"kind","syntax"},{"success",result.success},{"uri",result.uri},
+      {"documentVersion",static_cast<double>(result.documentVersion)},
+      {"iliVersion",result.iliVersion},{"tokens",std::move(tokens)},
+      {"nodes",std::move(nodes)},{"contexts",std::move(contexts)},
+      {"imports",std::move(imports)},{"diagnostics",diagnostics(result.diagnostics)}};
+}
+
+Value semanticResult(const ilic::SemanticSnapshot &result)
+{
+   Value::Array roots;
+   for (const auto &root : result.roots) roots.emplace_back(root);
+   Value::Object versions;
+   for (const auto &entry : result.documentVersions)
+      versions[entry.first] = static_cast<double>(entry.second);
+   Value::Array symbols;
+   for (const auto &symbol : result.symbols) {
+      symbols.push_back(Value::Object{{"id",symbol.id},{"name",symbol.name},
+         {"qualifiedName",symbol.qualifiedName},{"kind",symbol.kind},
+         {"containerId",symbol.containerId},{"range",range(symbol.range)},
+         {"abstract",symbol.abstract}});
+   }
+   Value::Array references;
+   for (const auto &reference : result.references) {
+      references.push_back(Value::Object{{"sourceId",reference.sourceId},
+         {"targetId",reference.targetId},{"kind",reference.kind},
+         {"range",range(reference.range)}});
+   }
+   Value::Array dependencies;
+   for (const auto &dependency : result.dependencies) {
+      dependencies.push_back(Value::Object{{"sourceUri",dependency.sourceUri},
+         {"targetUri",dependency.targetUri},{"model",dependency.model}});
+   }
+   Value::Array diagramNodes;
+   for (const auto &node : result.diagram.nodes) {
+      Value::Array members;
+      for (const auto &member : node.members)
+         members.push_back(Value::Object{{"name",member.name},{"type",member.type},
+            {"inherited",member.inherited}});
+      diagramNodes.push_back(Value::Object{{"id",node.id},{"containerId",node.containerId},
+         {"label",node.label},{"kind",node.kind},{"abstract",node.abstract},
+         {"range",range(node.range)},{"members",std::move(members)}});
+   }
+   Value::Array diagramEdges;
+   for (const auto &edge : result.diagram.edges) {
+      diagramEdges.push_back(Value::Object{{"id",edge.id},{"sourceId",edge.sourceId},
+         {"targetId",edge.targetId},{"kind",edge.kind},{"label",edge.label},
+         {"cardinality",edge.cardinality}});
+   }
+   Value::Array sections;
+   for (const auto &section : result.documentation.sections) {
+      sections.push_back(Value::Object{{"id",section.id},{"title",section.title},
+         {"kind",section.kind},{"text",section.text},{"level",section.level}});
+   }
+   return Value::Object{{"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
+      {"kind","semantic"},{"success",result.success},{"cancelled",result.cancelled},
+      {"roots",std::move(roots)},{"documentVersions",std::move(versions)},
+      {"symbols",std::move(symbols)},{"references",std::move(references)},
+      {"dependencies",std::move(dependencies)},
+      {"diagram",Value::Object{{"nodes",std::move(diagramNodes)},{"edges",std::move(diagramEdges)}}},
+      {"documentation",Value::Object{{"title",result.documentation.title},
+         {"sections",std::move(sections)}}},
+      {"diagnostics",diagnostics(result.diagnostics)},{"logs",logs(result.logs)}};
+}
+
 } // namespace
 
 extern "C" {
@@ -226,6 +310,40 @@ std::uint32_t ilic_compile(std::uint32_t session,const char *requestJson,std::si
    }
    catch (const std::exception &error) {
       return store(errorResult("compilation",error.what()));
+   }
+}
+
+std::uint32_t ilic_parse(std::uint32_t session,const char *requestJson,std::size_t requestLength)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return store(errorResult("syntax","invalid session handle"));
+   if (requestJson == nullptr) return store(errorResult("syntax","request JSON is null"));
+   try {
+      Value json = ilic::json::parse(std::string(requestJson,requestLength));
+      if (!json.isObject()) throw std::runtime_error("parse request must be an object");
+      if (!json.get("schemaVersion").isNumber() ||
+         static_cast<int>(json.get("schemaVersion").number()) != 1)
+         throw std::runtime_error("unsupported schemaVersion");
+      if (!json.get("uri").isString() || json.get("uri").string().empty())
+         throw std::runtime_error("uri must be a non-empty string");
+      return store(syntaxResult(value->parse(json.get("uri").string())));
+   }
+   catch (const std::exception &error) {
+      return store(errorResult("syntax",error.what()));
+   }
+}
+
+std::uint32_t ilic_analyze(std::uint32_t session,const char *requestJson,std::size_t requestLength)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return store(errorResult("semantic","invalid session handle"));
+   if (requestJson == nullptr) return store(errorResult("semantic","request JSON is null"));
+   try {
+      Value json = ilic::json::parse(std::string(requestJson,requestLength));
+      return store(semanticResult(value->analyze(compileRequest(json))));
+   }
+   catch (const std::exception &error) {
+      return store(errorResult("semantic",error.what()));
    }
 }
 
