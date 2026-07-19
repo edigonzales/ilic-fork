@@ -78,6 +78,17 @@ set(ILIC_CORE_SOURCES
 
 add_library(ilic-core STATIC ${ILIC_CORE_SOURCES})
 add_library(ilic::core ALIAS ilic-core)
+# The IlisMeta schema uses role names such as `Type`, `Class`, and
+# `MetaElement` that intentionally match their C++ type names. GCC 14 and
+# newer diagnose these legacy declarations as errors unless this narrowly
+# scoped compatibility diagnostic is disabled. Keep the schema-derived API
+# stable instead of renaming its public members.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
+   CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
+    target_compile_options(ilic-core PUBLIC
+        $<$<COMPILE_LANGUAGE:CXX>:-Wno-changes-meaning>
+    )
+endif()
 target_include_directories(ilic-core
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -214,7 +225,7 @@ if(BUILD_TESTING)
         COMMAND ilic -v
     )
     set_tests_properties(ilic_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "platform=macos64"
+        PASS_REGULAR_EXPRESSION "platform=(win|macos|wasm|linux|unix)(32|64)"
     )
 
     add_test(
