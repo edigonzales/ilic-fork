@@ -236,6 +236,6 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
    }
 }
 
-const char *version() { return "0.10.0"; }
+const char *version() { return "0.9.9"; }
 
 } // namespace ilic

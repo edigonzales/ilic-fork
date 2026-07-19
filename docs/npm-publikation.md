@@ -14,10 +14,10 @@ noch als GitHub Release veröffentlicht.
 ## Version und Dist-Tag
 
 Die Basisversion ist die CMake-Projektversion aus `CMakeLists.txt`, aktuell
-`0.10.0`. Ein Publish erhält einen UTC-Zeitstempel:
+`0.9.9`. Ein Publish erhält einen UTC-Zeitstempel:
 
 ```text
-0.10.0-SNAPSHOT.20260718143152
+0.9.9-SNAPSHOT.20260718143152
 ```
 
 Der Zeitstempel hat das Format `YYYYMMDDHHmmss`. Beide Pakete erhalten in einem

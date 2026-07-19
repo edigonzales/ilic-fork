@@ -1,6 +1,6 @@
 {
   "name": "@ilic/tools",
-  "version": "0.10.0",
+  "version": "0.9.9",
   "description": "INTERLIS repository resolution and caching for Node.js and browsers.",
   "author": "edigonzales",
   "license": "MIT",

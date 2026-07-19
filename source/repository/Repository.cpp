@@ -122,7 +122,7 @@ FetchResult fetch(const RepositoryOptions &options,const std::string &uri,
       curl_easy_setopt(curl,CURLOPT_FAILONERROR,1L);
       curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,15L);
       curl_easy_setopt(curl,CURLOPT_TIMEOUT,60L);
-      curl_easy_setopt(curl,CURLOPT_USERAGENT,"ilic/0.10.0");
+      curl_easy_setopt(curl,CURLOPT_USERAGENT,"ilic/0.9.9");
       curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,curlWrite);
       curl_easy_setopt(curl,CURLOPT_WRITEDATA,&result.text);
       CURLcode status = curl_easy_perform(curl);
