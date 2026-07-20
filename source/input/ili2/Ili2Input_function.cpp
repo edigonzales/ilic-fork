@@ -57,6 +57,7 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
 
    FunctionDef *f = new FunctionDef;
    init_metaelement(f,ctx->start->getLine());
+   set_selection_source(f,ctx->functioname);
 
    // MetaElement attributes
    f->Name = name;
@@ -76,6 +77,7 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
    for (auto pctx : ctx->functionDefParam()) {
       Argument *a = new Argument();
       init_metaelement(a,ctx->start->getLine());
+      set_selection_source(a,pctx->NAME()->getSymbol());
       a->Name = pctx->NAME()->getText();
       debug(ctx,">>> visitArgument " + a->Name);
       Log.incNestLevel();

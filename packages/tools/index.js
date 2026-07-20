@@ -109,7 +109,7 @@ function md5(bytes) {
 export class RepositoryManager {
   constructor({ repositories = [], cache = new MemoryCache(), load, offline = false,
     metadataTtlMs = 86_400_000, modelTtlMs = 604_800_000, allowStaleOnError = true,
-    followSiteLinks = true } = {}) {
+    followSiteLinks = true, onWarning } = {}) {
     this.repositories = repositories;
     this.cache = cache;
     this.offline = offline;
@@ -117,6 +117,7 @@ export class RepositoryManager {
     this.modelTtlMs = modelTtlMs;
     this.allowStaleOnError = allowStaleOnError;
     this.followSiteLinks = followSiteLinks;
+    this.onWarning = onWarning;
     this.load = load ?? (async uri => {
       const response = await fetch(uri);
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
@@ -144,11 +145,23 @@ export class RepositoryManager {
     const result = [];
     const pending = [...this.repositories];
     const visited = new Set();
+    const failures = [];
+    let loaded = 0;
     while (pending.length) {
       const repository = pending.shift().replace(/\/$/, "");
       if (visited.has(repository)) continue;
       visited.add(repository);
-      const resource = await this.#resource(joinUri(repository, "ilimodels.xml"), this.metadataTtlMs);
+      let resource;
+      const metadataUri = joinUri(repository, "ilimodels.xml");
+      try {
+        resource = await this.#resource(metadataUri, this.metadataTtlMs);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push(new Error(`${metadataUri}: ${message}`));
+        this.onWarning?.({ uri: metadataUri, operation: "metadata", message });
+        continue;
+      }
+      loaded++;
       result.push(...parseIliModelsXml(textDecoder.decode(resource.value), repository));
       if (this.followSiteLinks) {
         try {
@@ -157,6 +170,8 @@ export class RepositoryManager {
         } catch { /* ilisite.xml is optional */ }
       }
     }
+    if (this.repositories.length > 0 && loaded === 0)
+      throw new AggregateError(failures, "no configured INTERLIS repository is available");
     return result;
   }
 
@@ -176,7 +191,14 @@ export class RepositoryManager {
       if (metadata.file.split(/[\\/]/).includes("..")) throw new Error(`unsafe repository path ${metadata.file}`);
       const uri = joinUri(metadata.repository, metadata.file);
       if (!files.has(uri)) {
-        const resource = await this.#resource(uri, this.modelTtlMs);
+        let resource;
+        try {
+          resource = await this.#resource(uri, this.modelTtlMs);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.onWarning?.({ uri, operation: "model", message });
+          throw error;
+        }
         if (metadata.md5 && md5(resource.value) !== metadata.md5.toLowerCase()) {
           throw new Error(`MD5 mismatch for ${uri}`);
         }

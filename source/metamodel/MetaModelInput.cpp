@@ -1,7 +1,9 @@
 #include "MetaModelInput.h"
+#include "../../include/ilic/SourceManager.h"
 #include "../util/StringUtil.h"
 #include "../util/Logger.h"
 
+#include <algorithm>
 #include <sstream>
 #include <cctype>
 
@@ -26,6 +28,7 @@ namespace metamodel {
    static Class AnyClass;
    static Class AnyStructure;
    static bool UniversalClassesInitialized = false;
+   static string CurrentSourceText;
    struct PendingMetaAttribute {
       string Name;
       string Value;
@@ -69,6 +72,7 @@ namespace metamodel {
       AllLineForms.clear();
       AllGraphics.clear();
       PendingMetaAttributes.clear();
+      CurrentSourceText.clear();
       UniversalClassesInitialized = false;
       ili23 = true;
       ili24 = true;
@@ -77,6 +81,7 @@ namespace metamodel {
 
    void prepare_meta_attributes(const string &source)
    {
+      CurrentSourceText = source;
       PendingMetaAttributes.clear();
       list<PendingMetaAttribute> pending;
       istringstream lines(source);
@@ -157,6 +162,57 @@ namespace metamodel {
          o->_source.end = o->_source.start;
          o->_source.end.character = 1;
       }
+   }
+
+   static size_t utf8_byte_offset(size_t codepointOffset)
+   {
+      size_t byteOffset = 0;
+      for (size_t index = 0;
+           index < codepointOffset && byteOffset < CurrentSourceText.size();++index) {
+         const unsigned char lead = static_cast<unsigned char>(CurrentSourceText[byteOffset]);
+         size_t width = 1;
+         if ((lead & 0xe0) == 0xc0) width = 2;
+         else if ((lead & 0xf0) == 0xe0) width = 3;
+         else if ((lead & 0xf8) == 0xf0) width = 4;
+         byteOffset = min(CurrentSourceText.size(),byteOffset + width);
+      }
+      return byteOffset;
+   }
+
+   static ilic::SourceRange token_source(antlr4::Token *token)
+   {
+      ilic::SourceRange result;
+      if (token == nullptr || token->getStartIndex() > CurrentSourceText.size() ||
+          Log.getCurrentSource().empty()) return result;
+      const size_t start = utf8_byte_offset(token->getStartIndex());
+      const size_t end = utf8_byte_offset(token->getStopIndex() + 1);
+      ilic::SourceManager *sources = ilic::activeSourceManager();
+      if (sources == nullptr || sources->get(Log.getCurrentSource()) == nullptr) return result;
+      const ilic::SourcePosition startPosition = sources->position(Log.getCurrentSource(),start);
+      const ilic::SourcePosition endPosition = sources->position(Log.getCurrentSource(),end);
+      result.valid = true;
+      result.uri = Log.getCurrentSource();
+      result.start = {startPosition.line,startPosition.utf16Column,startPosition.offset};
+      result.end = {endPosition.line,endPosition.utf16Column,endPosition.offset};
+      return result;
+   }
+
+   void set_selection_source(MetaElement *element,antlr4::Token *token)
+   {
+      if (element != nullptr) element->_selectionSource = token_source(token);
+   }
+
+   void set_reference_source(MMObject *object,const string &kind,antlr4::Token *token)
+   {
+      if (object == nullptr) return;
+      const ilic::SourceRange source = token_source(token);
+      if (source.valid) object->_referenceSources[kind] = source;
+   }
+
+   void set_reference_source(MMObject *object,const string &kind,
+      antlr4::ParserRuleContext *context)
+   {
+      set_reference_source(object,kind,context == nullptr ? nullptr : context->getStop());
    }
 
    // metaelement helpers

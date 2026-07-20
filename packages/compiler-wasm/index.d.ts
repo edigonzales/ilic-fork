@@ -47,6 +47,9 @@ export interface CompilationResult {
 export interface SyntaxToken { kind: string; text: string; channel: number; range: SourceRange; }
 export interface SyntaxNode { id: number; parent: number | null; kind: string; range: SourceRange; }
 export interface SyntaxContext { kind: string; range: SourceRange; }
+export interface SyntaxImportReference {
+  model: string; unqualified: boolean; range: SourceRange;
+}
 export interface SyntaxSnapshot {
   schemaVersion: 1;
   abiVersion: 1;
@@ -60,16 +63,20 @@ export interface SyntaxSnapshot {
   nodes: SyntaxNode[];
   contexts: SyntaxContext[];
   imports: string[];
+  importReferences?: SyntaxImportReference[];
   diagnostics: Diagnostic[];
 }
 export interface SemanticSymbol {
   id: string; name: string; qualifiedName: string; kind: string;
   containerId: string; range: SourceRange | null; abstract: boolean;
+  selectionRange?: SourceRange | null;
 }
 export interface SemanticReference {
   sourceId: string; targetId: string; kind: string; range: SourceRange | null;
 }
-export interface SemanticDependency { sourceUri: string; targetUri: string; model: string; }
+export interface SemanticDependency {
+  sourceUri: string; targetUri: string; model: string; range?: SourceRange | null;
+}
 export interface DiagramMember { name: string; type: string; inherited: boolean; }
 export interface DiagramNode {
   id: string; containerId: string; label: string; kind: string; abstract: boolean;
@@ -91,6 +98,7 @@ export interface SemanticSnapshot {
   cancelled: boolean;
   roots: string[];
   documentVersions: Record<string, number>;
+  missingModels?: string[];
   symbols: SemanticSymbol[];
   references: SemanticReference[];
   dependencies: SemanticDependency[];

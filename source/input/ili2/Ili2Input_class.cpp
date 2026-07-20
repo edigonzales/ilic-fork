@@ -10,6 +10,38 @@ using namespace input;
 using namespace parser;
 using namespace metamodel;
 
+namespace {
+
+antlr4::Token *restricted_ref_token(Ili2Parser::RestrictedRefContext *ctx)
+{
+   if (ctx == nullptr) return nullptr;
+   if (ctx->typeref != nullptr) return ctx->typeref->getStop();
+   if (ctx->ANYCLASS() != nullptr) return ctx->ANYCLASS()->getSymbol();
+   return ctx->ANYSTRUCTURE() == nullptr ? nullptr : ctx->ANYSTRUCTURE()->getSymbol();
+}
+
+antlr4::Token *attr_type_token(Ili2Parser::AttrTypeContext *ctx)
+{
+   if (ctx == nullptr) return nullptr;
+   if (ctx->path() != nullptr) return ctx->path()->getStop();
+   if (ctx->referenceAttr() != nullptr)
+      return restricted_ref_token(ctx->referenceAttr()->restrictedRef());
+   if (ctx->restrictedRef() != nullptr) return restricted_ref_token(ctx->restrictedRef());
+   return nullptr;
+}
+
+antlr4::Token *attr_type_def_token(Ili2Parser::AttrTypeDefContext *ctx)
+{
+   if (ctx == nullptr) return nullptr;
+   if (ctx->attrType() != nullptr) return attr_type_token(ctx->attrType());
+   if (ctx->bagOrListType() == nullptr) return nullptr;
+   if (ctx->bagOrListType()->restrictedRef() != nullptr)
+      return restricted_ref_token(ctx->bagOrListType()->restrictedRef());
+   return attr_type_token(ctx->bagOrListType()->attrType());
+}
+
+}
+
 antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
 {
 
@@ -86,6 +118,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    Class *c = new Class();
    c->Kind = Class::ClassVal;
    init_type(c,get_line(ctx->classname1));
+   set_selection_source(c,ctx->classname1);
 
    // MetaElement Attributes
    c->Name = name1;
@@ -101,6 +134,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
 
    // EXTENDED
    if (c->Extended) {
+      set_reference_source(c,"inheritance",ctx->classname1);
       DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
       if (u->Super == nullptr) {
          Log.error(string("EXTENDED can only by used in extended topics"),c->_line);
@@ -119,6 +153,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
 
    // EXTENDS
    if (ctx->classbase != nullptr) {
+      set_reference_source(c,"inheritance",ctx->classbase);
       Class *s = find_class_or_structure(ctx->classbase->getText(),get_line(ctx->classbase));
       c->Super = s;
       if (s != nullptr) {
@@ -203,6 +238,7 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
    Class *c = new Class();
    c->Kind = Class::Structure;
    init_type(c,ctx->structurename1->getLine());
+   set_selection_source(c,ctx->structurename1);
 
    // MetaElement Attributes
    c->Name = name1;
@@ -215,6 +251,7 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
 
    // EXTENDED
    if (c->Extended) {
+      set_reference_source(c,"inheritance",ctx->structurename1);
       DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
       if (u->Super == nullptr) {
          Log.error(string("EXTENDED can only by used in extended topics"),c->_line);
@@ -233,6 +270,7 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
 
    // EXTENDS
    if (ctx->structurebase != nullptr) {
+      set_reference_source(c,"inheritance",ctx->structurebase);
       Class *s = find_structure(ctx->structurebase->getText(),get_line(ctx->structurebase));
       c->Super = s;
       if (s != nullptr) {
@@ -421,6 +459,7 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    // init AttrOrParam
    AttrOrParam *a = new AttrOrParam();
    init_extendableme(a, ctx->attributname->getLine());
+   set_selection_source(a,ctx->attributname);
 
    // MetaElement attributes
    a->Name = name;
@@ -433,6 +472,7 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    a->Final = properties[FINAL];
    a->Extended = properties[EXTENDED];
    if (a->Extended) {
+      set_reference_source(a,"inheritance",ctx->attributname);
       Class *c = get_class_context();
       if (c->Super == nullptr) {
          Log.error(string("EXTENDED can only by used in extended classes / structures / associations"),ctx->attributname->getLine());
@@ -453,6 +493,7 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
 
    push_context(a);
    a->Type = visitAttrTypeDef(ctx->attrTypeDef());
+   set_reference_source(a,"type",attr_type_def_token(ctx->attrTypeDef()));
    a->TypeExplicitlyDefined = ctx->attrTypeDef()->attrType() != nullptr ||
                               ctx->attrTypeDef()->bagOrListType() != nullptr;
    pop_context();
@@ -587,6 +628,7 @@ antlrcpp::Any Ili2Input::visitParameterDef(parser::Ili2Parser::ParameterDefConte
    // init AttrOrParam
    AttrOrParam *a = new AttrOrParam();
    init_extendableme(a, ctx->parameterName->getLine());
+   set_selection_source(a,ctx->parameterName);
 
    // MetaElement attributes
    a->Name = name;
@@ -598,6 +640,7 @@ antlrcpp::Any Ili2Input::visitParameterDef(parser::Ili2Parser::ParameterDefConte
       a->Final = properties[FINAL];
       a->Extended = properties[EXTENDED];
       if (properties[EXTENDED]) {
+         set_reference_source(a,"inheritance",ctx->parameterName);
          Class *c = get_class_context();
          if (c->Super == nullptr) {
             Log.error(string("EXTENDED can only by used in extended classes / structures / associations"),ctx->parameterName->getLine());
@@ -615,6 +658,7 @@ antlrcpp::Any Ili2Input::visitParameterDef(parser::Ili2Parser::ParameterDefConte
 
    push_context(a);
    a->Type = visitAttrTypeDef(ctx->attrTypeDef());
+   set_reference_source(a,"type",attr_type_def_token(ctx->attrTypeDef()));
    pop_context();
 
    // ASSOCIATION ClassParam

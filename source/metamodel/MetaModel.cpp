@@ -646,6 +646,9 @@ namespace metamodel {
    static void clone_init_mmobject(MMObject *clone,MMObject *org)
    {
       clone->_line = org->_line;
+      clone->_source = org->_source;
+      clone->_selectionSource = org->_selectionSource;
+      clone->_referenceSources = org->_referenceSources;
    }
 
    static void clone_init_doctext(DocText *clone,DocText *org)

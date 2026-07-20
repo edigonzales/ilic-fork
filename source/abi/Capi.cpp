@@ -105,12 +105,52 @@ Value logs(const std::vector<ilic::LogEvent> &logs)
    return values;
 }
 
-Value errorResult(const char *kind,const std::string &message)
+Value errorResult(const char *kind,const std::string &message,
+   const std::string &uri = std::string(),std::uint64_t documentVersion = 0)
 {
-   return Value::Object{{"schemaVersion",1},{"kind",kind},{"success",false},
-      {"diagnostics",Value::Array{Value::Object{{"severity","error"},{"code","ILIC-ABI-REQUEST"},
-         {"message",message},{"range",nullptr},{"relatedInformation",Value::Array{}},
-         {"notes",Value::Array{}},{"treatedAsError",false}}}}};
+   Value::Object result{{"schemaVersion",1},{"abiVersion",1},
+      {"compilerVersion",ilic::version()},{"kind",kind},{"success",false},
+      {"diagnostics",Value::Array{Value::Object{{"severity","error"},
+         {"code","ILIC-ABI-REQUEST"},{"message",message},{"range",nullptr},
+         {"relatedInformation",Value::Array{}},{"notes",Value::Array{}},
+         {"treatedAsError",false}}}}};
+   const std::string value(kind);
+   if (value == "syntax") {
+      result["uri"] = uri;
+      result["documentVersion"] = static_cast<double>(documentVersion);
+      result["iliVersion"] = "";
+      result["tokens"] = Value::Array{};
+      result["nodes"] = Value::Array{};
+      result["contexts"] = Value::Array{};
+      result["imports"] = Value::Array{};
+      result["importReferences"] = Value::Array{};
+   }
+   else if (value == "semantic") {
+      result["cancelled"] = false;
+      result["roots"] = Value::Array{};
+      result["documentVersions"] = Value::Object{};
+      result["missingModels"] = Value::Array{};
+      result["symbols"] = Value::Array{};
+      result["references"] = Value::Array{};
+      result["dependencies"] = Value::Array{};
+      result["diagram"] = Value::Object{{"nodes",Value::Array{}},{"edges",Value::Array{}}};
+      result["documentation"] = Value::Object{{"title",""},{"sections",Value::Array{}}};
+      result["logs"] = Value::Array{};
+   }
+   else if (value == "compilation") {
+      result["cancelled"] = false;
+      result["errorCount"] = 1;
+      result["warningCount"] = 0;
+      result["missingModels"] = Value::Array{};
+      result["models"] = Value::Array{};
+      result["logs"] = Value::Array{};
+   }
+   else if (value == "formatting") {
+      result["applicable"] = false;
+      result["changed"] = false;
+      result["text"] = "";
+   }
+   return result;
 }
 
 ilic::CompilationRequest compileRequest(const Value &json)
@@ -194,12 +234,17 @@ Value syntaxResult(const ilic::SyntaxSnapshot &result)
       contexts.push_back(Value::Object{{"kind",context.kind},{"range",range(context.range)}});
    Value::Array imports;
    for (const auto &model : result.imports) imports.emplace_back(model);
+   Value::Array importReferences;
+   for (const auto &reference : result.importReferences)
+      importReferences.push_back(Value::Object{{"model",reference.model},
+         {"unqualified",reference.unqualified},{"range",range(reference.range)}});
    return Value::Object{{"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
       {"kind","syntax"},{"success",result.success},{"uri",result.uri},
       {"documentVersion",static_cast<double>(result.documentVersion)},
       {"iliVersion",result.iliVersion},{"tokens",std::move(tokens)},
       {"nodes",std::move(nodes)},{"contexts",std::move(contexts)},
-      {"imports",std::move(imports)},{"diagnostics",diagnostics(result.diagnostics)}};
+      {"imports",std::move(imports)},{"importReferences",std::move(importReferences)},
+      {"diagnostics",diagnostics(result.diagnostics)}};
 }
 
 Value semanticResult(const ilic::SemanticSnapshot &result)
@@ -214,6 +259,7 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
       symbols.push_back(Value::Object{{"id",symbol.id},{"name",symbol.name},
          {"qualifiedName",symbol.qualifiedName},{"kind",symbol.kind},
          {"containerId",symbol.containerId},{"range",range(symbol.range)},
+         {"selectionRange",range(symbol.selectionRange)},
          {"abstract",symbol.abstract}});
    }
    Value::Array references;
@@ -225,7 +271,8 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
    Value::Array dependencies;
    for (const auto &dependency : result.dependencies) {
       dependencies.push_back(Value::Object{{"sourceUri",dependency.sourceUri},
-         {"targetUri",dependency.targetUri},{"model",dependency.model}});
+         {"targetUri",dependency.targetUri},{"model",dependency.model},
+         {"range",range(dependency.range)}});
    }
    Value::Array diagramNodes;
    for (const auto &node : result.diagram.nodes) {
@@ -248,9 +295,12 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
       sections.push_back(Value::Object{{"id",section.id},{"title",section.title},
          {"kind",section.kind},{"text",section.text},{"level",section.level}});
    }
+   Value::Array missingModels;
+   for (const auto &model : result.missingModels) missingModels.emplace_back(model);
    return Value::Object{{"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
       {"kind","semantic"},{"success",result.success},{"cancelled",result.cancelled},
       {"roots",std::move(roots)},{"documentVersions",std::move(versions)},
+      {"missingModels",std::move(missingModels)},
       {"symbols",std::move(symbols)},{"references",std::move(references)},
       {"dependencies",std::move(dependencies)},
       {"diagram",Value::Object{{"nodes",std::move(diagramNodes)},{"edges",std::move(diagramEdges)}}},
@@ -287,16 +337,20 @@ std::int32_t ilic_session_put_source(std::uint32_t session,const char *uri,std::
 {
    auto value = getSession(session);
    if (value == nullptr || uri == nullptr || (utf8 == nullptr && utf8Length != 0)) return -1;
-   value->putSource(std::string(uri,uriLength),
-      std::string(reinterpret_cast<const char *>(utf8),utf8Length),documentVersion);
-   return 0;
+   try {
+      value->putSource(std::string(uri,uriLength),
+         std::string(reinterpret_cast<const char *>(utf8),utf8Length),documentVersion);
+      return 0;
+   }
+   catch (...) { return -2; }
 }
 
 std::int32_t ilic_session_remove_source(std::uint32_t session,const char *uri,std::size_t uriLength)
 {
    auto value = getSession(session);
    if (value == nullptr || uri == nullptr) return -1;
-   return value->removeSource(std::string(uri,uriLength)) ? 0 : 1;
+   try { return value->removeSource(std::string(uri,uriLength)) ? 0 : 1; }
+   catch (...) { return -2; }
 }
 
 std::uint32_t ilic_compile(std::uint32_t session,const char *requestJson,std::size_t requestLength)
@@ -311,6 +365,7 @@ std::uint32_t ilic_compile(std::uint32_t session,const char *requestJson,std::si
    catch (const std::exception &error) {
       return store(errorResult("compilation",error.what()));
    }
+   catch (...) { return store(errorResult("compilation","unknown C++ exception")); }
 }
 
 std::uint32_t ilic_parse(std::uint32_t session,const char *requestJson,std::size_t requestLength)
@@ -318,6 +373,7 @@ std::uint32_t ilic_parse(std::uint32_t session,const char *requestJson,std::size
    auto value = getSession(session);
    if (value == nullptr) return store(errorResult("syntax","invalid session handle"));
    if (requestJson == nullptr) return store(errorResult("syntax","request JSON is null"));
+   std::string uri;
    try {
       Value json = ilic::json::parse(std::string(requestJson,requestLength));
       if (!json.isObject()) throw std::runtime_error("parse request must be an object");
@@ -326,10 +382,17 @@ std::uint32_t ilic_parse(std::uint32_t session,const char *requestJson,std::size
          throw std::runtime_error("unsupported schemaVersion");
       if (!json.get("uri").isString() || json.get("uri").string().empty())
          throw std::runtime_error("uri must be a non-empty string");
-      return store(syntaxResult(value->parse(json.get("uri").string())));
+      uri = json.get("uri").string();
+      return store(syntaxResult(value->parse(uri)));
    }
    catch (const std::exception &error) {
-      return store(errorResult("syntax",error.what()));
+      const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
+      return store(errorResult("syntax",error.what(),uri,source == nullptr ? 0 : source->version));
+   }
+   catch (...) {
+      const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
+      return store(errorResult("syntax","unknown C++ exception",uri,
+         source == nullptr ? 0 : source->version));
    }
 }
 
@@ -345,6 +408,7 @@ std::uint32_t ilic_analyze(std::uint32_t session,const char *requestJson,std::si
    catch (const std::exception &error) {
       return store(errorResult("semantic",error.what()));
    }
+   catch (...) { return store(errorResult("semantic","unknown C++ exception")); }
 }
 
 std::uint32_t ilic_format(std::uint32_t session,const char *requestJson,std::size_t requestLength)
@@ -386,6 +450,7 @@ std::uint32_t ilic_format(std::uint32_t session,const char *requestJson,std::siz
    catch (const std::exception &error) {
       return store(errorResult("formatting",error.what()));
    }
+   catch (...) { return store(errorResult("formatting","unknown C++ exception")); }
 }
 
 const char *ilic_result_json(std::uint32_t result,std::size_t *resultLength)

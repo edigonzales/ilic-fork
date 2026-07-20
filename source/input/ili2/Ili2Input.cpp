@@ -166,6 +166,7 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBask
    debug(ctx,">>> visitMetaDataBasketDef()");
    MetaBasketDef *basket = new MetaBasketDef();
    init_extendableme(basket,get_line(ctx));
+   set_selection_source(basket,ctx->basketname);
    basket->Name = ctx->basketname->getText();
    basket->Kind = ctx->SIGN() == nullptr ? MetaBasketDef::RefSystemB : MetaBasketDef::SignB;
    basket->Final = ctx->FINAL() != nullptr;

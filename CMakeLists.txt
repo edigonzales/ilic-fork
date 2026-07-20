@@ -113,10 +113,16 @@ add_executable(ilic-format source/main/ilic_format.cpp)
 target_link_libraries(ilic-format PRIVATE ilic-core)
 
 if(EMSCRIPTEN)
+    # Parser errors are expected for incomplete editor buffers. Emscripten
+    # requires exception support at both compile and link time so the C ABI
+    # can translate those C++ exceptions into structured JSON diagnostics.
+    target_compile_options(antlr4-runtime PRIVATE "-fexceptions")
+    target_compile_options(ilic-core PRIVATE "-fexceptions")
     add_executable(ilic-wasm
         source/abi/Capi.cpp
         source/abi/Json.cpp
     )
+    target_compile_options(ilic-wasm PRIVATE "-fexceptions")
     target_include_directories(ilic-wasm PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
     target_link_libraries(ilic-wasm PRIVATE ilic-core)
     target_link_options(ilic-wasm PRIVATE
@@ -127,6 +133,7 @@ if(EMSCRIPTEN)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sWASM_BIGINT=1"
         "-sASSERTIONS=1"
+        "-fexceptions"
         "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_parse','_ilic_analyze','_ilic_compile','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
     )
     set_target_properties(ilic-wasm PROPERTIES OUTPUT_NAME "ilic" SUFFIX ".mjs")

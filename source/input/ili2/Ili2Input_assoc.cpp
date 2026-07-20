@@ -88,6 +88,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    Class *c = new Class();
    c->Kind = Class::Association;
    init_type(c,get_line(ctx));
+   set_selection_source(c,ctx->associationname1);
 
    // MetaElement Attributes
    c->Name = name1;
@@ -100,6 +101,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
 
    // EXTENDED
    if (c->Extended) {
+      set_reference_source(c,"inheritance",ctx->associationname1);
       DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
       if (u->Super == nullptr) {
          Log.error(string("EXTENDED can only by used in extended topics"),c->_line);
@@ -118,6 +120,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    
    // EXTENDS
    if (ctx->associationRef() != nullptr) {
+      set_reference_source(c,"inheritance",ctx->associationRef());
       Class *s = find_association(ctx->associationRef()->getText(),c->_line);
       c->Super = s;
       if (s != nullptr) {
@@ -292,6 +295,7 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
 
    Role *r = new Role;
    init_domaintype(r,ctx->start->getLine());
+   set_selection_source(r,ctx->rolename);
 
    r->Name = name;
    r->ElementInPackage = nullptr;
@@ -305,6 +309,7 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
    r->Hiding = properties[HIDING];
 
    if (r->Extended) {
+      set_reference_source(r,"inheritance",ctx->rolename);
       Class* c = get_class_context();
       if (c->Super == nullptr) {
          Log.error("EXTENDED can only be used in extended associations",r->_line);
@@ -353,6 +358,11 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
       }
       r->_baseclass = rrr->_baseclass;
       r->_classrestriction = rrr->_classrestriction;
+      if (rr->typeref != nullptr) set_reference_source(r,"role",rr->typeref);
+      else if (rr->ANYCLASS() != nullptr)
+         set_reference_source(r,"role",rr->ANYCLASS()->getSymbol());
+      else if (rr->ANYSTRUCTURE() != nullptr)
+         set_reference_source(r,"role",rr->ANYSTRUCTURE()->getSymbol());
    }
    
    Log.decNestLevel();

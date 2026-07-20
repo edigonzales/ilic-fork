@@ -225,6 +225,7 @@ antlrcpp::Any Ili2Input::visitUniquenessConstraint(parser::Ili2Parser::Uniquenes
    c->PerBasket = ctx->BASKET() != nullptr;
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
+      set_selection_source(c,ctx->name);
    }
    
    if (ctx->WHERE() != nullptr) {
@@ -373,6 +374,7 @@ antlrcpp::Any Ili2Input::visitSetConstraint(parser::Ili2Parser::SetConstraintCon
    c->PerBasket = ctx->BASKET() != nullptr;
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
+      set_selection_source(c,ctx->name);
    }
    auto expressions = ctx->expression();
    if (ctx->logical != nullptr) {

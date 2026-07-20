@@ -74,6 +74,7 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
    
    Graphic *g = new Graphic();
    init_graphic(g,get_line(ctx));
+   set_selection_source(g,ctx->graphicname1);
    g->Name = name1;
    add_graphic(g);
    push_context(g);
@@ -88,6 +89,7 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
    
    g->Base = nullptr;
    if (ctx->EXTENDS() != nullptr) {
+      set_reference_source(g,"inheritance",ctx->expath);
       Graphic *s = find_graphic(ctx->expath->getText(),get_line(ctx->expath));
       g->Super = s;
       if (s != nullptr) {

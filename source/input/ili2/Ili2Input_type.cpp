@@ -106,6 +106,9 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
    
    t->Name = name;
    t->Super = basetype;
+   set_selection_source(t,ctx->domainname);
+   if (ctx->basedomain != nullptr)
+      set_reference_source(t,"inheritance",ctx->basedomain);
       
    map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,GENERIC,FINAL}));
    t->Abstract = properties[ABSTRACT];
@@ -155,6 +158,7 @@ antlrcpp::Any Ili2Input::visitContextBlock(parser::Ili2Parser::ContextBlockConte
 {
    Context *context = new Context();
    init_metaelement(context,get_line(ctx->name));
+   set_selection_source(context,ctx->name);
    context->Name = ctx->name->getText();
 
    push_context(context);

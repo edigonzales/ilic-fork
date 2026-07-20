@@ -16,6 +16,7 @@ struct SemanticSymbol {
    std::string kind;
    std::string containerId;
    SourceRange range;
+   SourceRange selectionRange;
    bool abstract = false;
 };
 
@@ -30,6 +31,7 @@ struct SemanticDependency {
    std::string sourceUri;
    std::string targetUri;
    std::string model;
+   SourceRange range;
 };
 
 struct DiagramMember {
@@ -80,6 +82,7 @@ struct SemanticSnapshot {
    bool cancelled = false;
    std::vector<std::string> roots;
    std::map<std::string,std::uint64_t> documentVersions;
+   std::vector<std::string> missingModels;
    std::vector<SemanticSymbol> symbols;
    std::vector<SemanticReference> references;
    std::vector<SemanticDependency> dependencies;

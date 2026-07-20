@@ -37,6 +37,8 @@ antlrcpp::Any Ili2Input::visitUnitDef(parser::Ili2Parser::UnitDefContext *ctx)
    // init Unit
    Unit *u = new Unit;
    init_extendableme(u,ctx->unitname->getLine());
+   set_selection_source(u,ctx->unitshort == nullptr
+      ? ctx->unitname : ctx->unitshort->getStop());
 
    // MetaElement Attributes
    u->_unitname = name;
@@ -53,6 +55,7 @@ antlrcpp::Any Ili2Input::visitUnitDef(parser::Ili2Parser::UnitDefContext *ctx)
       u->Abstract = true;
    }
    if (ctx->super != nullptr) {
+      set_reference_source(u,"inheritance",ctx->super);
       u->Super = find_unit(ctx->super->getText(),ctx->super->start->getLine());
       if (u->Super != nullptr) {
          u->Super->Sub.push_back(u);

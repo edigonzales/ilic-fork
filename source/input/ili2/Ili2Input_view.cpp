@@ -114,6 +114,7 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
    v->Name = name1;
    v->Kind = Class::ViewVal;
    init_class(v,get_line(ctx));
+   set_selection_source(v,ctx->viewname1);
    add_class(v); 
 
    map<string,bool> properties = get_properties(ctx->properties(),vector({ABSTRACT,FINAL,TRANSIENT,EXTENDED}));
@@ -129,6 +130,7 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
    
    if (properties[EXTENDED]) {
       v->Extended = true;
+      set_reference_source(v,"inheritance",ctx->viewname1);
       SubModel *topic = dynamic_cast<SubModel *>(get_package_context());
       Package *baseTopic = topic == nullptr ? nullptr : topic->_super;
       if (baseTopic == nullptr) {
@@ -149,6 +151,7 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
    }
 
    if (ctx->EXTENDS() != nullptr) {
+      set_reference_source(v,"inheritance",ctx->viewref);
       View* vv = find_view(visitPath(ctx->viewref),get_line(ctx->viewref));
       v->Super = vv;
    }
@@ -346,6 +349,11 @@ antlrcpp::Any Ili2Input::visitRenamedViewableRef(parser::Ili2Parser::RenamedView
    o->_baseclass = referencedViewable;
 
    AttrOrParam *a = new AttrOrParam;
+   antlr4::Token *aliasToken = ctx->basename == nullptr
+      ? ctx->path()->getStop() : ctx->basename;
+   init_extendableme(a,get_line(aliasToken));
+   set_selection_source(a,aliasToken);
+   set_reference_source(a,"type",ctx->path());
    a->_visible = false;
    a->AttrParent = get_class_context();
    a->Name = name;
@@ -486,6 +494,7 @@ antlrcpp::Any Ili2Input::visitViewAttribute(parser::Ili2Parser::ViewAttributeCon
       
       AttrOrParam *a = new AttrOrParam;
       init_extendableme(a,get_line(ctx->attributename));
+      set_selection_source(a,ctx->attributename);
       a->Name = name;
       a->Abstract = properties[ABSTRACT];
       a->Final = properties[FINAL];

@@ -29,6 +29,12 @@ struct SyntaxContext {
    SourceRange range;
 };
 
+struct SyntaxImportReference {
+   std::string model;
+   bool unqualified = false;
+   SourceRange range;
+};
+
 struct SyntaxSnapshot {
    bool success = false;
    std::string uri;
@@ -38,6 +44,7 @@ struct SyntaxSnapshot {
    std::vector<SyntaxNode> nodes;
    std::vector<SyntaxContext> contexts;
    std::vector<std::string> imports;
+   std::vector<SyntaxImportReference> importReferences;
    std::vector<Diagnostic> diagnostics;
 };
 

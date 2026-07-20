@@ -59,6 +59,7 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
    
    Model *m = new Model();
    init_package(m,get_line(ctx));
+   set_selection_source(m,ctx->modelname1);
 
    // Model Attributes
    m->Name = name1;
@@ -249,6 +250,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    // init topic
    SubModel *s = new SubModel();
    init_package(s,get_line(ctx->topicname1));
+   set_selection_source(s,ctx->topicname1);
    s->Name = name1;
    add_package(s);
    push_context(s);
@@ -266,6 +268,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    d->Final = properties[FINAL];
 
    if (ctx->topicbase != nullptr) {
+      set_reference_source(s,"inheritance",ctx->topicbase);
       SubModel *ss = find_topic(visitPath(ctx->topicbase), get_line(ctx->topicbase));
       s->_super = ss;
       if (ss != nullptr) {

@@ -30,6 +30,7 @@ export interface RepositoryManagerOptions {
   modelTtlMs?: number;
   allowStaleOnError?: boolean;
   followSiteLinks?: boolean;
+  onWarning?: (warning: { uri: string; operation: "metadata" | "model"; message: string }) => void;
 }
 export interface ResolvedWorkspace {
   models: Array<{ metadata: ModelMetadata; uri: string; source: string; fromCache: boolean }>;

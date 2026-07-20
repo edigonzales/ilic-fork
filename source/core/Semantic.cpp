@@ -84,14 +84,17 @@ public:
    {
       for (auto *element : ordered_) {
          const std::string sourceId = id(element);
+         if (auto *topic = dynamic_cast<metamodel::SubModel *>(element)) {
+            addReference(sourceId,topic->_super,"inheritance",element);
+         }
          if (auto *extendable = dynamic_cast<metamodel::ExtendableME *>(element)) {
-            addReference(sourceId,extendable->Super,"inheritance",element->_source);
+            addReference(sourceId,extendable->Super,"inheritance",element);
          }
          if (auto *attribute = dynamic_cast<metamodel::AttrOrParam *>(element)) {
-            addReference(sourceId,attribute->Type,"type",element->_source);
+            addReference(sourceId,typeTarget(attribute->Type),"type",element);
          }
          if (auto *role = dynamic_cast<metamodel::Role *>(element)) {
-            addReference(sourceId,role->_baseclass,"role",element->_source);
+            addReference(sourceId,role->_baseclass,"role",element);
          }
       }
       addDiagramEdges();
@@ -102,6 +105,20 @@ private:
    std::map<metamodel::MetaElement *,std::string> ids_;
    std::vector<metamodel::MetaElement *> ordered_;
    std::set<std::string> diagramNodeIds_;
+
+   metamodel::MetaElement *typeTarget(metamodel::Type *type) const
+   {
+      if (type == nullptr) return nullptr;
+      if (!id(type).empty()) return type;
+      if (type->Super != nullptr && !id(type->Super).empty()) return type->Super;
+      if (auto *related = dynamic_cast<metamodel::TypeRelatedType *>(type)) {
+         if (related->BaseType != nullptr && !id(related->BaseType).empty())
+            return related->BaseType;
+      }
+      if (auto *related = dynamic_cast<metamodel::ClassRelatedType *>(type))
+         return related->_baseclass;
+      return nullptr;
+   }
 
    std::string id(metamodel::MetaElement *element) const
    {
@@ -119,7 +136,7 @@ private:
       ids_[element] = symbolId;
       ordered_.push_back(element);
       snapshot_.symbols.push_back({symbolId,element->Name,qualifiedName,kind,containerId,
-         element->_source,isAbstract(element)});
+         element->_source,element->_selectionSource,isAbstract(element)});
       snapshot_.documentation.sections.push_back({symbolId,
          element->Name.empty() ? element->getClass() : element->Name,
          kind,documentation(element),level});
@@ -163,10 +180,15 @@ private:
    }
 
    void addReference(const std::string &sourceId,metamodel::MetaElement *target,
-      const std::string &kind,const SourceRange &range)
+      const std::string &kind,const metamodel::MMObject *source)
    {
       const std::string targetId = id(target);
       if (sourceId.empty() || targetId.empty()) return;
+      SourceRange range;
+      if (source != nullptr) {
+         auto found = source->_referenceSources.find(kind);
+         if (found != source->_referenceSources.end()) range = found->second;
+      }
       snapshot_.references.push_back({sourceId,targetId,kind,range});
    }
 
@@ -209,25 +231,60 @@ SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
    snapshot.roots = request.roots;
    snapshot.diagnostics = compilation.diagnostics;
    snapshot.logs = compilation.logs;
+   snapshot.missingModels = compilation.missingModels;
    for (const auto &uri : sources.uris()) {
       if (const SourceBuffer *source = sources.get(uri))
          snapshot.documentVersions[uri] = source->version;
    }
 
    std::map<std::string,std::string> modelUris;
+   std::map<std::string,std::string> uriModels;
    for (const auto &model : compilation.models) modelUris[model.name] = model.uri;
+   for (const auto &model : compilation.models) uriModels[model.uri] = model.name;
+   std::map<std::string,SyntaxSnapshot> syntaxByUri;
    for (const auto &uri : sources.uris()) {
-      const SyntaxSnapshot syntax = parseSyntax(sources,uri);
-      for (const auto &model : syntax.imports) {
-         auto found = modelUris.find(model);
-         if (found != modelUris.end()) snapshot.dependencies.push_back({uri,found->second,model});
+      SyntaxSnapshot syntax = parseSyntax(sources,uri);
+      for (const auto &reference : syntax.importReferences) {
+         auto found = modelUris.find(reference.model);
+         if (found != modelUris.end())
+            snapshot.dependencies.push_back({uri,found->second,reference.model,reference.range});
       }
+      syntaxByUri.emplace(uri,std::move(syntax));
    }
 
    if (compilation.success) {
       SnapshotBuilder builder(snapshot);
       for (auto *model : metamodel::get_all_models()) builder.addModel(model);
       builder.finishReferences();
+
+      std::map<std::string,const SemanticSymbol *> modelSymbols;
+      for (const auto &symbol : snapshot.symbols)
+         if (symbol.kind == "model") modelSymbols[symbol.name] = &symbol;
+      for (const auto &dependency : snapshot.dependencies) {
+         auto sourceName = uriModels.find(dependency.sourceUri);
+         auto target = modelSymbols.find(dependency.model);
+         if (sourceName == uriModels.end() || target == modelSymbols.end()) continue;
+         auto source = modelSymbols.find(sourceName->second);
+         if (source == modelSymbols.end()) continue;
+         snapshot.references.push_back({source->second->id,target->second->id,
+            "import",dependency.range});
+      }
+      for (const auto &entry : syntaxByUri) {
+         auto sourceName = uriModels.find(entry.first);
+         if (sourceName == uriModels.end()) continue;
+         auto source = modelSymbols.find(sourceName->second);
+         if (source == modelSymbols.end()) continue;
+         std::vector<SyntaxToken> tokens;
+         for (const auto &token : entry.second.tokens)
+            if (token.channel == 0) tokens.push_back(token);
+         for (std::size_t index = 0; index + 2 < tokens.size(); ++index) {
+            if (tokens[index + 1].text != "." || tokens[index + 2].kind != "NAME") continue;
+            auto target = modelSymbols.find(tokens[index].text);
+            if (target == modelSymbols.end()) continue;
+            snapshot.references.push_back({source->second->id,target->second->id,
+               "qualifier",tokens[index].range});
+         }
+      }
    }
    return snapshot;
 }

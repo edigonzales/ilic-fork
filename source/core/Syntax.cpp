@@ -17,14 +17,29 @@
 namespace ilic {
 namespace {
 
+std::size_t utf8ByteOffset(const std::string &text,std::size_t codepointOffset)
+{
+   std::size_t byteOffset = 0;
+   for (std::size_t index = 0; index < codepointOffset && byteOffset < text.size(); ++index) {
+      const unsigned char lead = static_cast<unsigned char>(text[byteOffset]);
+      std::size_t width = 1;
+      if ((lead & 0xe0) == 0xc0) width = 2;
+      else if ((lead & 0xf0) == 0xe0) width = 3;
+      else if ((lead & 0xf8) == 0xf0) width = 4;
+      byteOffset = std::min(text.size(),byteOffset + width);
+   }
+   return byteOffset;
+}
+
 SourceRange rangeAt(const SourceManager &sources,const std::string &uri,
    std::size_t start,std::size_t end)
 {
    const SourceBuffer *source = sources.get(uri);
    SourceRange value;
    if (source == nullptr) return value;
-   start = std::min(start,source->text.size());
-   end = std::min(std::max(end,start),source->text.size());
+   const std::size_t startCodepoint = start;
+   start = utf8ByteOffset(source->text,startCodepoint);
+   end = utf8ByteOffset(source->text,std::max(end,startCodepoint));
    const SourcePosition startPosition = sources.position(uri,start);
    const SourcePosition endPosition = sources.position(uri,end);
    value.uri = uri;
@@ -154,8 +169,17 @@ SyntaxSnapshot parseIli2(const SourceManager &sources,const SourceBuffer &source
       for (auto *model : root->modelDef()) {
          for (auto *definition : model->importDef()) {
             for (auto *importing : definition->importing()) {
-               if (importing->INTERLIS() != nullptr) snapshot.imports.push_back("INTERLIS");
-               else if (importing->NAME() != nullptr) snapshot.imports.push_back(importing->NAME()->getText());
+               antlr4::tree::TerminalNode *name = importing->INTERLIS();
+               if (name == nullptr) name = importing->NAME();
+               if (name == nullptr) continue;
+               const std::string modelName = name->getText();
+               snapshot.imports.push_back(modelName);
+               antlr4::Token *token = name->getSymbol();
+               const SourceRange importRange = token == nullptr
+                  ? SourceRange{}
+                  : rangeAt(sources,source.uri,token->getStartIndex(),token->getStopIndex() + 1);
+               snapshot.importReferences.push_back({modelName,
+                  importing->UNQUALIFIED() != nullptr,importRange});
             }
          }
       }

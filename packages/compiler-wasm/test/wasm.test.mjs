@@ -56,3 +56,31 @@ END WaesmInvalid.
     diagnostic.range?.uri === invalidUri && diagnostic.range.start.line === 4));
   session.dispose();
 });
+
+test("keeps the WASM session usable while an editor buffer is incomplete", {
+  skip: existsSync(modulePath) ? false : "build/wasm/ilic.mjs has not been built"
+}, async () => {
+  const compiler = await createCompiler();
+  const session = compiler.createSession();
+  const uri = "memory:///LiveEdit.ili";
+  const source = `INTERLIS 2.4;
+MODEL LiveEdit (en) AT "https://example.invalid" VERSION "1" =
+END LiveEdit.
+`;
+  for (let length = 1; length < source.length; length += 3) {
+    session.putSource(uri, source.slice(0, length), length);
+    const syntax = session.parse(uri);
+    assert.equal(syntax.kind, "syntax");
+    assert.equal(syntax.documentVersion, length);
+  }
+  session.putSource(uri, source, source.length);
+  const syntax = session.parse(uri);
+  assert.equal(syntax.success, true, JSON.stringify(syntax.diagnostics));
+  const compilation = session.compile({ roots: [uri] });
+  assert.equal(
+    compilation.success,
+    true,
+    JSON.stringify(compilation.diagnostics),
+  );
+  session.dispose();
+});

@@ -52,6 +52,10 @@ namespace metamodel {
    public:
       int _line = -1;
       ilic::SourceRange _source;
+      // Exact parser-token locations used by editor-facing semantic snapshots.
+      // They are internal metadata and are not part of the IlisMeta transfer model.
+      ilic::SourceRange _selectionSource;
+      map<string,ilic::SourceRange> _referenceSources;
       virtual string getClass() { return "MMObject"; };
       virtual string getBaseClass() { return ""; };
       virtual bool isAbstract() { return true; };

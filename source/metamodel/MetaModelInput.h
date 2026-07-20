@@ -18,6 +18,10 @@ namespace metamodel {
 
    // mmobject helpers
    void init_mmobject(MMObject *o, int line);
+   void set_selection_source(MetaElement *element,antlr4::Token *token);
+   void set_reference_source(MMObject *object,const string &kind,antlr4::Token *token);
+   void set_reference_source(MMObject *object,const string &kind,
+      antlr4::ParserRuleContext *context);
    
    // metaelement helpers
    void init_metaelement(MetaElement *e, int line);
