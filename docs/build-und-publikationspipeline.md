@@ -65,6 +65,8 @@ mit statischen OpenSSL-Libraries und Windows x86_64 Schannel samt statischer
 MSVC-Runtime. Nach CTest folgen plattformspezifische Runtime-Dependency-Checks,
 lokale Smoke-Tests und die Archive `ilic-macos-arm64.tar.gz`,
 `ilic-linux-x86_64.tar.gz` und `ilic-windows-x86_64.zip`.
+Die technischen Einzelheiten des Windows-Pfads stehen unter
+[Windows-Build-Stack](build-und-installation.md#windows-build-stack).
 
 ### 3. Reproduzierbarer WASM-Build
 

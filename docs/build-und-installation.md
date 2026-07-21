@@ -13,6 +13,68 @@ per SHA256 gepinnten Quellarchiv statisch gebaut. Im normalen Modus wird eine
 installierte libcurl verwendet; libxml2 wird nicht benötigt. Im Static-Modus
 wird auch curl 8.10.1 aus einem gepinnten Quellarchiv gebaut.
 
+## ANTLR-Runtime
+
+Die ANTLR-4.7.1-C++-Runtime ist im Repository enthalten. Unter
+`lib/antlr4/include` liegen sowohl die Header als auch die zugehörigen
+`.cpp`-Quelldateien. Der Name des Verzeichnisses ist historisch; es handelt
+sich nicht nur um Header-Dateien und es wird keine ANTLR-Runtime aus dem
+Internet geladen.
+
+Der normale CMake-Build kompiliert diese Quelldateien selbst als statische
+Bibliothek `antlr4-runtime`. Das daraus entstehende `libantlr4-runtime.a`
+beziehungsweise `antlr4-runtime.lib` ist ein Buildartefakt; zur Laufzeit muss
+keine separate ANTLR-DLL installiert werden.
+
+`lib/antlr4/bin.zip` enthält die zum ursprünglichen Visual-Studio-Build
+gehörigen vorgebauten statischen Bibliotheken sowie den passenden
+ANTLR-4.7.1-Java-Generator. Für einen normalen CMake-Build wird die
+vorgebaute Runtime daraus nicht verwendet. Das Target
+`check-parser-regeneration` extrahiert bei Bedarf nur den passenden Generator
+in ein temporäres Verzeichnis. Dadurch bleiben die eingecheckten generierten
+Parserdateien unverändert.
+
+Die Header deklarieren öffentliche ANTLR-Symbole über `ANTLR4CPP_PUBLIC`.
+`ANTLR4CPP_STATIC` teilt ihnen mit, dass diese Symbole aus einer statischen
+Bibliothek kommen und nicht als `__declspec(dllimport)` aus einer DLL importiert
+werden sollen. Die Definition wird in CMake als öffentliche
+Target-Compile-Definition weitergereicht, damit Runtime und alle abhängigen
+Targets dieselbe Symbolsemantik verwenden. Das Makro schaltet den statischen
+Link nicht selbst ein; dafür sorgt `add_library(antlr4-runtime STATIC ...)`.
+
+`ANTLR4CPP_STATIC` ist außerdem unabhängig von der statischen MSVC-Runtime:
+Das ANTLR-Makro steuert nur die Export-/Import-Deklarationen der ANTLR-Symbole,
+während `/MT` die Microsoft-C++-Runtime in das Programm einbindet.
+
+## Windows-Build-Stack
+
+Der aktuelle Fork baut Windows x86_64 über CMake und ein daraus generiertes
+Visual-Studio-Projekt. Die GitHub-Actions konfigurieren mit `cmake -A x64` und
+verwenden die MSVC-Toolchain des Windows-Runners. Für die statische
+Distribution setzt CMake die statische MSVC-Runtime (`/MT`), baut curl mit
+Windows Schannel und prüft anschließend mit
+`scripts/check-windows-runtime-deps.ps1`, dass keine curl-, XML- oder
+MSVC-Runtime-DLL neben dem Programm benötigt wird.
+
+Das ist ein anderer Buildpfad als im ursprünglichen
+[`infogrips/ilic`](https://github.com/infogrips/ilic). Dort beschreibt
+`build/vc2019/ilic.vcxproj` ein handgepflegtes Visual-Studio-Projekt mit dem
+`ClangCL`-Toolset und referenziert vorgebaute
+`antlr4-runtime.lib`-Dateien aus einem `Static`-Verzeichnis. Auch dieser
+Upstream-Pfad ist statisch gelinkt; der Unterschied liegt in der Bereitstellung
+der Runtime und in der Toolchain. Der Fork baut die bereits eingecheckten
+ANTLR-Quellen reproduzierbar selbst und validiert den Windows-Build in der
+CI.
+
+Die Windows-CI hat dadurch Portabilitätsprobleme sichtbar gemacht, die im
+vorbereiteten Upstream-Build nicht auftraten. `C2491` entstand, weil MSVC beim
+Übersetzen der statischen ANTLR-Runtime ohne `ANTLR4CPP_STATIC` fälschlich
+`dllimport`-Deklarationen sah. Der Fehler bei `std::replace` in
+`RepositoryUri.cpp` war eine separate MSVC-Typüberladung zwischen `char` und
+`wchar_t`. Beide Korrekturen betreffen die Kompatibilität des neuen
+CMake/MSVC-Buildpfads und ändern nicht die öffentliche Compiler- oder
+Repository-API.
+
 ## Normaler Build
 
 ```sh

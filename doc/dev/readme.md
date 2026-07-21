@@ -19,14 +19,25 @@ ilic was completely built from scratch, this is no c++ port of the
 + supported input formats: INTERLIS 1.0, 2.3 and 2.4
 + supported output formats: INTERLIS 1.0, 2.3 and 2.4, imd, xsd, gml
 
-## How to build ilic?
-Unpack the static libraries in \lib\antlr4\bin.zip to folder \lib\antlr4\bin. To compile 
-the c++ source files you will need Visual Studio 2019 community edition (VS). A preconfigured 
-project file for VS can be found in /build/vc2019. If you need to modify the ANTLR4 grammar 
-files in folder /source/input/parser/grammar, you have to generate c++ source from ANTLR4 
-definition files first. To do this, use the batch file /build/scripts/a.bat. As ANTLR4 is 
-a Java based utility a Java Runtime or JDK must be present on the development machine 
-(java.exe has to work from the command line).
+## Historischer Upstream-Windows-Build
+
+Die folgenden Hinweise beschreiben den ursprünglichen Visual-Studio-Pfad des
+Upstream-Repositories. Dafür werden die vorgebauten statischen Bibliotheken aus
+`lib/antlr4/bin.zip` nach `lib/antlr4/bin` entpackt und das vorbereitete Projekt
+unter `build/vc2019` mit Visual Studio verwendet. Dieser Pfad ist für die
+Historie des Projekts dokumentiert, aber nicht der aktuelle CMake-Build des
+Forks.
+
+Für den aktuellen lokalen Build, den Windows-CI-Stack und die Erklärung der
+ANTLR-Runtime siehe [Build und Installation](../../docs/build-und-installation.md),
+insbesondere [ANTLR-Runtime](../../docs/build-und-installation.md#antlr-runtime)
+und [Windows-Build-Stack](../../docs/build-und-installation.md#windows-build-stack).
+
+Wenn ANTLR-Grammatiken unter `/source/input/parser/grammar` geändert werden,
+müssen die C++-Parserdateien mit dem passenden ANTLR-4.7.1-Generator neu erzeugt
+werden. Die aktuelle, nicht überschreibende Prüfung ist unter
+[Parser-Regeneration](../../docs/build-und-installation.md#parser-regeneration)
+beschrieben.
 
 ## Additional Information
 + [ilic overall architecture](./architecture.md)
