@@ -1,185 +1,138 @@
 # Build und Installation
 
-[Dokumentationsindex](README.md) · [Beispiele](examples/README.md) · [WASM](wasm.md)
+[Dokumentationsindex](README.md) · [Beispiele](examples/README.md) · [Repositories](repositories.md)
 
-## Voraussetzungen für den nativen Build
+## Voraussetzungen
 
-- CMake 3.20 oder neuer;
-- ein C11- und C++17-Compiler;
-- libcurl und libxml2 für die native Repository-Unterstützung;
-- Git nur zum Beziehen des Quellcodes.
+Der native Build benötigt CMake 3.20 oder neuer sowie einen C11- und
+C++17-Compiler. Die ANTLR-4.7.1-Runtime, generierten Parser und Sources liegen
+im Repository. Java ist nur für eine absichtliche Parser-Regeneration nötig.
 
-Der ANTLR-4.7.1-C++-Runtime und die generierten Parser sind eingecheckt. Ein
-normaler Build und der laufende Compiler benötigen weder Java noch ein
-installiertes ANTLR. Java ist nur für eine absichtliche Parser-Regeneration und
-für die externe Conformance-Suite nötig.
+Bei aktivierter nativer Repository-Unterstützung wird pugixml 1.14 aus einem
+per SHA256 gepinnten Quellarchiv statisch gebaut. Im normalen Modus wird eine
+installierte libcurl verwendet; libxml2 wird nicht benötigt. Im Static-Modus
+wird auch curl 8.10.1 aus einem gepinnten Quellarchiv gebaut.
 
-## Nativer Debug-Build
-
-```sh
-cmake -S . -B build/macos \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DBUILD_TESTING=ON
-cmake --build build/macos --parallel
-ctest --test-dir build/macos --output-on-failure
-build/macos/ilic -version
-```
-
-Wichtige Artefakte:
-
-| Artefakt | Zweck |
-| --- | --- |
-| `build/macos/ilic` | Compiler-CLI |
-| `build/macos/ilic-format` | Formatter-CLI |
-| `build/macos/libilic-core.a` | C++-Compiler-Core |
-| `build/macos/libilic-capi.a` | statische C-ABI |
-| `build/macos/libilic-repository.a` | native Repository-Library |
-
-Der Ordnername `build/macos` ist keine CMake-Vorgabe. Auf Linux kann
-beispielsweise `build/linux` verwendet werden.
-
-## Release-Build
+## Normaler Build
 
 ```sh
-cmake -S . -B build/release \
+cmake -S . -B build/native \
   -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=OFF
-cmake --build build/release --parallel
+  -DBUILD_TESTING=ON
+cmake --build build/native --parallel
+ctest --test-dir build/native --output-on-failure
+build/native/ilic -version
 ```
 
-Repository-Unterstützung lässt sich für einen Core-only-Build deaktivieren:
+Wichtige Artefakte sind `ilic`, `ilic-format`, `libilic-core.a`,
+`libilic-capi.a` und bei nativer Repository-Unterstützung
+`libilic-repository.a`.
+
+## Core-only
 
 ```sh
 cmake -S . -B build/core-only \
+  -DCMAKE_BUILD_TYPE=Release \
   -DILIC_ENABLE_NATIVE_REPOSITORY=OFF
 cmake --build build/core-only --parallel
 ```
 
-Dann fehlen `-repositories`, `-models` und `ilic-repository`; die lokale Suche
-mit `-ilidirs` bleibt Bestandteil des Compilers.
+Dieser Modus konfiguriert weder curl noch pugixml und baut kein
+`ilic-repository`. Compiler-Core, C-API, Formatter, lokale `-ilidirs`-Suche und
+die zugehörigen Tests bleiben verfügbar. Repository-Optionen stehen in diesem
+Binary nicht als Funktion zur Verfügung.
+
+## Statische Distribution
+
+```sh
+cmake -S . -B build/static \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=ON \
+  -DILIC_STATIC_DISTRIBUTION=ON
+cmake --build build/static --parallel
+ctest --test-dir build/static --output-on-failure
+```
+
+Der Modus baut HTTP(S)-only curl statisch und deaktiviert unnötige Protokolle
+und optionale Kompressions-/Netzwerkabhängigkeiten. TLS verwendet auf macOS
+Secure Transport, auf Windows Schannel und im Linux-Release statische OpenSSL-
+Libraries. Die MSVC-Runtime wird über `CMAKE_MSVC_RUNTIME_LIBRARY` statisch
+gelinkt; Linux erhält einen vollständig statischen Link.
+
+Unterstützte Release-Artefakte:
+
+| Plattform | Artefakt | Prüfung |
+| --- | --- | --- |
+| macOS ARM64 | `ilic-macos-arm64.tar.gz` | nur Apple-Systemframeworks und `/usr/lib` laut `otool -L` |
+| Linux x86_64 (musl) | `ilic-linux-x86_64.tar.gz` | kein dynamischer Interpreter und keine `NEEDED`-Einträge |
+| Windows x86_64 | `ilic-windows-x86_64.zip` | keine curl-, XML- oder MSVC-Runtime-DLL |
+
+Die Prüfskripte sind `scripts/check-macos-runtime-deps.sh`,
+`scripts/check-linux-static.sh` und `scripts/check-windows-runtime-deps.ps1`.
+Der Workflow `.github/workflows/build-native-release.yml` baut, testet,
+smoke-testet und paketiert alle drei Plattformen. macOS x86_64 gehört nicht zur
+Release-Matrix.
 
 ## Parser-Regeneration
 
-Die Grammatiken liegen unter `source/input/parser/grammar`, die erzeugten
-Dateien unter `source/input/parser/generated`. Die normale Buildkette verändert
-diese Dateien nicht. Der reproduzierbare Vergleich verwendet exakt den
-mitgelieferten ANTLR-Generator:
-
 ```sh
-cmake --build build/macos --target check-parser-regeneration
+cmake --build build/native --target check-parser-regeneration
 ```
 
-Der Target generiert in einem temporären Buildverzeichnis und meldet Diffs,
-ohne eingecheckte Parserdateien zu überschreiben.
+Das Target verwendet den mitgelieferten ANTLR-4.7.1-Generator in einem
+temporären Buildverzeichnis und überschreibt keine eingecheckten Parserdateien.
 
-## WebAssembly
+## Emscripten SDK einmalig installieren
 
-Die unterstützte Emscripten-Version steht in `.emscripten-version` und ist
-aktuell `3.1.64`.
-
-### Emscripten SDK einmalig installieren
-
-Das offizielle `emsdk` kann an einem beliebigen Ort ausserhalb dieses
-Repositories installiert werden. Im folgenden Beispiel müssen nur die beiden
-Pfade angepasst werden:
+Die unterstützte Version steht in `.emscripten-version`. Das SDK kann außerhalb
+des Repositories installiert und für das aktuelle Terminal aktiviert werden:
 
 ```sh
-cd /pfad/zu/ilic-fork
 export ILIC_EMSDK_DIR=/pfad/zu/emsdk
-
 git clone https://github.com/emscripten-core/emsdk.git "$ILIC_EMSDK_DIR"
-
 ILIC_EMSCRIPTEN_VERSION="$(tr -d '[:space:]' < .emscripten-version)"
 "$ILIC_EMSDK_DIR/emsdk" install "$ILIC_EMSCRIPTEN_VERSION"
 "$ILIC_EMSDK_DIR/emsdk" activate "$ILIC_EMSCRIPTEN_VERSION"
 source "$ILIC_EMSDK_DIR/emsdk_env.sh"
+```
 
-emcc --version
+Die Aktivierung verändert nur die aktuelle Shell und muss in einem neuen
+Terminal wiederholt werden.
+
+## WebAssembly
+
+Mit aktivierter, zu `.emscripten-version` passender Umgebung:
+
+```sh
 ./scripts/build-wasm.sh
 npm test --prefix packages/compiler-wasm
 ```
 
-`emsdk install` lädt die gepinnte Toolchain herunter. `emsdk activate` wählt
-sie innerhalb der SDK-Installation aus. `source emsdk_env.sh` ergänzt unter
-anderem `PATH` nur für das aktuelle Terminal. In jedem neu geöffneten Terminal
-muss die Umgebung deshalb erneut geladen werden:
+Erzeugt werden `build/wasm/ilic.mjs`, `build/wasm/ilic.wasm` und Kopien im
+Paket `packages/compiler-wasm`. Der WASM-Build hängt nicht von der nativen
+Repository-Library ab; Repository-Zugriffe übernimmt `@ilic/tools` im Host.
+
+## npm-Pakete
+
+Nach dem WASM-Build lassen sich Snapshot-Tarballs reproduzierbar vorbereiten
+und als echte Konsumenten testen:
 
 ```sh
-cd /pfad/zu/ilic-fork
-export ILIC_EMSDK_DIR=/pfad/zu/emsdk
-source "$ILIC_EMSDK_DIR/emsdk_env.sh"
-emcc --version
-```
-
-Eine dauerhaft globale Aktivierung ist nicht erforderlich. Dadurch können
-andere Projekte weiterhin eine andere Emscripten-Version verwenden.
-
-### WASM bauen
-
-Mit aktivierter Emscripten-Umgebung wird der Build aus dem Projektverzeichnis
-gestartet:
-
-```sh
-cd /pfad/zu/ilic-fork
-source /pfad/zu/emsdk/emsdk_env.sh
-
-./scripts/build-wasm.sh
-npm test --prefix packages/compiler-wasm
-```
-
-`scripts/build-wasm.sh` vergleicht `emcc --version` mit
-`.emscripten-version` und bricht ab, falls eine andere Version aktiv ist.
-
-Erzeugt werden:
-
-- `build/wasm/ilic.mjs`;
-- `build/wasm/ilic.wasm`;
-- lokale Kopien beider Dateien in `packages/compiler-wasm`.
-
-Die WASM-Dateien sind Buildartefakte und werden nicht eingecheckt.
-
-## Lokale npm-Pakete
-
-Für lokale und publizierbare Tarballs müssen zuerst die WASM-Artefakte gebaut
-werden. Das Snapshot-Staging liest die CMake-Projektversion, ergänzt einen
-gemeinsamen UTC-Zeitstempel und verändert die Quell-Manifeste nicht:
-
-```sh
-./scripts/build-wasm.sh
 node scripts/prepare-npm-snapshot.mjs
 node scripts/test-npm-packages.mjs
 ```
 
-Die geprüften Tarballs liegen danach unter `build/npm/tarballs`. Ein anderes
-Projekt kann sie direkt installieren:
-
-```sh
-npm install /pfad/zu/build/npm/tarballs/ilic-compiler-wasm-0.9.9-SNAPSHOT.ZEITSTEMPEL.tgz
-npm install /pfad/zu/build/npm/tarballs/ilic-tools-0.9.9-SNAPSHOT.ZEITSTEMPEL.tgz
-```
-
-Die öffentliche Snapshot-Publikation, der einmalige Bootstrap und die
-OIDC-Authentisierung sind unter [npm-Publikation](npm-publikation.md)
-dokumentiert. Bis dieser Bootstrap auf npmjs.com durchgeführt wurde, bleiben
-die lokalen Tarballs der verlässliche Installationsweg.
-
-Für die Entwicklung im Checkout importieren die
-[JavaScript-Beispiele](examples/README.md#webassembly-und-javascript) direkt aus
-`packages/`.
+Details zu Versionierung, OIDC und Veröffentlichung stehen unter
+[npm-Publikation](npm-publikation.md).
 
 ## Testgruppen
 
 ```sh
-# Native Unit-, Regression-, Repository- und Dokumentationstests
-ctest --test-dir build/macos --output-on-failure
-
-# Repository-Hostbibliothek
+ctest --test-dir build/native --output-on-failure
 npm test --prefix packages/tools
-
-# Reales WASM und dokumentierte JS-Beispiele
 ./scripts/build-wasm.sh
 npm test --prefix packages/compiler-wasm
 ```
 
-Die externe 571-Fälle-Messung ist getrennt und wird unter
-[Compiler-Conformance](conformance.md) beschrieben.
+Die normale CTest-Suite benötigt für Repository-Tests kein externes Netzwerk;
+sie verwendet lokale gemeinsame Fixtures und Fake-Transporte.

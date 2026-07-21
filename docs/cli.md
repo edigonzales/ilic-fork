@@ -38,7 +38,9 @@ build/macos/ilic --silent docs/examples/models/Legacy.ili
 | `-ilidirs` | Verzeichnisliste | Lokale Suchverzeichnisse, vorzugsweise mit Semikolon getrennt; Kommas werden ebenfalls verarbeitet. |
 | `-no_auto` | – | Unterbindet die automatische Suche nach fehlenden Imports. Bereits explizit geladene Dateien bleiben verfügbar. |
 | `-repositories` | URI-Liste | Geordnete lokale, `file://`- oder HTTP(S)-Repositories; Semikolon oder Komma als Trenner. |
-| `-models` | Modellnamen | Kommagetrennte Root-Modelle, die über `-repositories` aufgelöst werden. |
+| `-models` | Modellnamen | Komma- oder semikolongetrennte Root-Modelle, die über Repositories aufgelöst werden. |
+| `--ili-version` | `1.0`, `2.3` oder `2.4` | Schränkt die Repository-Suche exakt auf `ili1`, `ili2_3` oder `ili2_4` ein. Ohne Option gilt `ili2_4`, dann `ili2_3`, dann `ili1`. |
+| `--no-default-repositories` | – | Verwendet nur explizite `-repositories` und unterdrückt `https://models.interlis.ch`. |
 
 Lokaler Import:
 
@@ -60,21 +62,45 @@ Repository-Modell ohne manuelles Herunterladen:
 
 ```sh
 build/macos/ilic -silent \
-  -repositories https://models.interlis.ch \
-  -models DatasetIdx16
+  -models DatasetIdx16 \
+  --ili-version 2.3
 ```
+
+Ohne `-repositories` ergänzt die CLI `https://models.interlis.ch`. Explizite
+Repositories werden davor durchsucht und normalisierte Duplikate entfernt.
 
 Ein lokales Repository kann genauso verwendet werden:
 
 ```sh
 build/macos/ilic -silent \
   -repositories test/repository/fixture \
-  -models RepositoryRoot
+  --no-default-repositories \
+  -models RepositoryRoot \
+  --ili-version 2.3
 ```
 
-Wenn Eingabedateien Imports enthalten, sucht die CLI zuerst in bereits
-geladenen Dateien und `-ilidirs`. Nur wenn dort nichts gefunden wird, greift sie
-auf den konfigurierten `RepositoryManager` zurück.
+`--ili-version` akzeptiert ausschließlich `1.0`, `2.3` und `2.4`; Werte wie
+`2.2`, `2`, `ili2_4` oder `foo` führen zu einem Argumentfehler.
+
+`-models` benötigt mindestens ein effektives Repository. Deshalb ist
+`-models DatasetIdx16 --no-default-repositories` ohne `-repositories` ein
+kontrollierter Fehler. Nur `-repositories` oder nur `--ili-version` ohne
+`.ili`-Datei und ohne Root-Modell wird ebenfalls mit
+`no input .ili files or root models specified` abgewiesen.
+
+Bei Imports einer expliziten Datei gilt folgende Reihenfolge:
+
+1. bereits geladene Modelle;
+2. virtuelle Quellen der `CompilerSession`;
+3. lokale Suche über `-ilidirs`;
+4. explizite Repositories;
+5. Default-Repositories.
+
+Damit ist `-repositories` ohne `-models` gültig, sofern mindestens eine
+explizite `.ili`-Datei vorliegt; das Repository dient dann als Import-Fallback.
+Repository-Diagnostics werden unabhängig vom Gesamterfolg ausgegeben, sodass
+eine Warning über einen ausgefallenen frühen Seed sichtbar bleibt, wenn ein
+späterer Seed das Modell liefert.
 
 ## Ausgabeoptionen
 

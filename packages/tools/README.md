@@ -33,8 +33,9 @@ console.log(workspace.models.map(model => model.metadata.name));
 
 `resolveWorkspace` gibt die Dateien dependency-first zurück. `INTERLIS` gilt
 als eingebaut und wird nicht heruntergeladen. Frühere Repositories haben
-Vorrang; innerhalb desselben Repository wird die lexikografisch höchste
-Version gewählt.
+Vorrang. Innerhalb desselben Repository wird die aktuelle Version über die
+`Version`-/`precursorVersion`-Kette gewählt; `browseOnly=true` ist nicht
+kompilierbar. Ohne Sprachargument gilt `ili2_4`, dann `ili2_3`, dann `ili1`.
 
 ## Ephemerer Cache und eigener Transport
 

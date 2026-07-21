@@ -1,0 +1,104 @@
+name: Build native release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify ARM64 runner
+        run: test "$(uname -m)" = "arm64"
+      - name: Configure and build
+        run: |
+          cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=ON
+          cmake --build build/release --parallel
+          ctest --test-dir build/release --output-on-failure
+      - name: Verify and smoke-test binary
+        run: |
+          scripts/check-macos-runtime-deps.sh build/release/ilic
+          build/release/ilic -version
+          build/release/ilic -silent docs/examples/models/Legacy.ili
+          build/release/ilic -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
+          build/release/ilic -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
+      - name: Package
+        run: tar -czf ilic-macos-arm64.tar.gz -C build/release ilic
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ilic-macos-arm64
+          path: ilic-macos-arm64.tar.gz
+          if-no-files-found: error
+
+  build-linux-x86_64:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Build and verify in pinned musl image
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "x86_64"
+          docker run --rm -v "$PWD:/src" -w /src alpine:3.20.3 sh -euxc '
+            apk add --no-cache build-base cmake ninja perl linux-headers openssl-dev openssl-libs-static file binutils
+            cmake -S . -B build/release-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=ON
+            cmake --build build/release-linux --parallel
+            ctest --test-dir build/release-linux --output-on-failure
+            scripts/check-linux-static.sh build/release-linux/ilic
+            build/release-linux/ilic -version
+            build/release-linux/ilic -silent docs/examples/models/Legacy.ili
+            build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
+            build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
+            tar -czf ilic-linux-x86_64.tar.gz -C build/release-linux ilic
+          '
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ilic-linux-x86_64
+          path: ilic-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+  build-windows-x86_64:
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify x86_64 runner
+        shell: pwsh
+        run: |
+          if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
+            throw "x86_64 Windows is required"
+          }
+      - name: Configure, build and test
+        run: |
+          cmake -S . -B build/release -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=ON
+          cmake --build build/release --config Release --parallel
+          ctest --test-dir build/release -C Release --output-on-failure
+      - name: Verify and smoke-test binary
+        shell: pwsh
+        run: |
+          ./scripts/check-windows-runtime-deps.ps1 -Binary build/release/Release/ilic.exe
+          build/release/Release/ilic.exe -version
+          build/release/Release/ilic.exe -silent docs/examples/models/Legacy.ili
+          build/release/Release/ilic.exe -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
+          build/release/Release/ilic.exe -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
+      - name: Package
+        shell: pwsh
+        run: Compress-Archive -Path build/release/Release/ilic.exe -DestinationPath ilic-windows-x86_64.zip
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ilic-windows-x86_64
+          path: ilic-windows-x86_64.zip
+          if-no-files-found: error

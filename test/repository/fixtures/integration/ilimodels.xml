@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TRANSFER>
+  <DATASECTION>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="base">
+      <Name>Base</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>Base.ili</File><Version>1</Version>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="root-29">
+      <Name>Root</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>Root29.ili</File><Version>2.9</Version>
+      <dependsOnModel><IliRepository20.ModelName_><value>Base</value></IliRepository20.ModelName_></dependsOnModel>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="root-210">
+      <Name>Root</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>Root210.ili</File><Version>2.10</Version>
+      <precursorVersion>2.9</precursorVersion>
+      <dependsOnModel><IliRepository20.ModelName_><value>Base</value></IliRepository20.ModelName_></dependsOnModel>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="shared-a">
+      <Name>SharedA</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>Shared.ili</File><Version>1</Version>
+      <md5>f2c47665a6fe1b35cbf6a56457dd7958</md5>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="shared-b">
+      <Name>SharedB</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>Shared.ili</File><Version>1</Version>
+      <md5>F2C47665A6FE1B35CBF6A56457DD7958</md5>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="shared-bad-checksum">
+      <Name>SharedBadChecksum</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>Shared.ili</File><Version>1</Version>
+      <md5>00000000000000000000000000000000</md5>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="cycle-a">
+      <Name>CycleA</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>CycleA.ili</File><Version>1</Version>
+      <dependsOnModel><IliRepository20.ModelName_><value>CycleB</value></IliRepository20.ModelName_></dependsOnModel>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="cycle-b">
+      <Name>CycleB</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>CycleB.ili</File><Version>1</Version>
+      <dependsOnModel><IliRepository20.ModelName_><value>CycleA</value></IliRepository20.ModelName_></dependsOnModel>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="unsafe">
+      <Name>Unsafe</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>../Escape.ili</File><Version>1</Version>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="browse-1">
+      <Name>Browsable</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>Browsable.ili</File><Version>1</Version>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="browse-2">
+      <Name>Browsable</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>BrowseOnly.ili</File><Version>2</Version>
+      <precursorVersion>1</precursorVersion><browseOnly>true</browseOnly>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="language-23">
+      <Name>LanguageChoice</Name><SchemaLanguage>ili2_3</SchemaLanguage><File>Language23.ili</File><Version>1</Version>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+    <IliRepository20.RepositoryIndex.ModelMetadata TID="language-24">
+      <Name>LanguageChoice</Name><SchemaLanguage>ili2_4</SchemaLanguage><File>Language24.ili</File><Version>1</Version>
+    </IliRepository20.RepositoryIndex.ModelMetadata>
+  </DATASECTION>
+</TRANSFER>

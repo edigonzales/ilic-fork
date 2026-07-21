@@ -29,6 +29,7 @@
 #include "ilic.h"
 #ifdef ILIC_NATIVE_REPOSITORY
 #include "ilic/Repository.h"
+#include "RepositoryCli.h"
 #endif
 //#include "Gui.h"
 
@@ -98,6 +99,10 @@ static void display_options() {
    Log.message("   ordered local or HTTP(S) INTERLIS model repositories.");
    Log.message("-models model1,model2");
    Log.message("   resolve root models from the configured repositories.");
+   Log.message("-ili-version 1.0|2.3|2.4");
+   Log.message("   constrain repository lookup to an INTERLIS language version.");
+   Log.message("-no-default-repositories");
+   Log.message("   use only explicitly configured repositories.");
 #endif
 
    Log.message("");
@@ -341,7 +346,8 @@ static void check_arguments(StringMap arguments)
       else if (arg == "ilidirs") {
          continue;
       }
-      else if (arg == "repositories" || arg == "models") {
+      else if (arg == "repositories" || arg == "models" || arg == "ili-version"
+         || arg == "no-default-repositories") {
          continue;
       }
       else if (arg == "silent") {
@@ -606,8 +612,6 @@ int main(int argc, char* argv[])
    bool gml = false;
    string gml_output = "output.gml";
    string ilidirs = "";
-   string repositories = "";
-   string requested_models = "";
    bool log_silent = false;
    bool log_info = true;
    bool log_warnings = true;
@@ -678,11 +682,9 @@ int main(int argc, char* argv[])
       else if (arg == "ilidirs") {
          ilidirs = value;
       }
-      else if (arg == "repositories") {
-         repositories = value;
-      }
-      else if (arg == "models") {
-         requested_models = value;
+      else if (arg == "repositories" || arg == "models" || arg == "ili-version"
+         || arg == "no-default-repositories") {
+         // Repository arguments are normalized and validated together below.
       }
       else if (arg == "silent") {
          log_silent = true;
@@ -758,6 +760,21 @@ int main(int argc, char* argv[])
       exit(0);
    }
 
+#ifdef ILIC_NATIVE_REPOSITORY
+   bool has_explicit_ili_files = false;
+   for (const auto &arg : arguments.getKeys())
+      if (arg.find("ilifile") == 0) has_explicit_ili_files = true;
+   const ilic::cli::CliRepositoryConfig repository_config =
+      ilic::cli::buildRepositoryConfig(arguments);
+   if (auto error = ilic::cli::validateRepositoryCliConfig(
+      arguments,repository_config,has_explicit_ili_files)) {
+      Log.error(*error);
+      return 1;
+   }
+   std::unique_ptr<ilic::RepositoryManager> repository_manager =
+      ilic::cli::createRepositoryManager(repository_config);
+#endif
+
    Log.info(get_version_string());
 
    Log.info("");
@@ -766,34 +783,11 @@ int main(int argc, char* argv[])
    set_autosearch(!no_auto);
    set_ilidirs(ilidirs);
 #ifdef ILIC_NATIVE_REPOSITORY
-   std::unique_ptr<ilic::RepositoryManager> repository_manager;
-   if (!repositories.empty()) {
-      ilic::RepositoryOptions repository_options;
-      string remaining = repositories;
-      while (!remaining.empty()) {
-         size_t delimiter = remaining.find_first_of(";,");
-         string repository = delimiter == string::npos ? remaining : remaining.substr(0,delimiter);
-         if (!repository.empty()) repository_options.repositories.push_back(repository);
-         if (delimiter == string::npos) break;
-         remaining = remaining.substr(delimiter + 1);
-      }
-      repository_manager = std::make_unique<ilic::RepositoryManager>(repository_options);
-      if (!requested_models.empty()) {
-         vector<string> models;
-         string names = requested_models;
-         while (!names.empty()) {
-            size_t delimiter = names.find(',');
-            models.push_back(delimiter == string::npos ? names : names.substr(0,delimiter));
-            if (delimiter == string::npos) break;
-            names = names.substr(delimiter + 1);
-         }
-         ilic::RepositoryResult resolved = repository_manager->resolve(models,"");
-         if (!resolved.success) {
-            for (const auto &diagnostic : resolved.diagnostics) Log.error(diagnostic.message);
-            abort(1);
-         }
-         for (const auto &model : resolved.models) load_ilifiles_by_file(model.localPath.string());
-      }
+   if (repository_manager && !repository_config.requestedModels.empty()) {
+      ilic::RepositoryResult resolved = repository_manager->resolve(
+         repository_config.requestedModels,repository_config.schemaLanguage);
+      ilic::cli::logRepositoryDiagnostics(resolved.diagnostics);
+      if (!resolved.success || !ilic::cli::loadResolvedRepositoryModels(resolved)) return 1;
    }
 #endif
    for (auto arg : arguments.getKeys()) {
@@ -813,6 +807,10 @@ int main(int argc, char* argv[])
    Log.info("done.");
 
    // get interlis version from last file
+   if (all_ilifiles.empty()) {
+      Log.error("no input .ili files or root models specified");
+      return 1;
+   }
    string iliversion = all_ilifiles.back()->getIliVersion();
    metamodel::init(iliversion);
 
@@ -835,15 +833,14 @@ int main(int argc, char* argv[])
             IliFile *f = load_ilifiles_by_model(modelname,iliversion);
 #ifdef ILIC_NATIVE_REPOSITORY
             if (f == nullptr && repository_manager) {
-               const string schema = iliversion == "1.0" ? "ili1" :
-                  (iliversion == "2.4" ? "ili2_4" : "ili2_3");
+               const string schema = !repository_config.schemaLanguage.empty()
+                  ? repository_config.schemaLanguage : (iliversion == "1.0" ? "ili1" :
+                     (iliversion == "2.4" ? "ili2_4" : "ili2_3"));
                ilic::RepositoryResult resolved = repository_manager->resolve(modelname,schema);
+               ilic::cli::logRepositoryDiagnostics(resolved.diagnostics);
                if (resolved.success) {
-                  for (const auto &model : resolved.models) load_ilifiles_by_file(model.localPath.string());
+                  ilic::cli::loadResolvedRepositoryModels(resolved);
                   f = load_ilifiles_by_model(modelname,iliversion);
-               }
-               else {
-                  for (const auto &diagnostic : resolved.diagnostics) Log.error(diagnostic.message);
                }
             }
 #endif

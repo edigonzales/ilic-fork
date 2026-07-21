@@ -7,7 +7,7 @@ const docsRoot = join(sourceRoot,"docs");
 const required = [
   "README.md","funktionsumfang.md","build-und-installation.md","cli.md","formatter.md",
   "repositories.md","diagnostik-und-logging.md","native-api.md","wasm.md","conformance.md",
-  "npm-publikation.md","examples/README.md"
+  "build-und-publikationspipeline.md","npm-publikation.md","examples/README.md"
 ];
 for (const file of required) assert.ok(existsSync(join(docsRoot,file)),`missing docs/${file}`);
 

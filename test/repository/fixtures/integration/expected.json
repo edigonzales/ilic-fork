@@ -1,0 +1,6 @@
+{
+  "requestedModel": "Root",
+  "schemaLanguage": "ili2_4",
+  "resolvedModels": ["Base", "Root"],
+  "selectedVersion": "2.10"
+}

@@ -10,21 +10,66 @@ permissions:
   contents: read
 
 jobs:
-  native-and-packages:
+  native:
+    name: Native (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            static: "OFF"
+          - name: macOS ARM64
+            os: macos-14
+            static: "OFF"
+          - name: Windows x86_64
+            os: windows-latest
+            static: "ON"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify Linux architecture
+        if: runner.os == 'Linux'
+        run: test "$(uname -m)" = "x86_64"
+      - name: Verify macOS architecture
+        if: runner.os == 'macOS'
+        run: test "$(uname -m)" = "arm64"
+      - name: Verify Windows architecture
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
+            throw "x86_64 Windows is required"
+          }
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libcurl4-openssl-dev ninja-build
+      - name: Configure native build (Unix)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=${{ matrix.static }}
+      - name: Configure native build (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build/ci -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=${{ matrix.static }}
+      - name: Build native compiler and tests
+        run: cmake --build build/ci --config Release --parallel
+      - name: Run native tests
+        run: ctest --test-dir build/ci -C Release --output-on-failure
+      - name: Verify Windows runtime dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/check-windows-runtime-deps.ps1 -Binary build/ci/Release/ilic.exe
+
+  wasm-and-packages:
+    name: WASM and JavaScript packages
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Install native dependencies
-        run: sudo apt-get update && sudo apt-get install --yes libcurl4-openssl-dev libxml2-dev ninja-build
-      - name: Configure native build
-        run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release
-      - name: Build native compiler and tests
-        run: cmake --build build/ci --parallel
-      - name: Run native tests
-        run: ctest --test-dir build/ci --output-on-failure
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
@@ -55,7 +100,7 @@ jobs:
 
   request-release-train:
     name: Request coordinated release train
-    needs: native-and-packages
+    needs: [native, wasm-and-packages]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

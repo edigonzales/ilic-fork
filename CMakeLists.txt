@@ -9,6 +9,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(CTest)
 
 option(ILIC_ENABLE_NATIVE_REPOSITORY "Build native HTTP and filesystem repository support" ON)
+option(ILIC_STATIC_DISTRIBUTION "Build ilic as a self-contained distribution binary" OFF)
+
+include(cmake/IlicStaticDistribution.cmake)
 
 file(GLOB_RECURSE ANTLR_RUNTIME_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/include/*.cpp"
@@ -140,21 +143,36 @@ if(EMSCRIPTEN)
 endif()
 
 if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
-    find_package(CURL REQUIRED)
-    find_package(LibXml2 REQUIRED)
+    include(cmake/IlicDependencies.cmake)
+    ilic_configure_repository_dependencies(ILIC_CURL_TARGET ILIC_XML_TARGET)
     add_library(ilic-repository STATIC
         source/repository/Md5.cpp
         source/repository/Repository.cpp
+        source/repository/RepositoryUri.cpp
+        source/repository/RepositoryXml.cpp
+        source/repository/RepositoryVersion.cpp
+        source/repository/RepositoryTransport.cpp
+        source/repository/RepositoryCache.cpp
+        source/repository/RepositoryResourceLoader.cpp
+        source/repository/RepositoryCrawler.cpp
     )
     add_library(ilic::repository ALIAS ilic-repository)
     target_include_directories(ilic-repository
         PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/source/repository"
     )
     target_link_libraries(ilic-repository
-        PUBLIC ilic-core CURL::libcurl LibXml2::LibXml2
+        PUBLIC ilic-core
+        PRIVATE ${ILIC_CURL_TARGET} ${ILIC_XML_TARGET}
     )
     target_link_libraries(ilic PRIVATE ilic-repository)
     target_compile_definitions(ilic PRIVATE ILIC_NATIVE_REPOSITORY=1)
+    target_sources(ilic PRIVATE source/main/RepositoryCli.cpp)
+    target_include_directories(ilic PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/main"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/repository"
+    )
+    ilic_enable_static_distribution(ilic)
 endif()
 
 if(BUILD_TESTING)
@@ -200,13 +218,71 @@ if(BUILD_TESTING)
     target_link_libraries(ilic_formatter_test PRIVATE ilic-core)
     add_test(NAME ilic_formatter COMMAND ilic_formatter_test)
     if(TARGET ilic-repository)
+        find_package(Threads REQUIRED)
         add_executable(ilic_repository_test test/repository/RepositoryTest.cpp)
         target_link_libraries(ilic_repository_test PRIVATE ilic-repository)
         add_test(NAME ilic_repository COMMAND ilic_repository_test
             "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture")
+        add_executable(ilic_repository_uri_test test/repository/RepositoryUriTest.cpp)
+        target_include_directories(ilic_repository_uri_test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
+        target_link_libraries(ilic_repository_uri_test PRIVATE ilic-repository)
+        add_test(NAME ilic_repository_uri COMMAND ilic_repository_uri_test)
+        add_executable(ilic_repository_xml_test test/repository/RepositoryXmlTest.cpp)
+        target_include_directories(ilic_repository_xml_test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
+        target_link_libraries(ilic_repository_xml_test PRIVATE ilic-repository)
+        add_test(NAME ilic_repository_xml COMMAND ilic_repository_xml_test)
+        add_executable(ilic_repository_version_test test/repository/RepositoryVersionTest.cpp)
+        target_include_directories(ilic_repository_version_test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
+        target_link_libraries(ilic_repository_version_test PRIVATE ilic-repository)
+        add_test(NAME ilic_repository_version COMMAND ilic_repository_version_test)
+        add_executable(ilic_repository_cache_test test/repository/RepositoryCacheTest.cpp)
+        target_include_directories(ilic_repository_cache_test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
+        target_link_libraries(ilic_repository_cache_test PRIVATE
+            ilic-repository Threads::Threads)
+        add_test(NAME ilic_repository_cache COMMAND ilic_repository_cache_test)
+        add_executable(ilic_repository_traversal_test test/repository/RepositoryTraversalTest.cpp)
+        target_include_directories(ilic_repository_traversal_test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
+        target_link_libraries(ilic_repository_traversal_test PRIVATE ilic-repository)
+        add_test(NAME ilic_repository_traversal COMMAND ilic_repository_traversal_test)
+        add_executable(ilic_repository_integration_test
+            test/repository/RepositoryIntegrationTest.cpp)
+        target_link_libraries(ilic_repository_integration_test PRIVATE ilic-repository)
+        add_test(NAME ilic_repository_integration COMMAND ilic_repository_integration_test
+            "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixtures/integration")
+        add_executable(ilic_repository_cli_config_test
+            test/repository/RepositoryCliTest.cpp source/main/RepositoryCli.cpp)
+        target_include_directories(ilic_repository_cli_config_test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/main"
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
+        target_link_libraries(ilic_repository_cli_config_test PRIVATE ilic-repository)
+        add_test(NAME ilic_repository_cli_config COMMAND ilic_repository_cli_config_test)
         add_test(NAME ilic_repository_cli COMMAND ilic -silent
             -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
-            -models RepositoryRoot)
+            -models RepositoryRoot --ili-version 2.3 --no-default-repositories)
+        add_test(NAME ilic_repository_cli_import_fallback COMMAND ilic -silent
+            -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
+            --no-default-repositories
+            "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/import-fallback/RepositoryConsumer.ili")
+        add_test(NAME ilic_repository_cli_no_input COMMAND ilic
+            -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture")
+        set_tests_properties(ilic_repository_cli_no_input PROPERTIES
+            WILL_FAIL TRUE)
+        add_test(NAME ilic_repository_cli_version_no_input COMMAND ilic --ili-version 2.4)
+        set_tests_properties(ilic_repository_cli_version_no_input PROPERTIES
+            WILL_FAIL TRUE)
+        add_test(NAME ilic_repository_cli_no_repositories COMMAND ilic
+            -models DatasetIdx16 --no-default-repositories)
+        set_tests_properties(ilic_repository_cli_no_repositories PROPERTIES
+            WILL_FAIL TRUE)
+        add_test(NAME ilic_repository_cli_invalid_version COMMAND ilic
+            --ili-version 2.2 "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples/models/Legacy.ili")
+        set_tests_properties(ilic_repository_cli_invalid_version PROPERTIES
+            WILL_FAIL TRUE)
     endif()
 
     function(add_ilic_regression_test name expected_success)

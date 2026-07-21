@@ -1,0 +1,10 @@
+INTERLIS 2.3;
+
+MODEL RepositoryConsumer AT "https://example.invalid/ilic/tests" VERSION "1" =
+  IMPORTS RepositoryBase;
+  TOPIC Topic =
+    CLASS Item =
+      Identifier : MANDATORY RepositoryBase.Identifier;
+    END Item;
+  END Topic;
+END RepositoryConsumer.

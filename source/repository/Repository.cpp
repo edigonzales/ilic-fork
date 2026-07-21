@@ -1,330 +1,266 @@
-#include "../../include/ilic/Repository.h"
+#include "ilic/Repository.h"
 
 #include "Md5.h"
-#include "../util/Logger.h"
-
-#include <curl/curl.h>
-#include <libxml/parser.h>
-#include <libxml/tree.h>
+#include "RepositoryCache.h"
+#include "RepositoryCrawler.h"
+#include "RepositoryResourceLoader.h"
+#include "RepositoryTransport.h"
+#include "RepositoryUri.h"
+#include "RepositoryXml.h"
 
 #include <algorithm>
-#include <cstdlib>
-#include <fstream>
-#include <iterator>
-#include <map>
-#include <queue>
-#include <set>
-#include <sstream>
+#include <cctype>
+#include <functional>
+#include <optional>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace ilic {
 namespace {
 
-struct FetchResult {
-   bool success = false;
-   bool fromCache = false;
-   std::string text;
-   std::filesystem::path path;
-   std::string error;
-};
-
-bool isHttp(const std::string &uri)
-{
-   return uri.rfind("http://",0) == 0 || uri.rfind("https://",0) == 0;
-}
-
-std::string stripFileScheme(const std::string &uri)
-{
-   return uri.rfind("file://",0) == 0 ? uri.substr(7) : uri;
-}
-
-std::string joinUri(const std::string &base,const std::string &relative)
-{
-   if (relative.rfind("http://",0) == 0 || relative.rfind("https://",0) == 0
-       || relative.rfind("file://",0) == 0) return relative;
-   if (isHttp(base)) return base + (base.back() == '/' ? "" : "/") + relative;
-   return (std::filesystem::path(stripFileScheme(base)) / relative).lexically_normal().string();
-}
-
-bool safeRelativePath(const std::string &value)
-{
-   std::filesystem::path path(value);
-   if (path.is_absolute()) return false;
-   for (const auto &component : path)
-      if (component == "..") return false;
-   return true;
-}
-
-std::string readFile(const std::filesystem::path &path)
-{
-   std::ifstream input(path,std::ios::binary);
-   if (!input) return {};
-   return std::string((std::istreambuf_iterator<char>(input)),std::istreambuf_iterator<char>());
-}
-
-bool isFresh(const std::filesystem::path &path,std::chrono::seconds ttl)
-{
-   std::error_code error;
-   auto written = std::filesystem::last_write_time(path,error);
-   if (error) return false;
-   auto age = std::filesystem::file_time_type::clock::now() - written;
-   return age <= ttl;
-}
-
-std::filesystem::path defaultCacheDirectory()
-{
-   if (const char *configured = std::getenv("ILIC_CACHE"))
-      if (*configured != '\0') return std::filesystem::path(configured);
-   if (const char *legacy = std::getenv("ILI_CACHE"))
-      if (*legacy != '\0') return std::filesystem::path(legacy) / "ilic-v1";
-   if (const char *home = std::getenv("HOME"))
-      return std::filesystem::path(home) / ".ilicache" / "ilic-v1";
-   return std::filesystem::temp_directory_path() / "ilic-cache-v1";
-}
-
-std::size_t curlWrite(char *data,std::size_t size,std::size_t count,void *target)
-{
-   static_cast<std::string *>(target)->append(data,size * count);
-   return size * count;
-}
-
-FetchResult fetch(const RepositoryOptions &options,const std::string &uri,
-   std::chrono::seconds ttl,bool optional = false)
-{
-   FetchResult result;
-   if (!isHttp(uri)) {
-      result.path = stripFileScheme(uri);
-      result.text = readFile(result.path);
-      result.success = !result.text.empty() || std::filesystem::exists(result.path);
-      if (!result.success && !optional) result.error = "unable to read " + result.path.string();
-      return result;
-   }
-
-   const std::filesystem::path cacheRoot = options.cacheDirectory.empty()
-      ? defaultCacheDirectory() : options.cacheDirectory;
-   const std::string extension = std::filesystem::path(uri).extension().string();
-   result.path = cacheRoot / (repository::md5(uri) + extension);
-   if (std::filesystem::exists(result.path) && (options.offline || isFresh(result.path,ttl))) {
-      result.text = readFile(result.path);
-      result.success = true;
-      result.fromCache = true;
-      Log.log(LogLevel::Debug,"cache","cache hit",{{"uri",uri},{"path",result.path.string()}});
-      return result;
-   }
-   if (options.offline) {
-      if (!optional) result.error = "offline and no cached copy of " + uri;
-      return result;
-   }
-
-   CURL *curl = curl_easy_init();
-   if (curl != nullptr) {
-      curl_easy_setopt(curl,CURLOPT_URL,uri.c_str());
-      curl_easy_setopt(curl,CURLOPT_FOLLOWLOCATION,1L);
-      curl_easy_setopt(curl,CURLOPT_FAILONERROR,1L);
-      curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,15L);
-      curl_easy_setopt(curl,CURLOPT_TIMEOUT,60L);
-      curl_easy_setopt(curl,CURLOPT_USERAGENT,"ilic/0.9.9");
-      curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,curlWrite);
-      curl_easy_setopt(curl,CURLOPT_WRITEDATA,&result.text);
-      CURLcode status = curl_easy_perform(curl);
-      if (status == CURLE_OK) result.success = true;
-      else result.error = curl_easy_strerror(status);
-      curl_easy_cleanup(curl);
-   }
-   else result.error = "unable to initialize libcurl";
-
-   if (result.success) {
-      std::error_code error;
-      std::filesystem::create_directories(cacheRoot,error);
-      std::filesystem::path temporary = result.path;
-      temporary += ".tmp";
-      {
-         std::ofstream output(temporary,std::ios::binary | std::ios::trunc);
-         output.write(result.text.data(),static_cast<std::streamsize>(result.text.size()));
-      }
-      std::filesystem::rename(temporary,result.path,error);
-      if (error) {
-         std::filesystem::remove(result.path,error);
-         error.clear();
-         std::filesystem::rename(temporary,result.path,error);
-      }
-      Log.log(LogLevel::Information,"repository","downloaded repository resource",{{"uri",uri}});
-      return result;
-   }
-
-   if (options.allowStaleOnError && std::filesystem::exists(result.path)) {
-      result.text = readFile(result.path);
-      result.success = true;
-      result.fromCache = true;
-      Log.log(LogLevel::Warning,"cache","using stale cache entry",{{"uri",uri},{"error",result.error}});
-      return result;
-   }
-   if (optional) result.error.clear();
-   return result;
-}
-
-std::string nodeText(xmlNode *node)
-{
-   xmlChar *content = xmlNodeGetContent(node);
-   if (content == nullptr) return {};
-   std::string value(reinterpret_cast<const char *>(content));
-   xmlFree(content);
-   return value;
-}
-
-std::string childText(xmlNode *node,const char *name)
-{
-   for (xmlNode *child = node->children; child != nullptr; child = child->next) {
-      if (child->type == XML_ELEMENT_NODE && xmlStrEqual(child->name,BAD_CAST name)) return nodeText(child);
-   }
-   return {};
-}
-
-void descendantValues(xmlNode *node,std::vector<std::string> &values)
-{
-   for (xmlNode *child = node->children; child != nullptr; child = child->next) {
-      if (child->type != XML_ELEMENT_NODE) continue;
-      if (xmlStrEqual(child->name,BAD_CAST "value")) values.push_back(nodeText(child));
-      else descendantValues(child,values);
-   }
-}
-
-void collectMetadata(xmlNode *node,const std::string &repository,
-   std::vector<ModelMetadata> &models)
-{
-   for (xmlNode *current = node; current != nullptr; current = current->next) {
-      if (current->type == XML_ELEMENT_NODE) {
-         const std::string name(reinterpret_cast<const char *>(current->name));
-         if (name.find("ModelMetadata") != std::string::npos) {
-            ModelMetadata model;
-            model.name = childText(current,"Name");
-            model.schemaLanguage = childText(current,"SchemaLanguage");
-            model.file = childText(current,"File");
-            model.version = childText(current,"Version");
-            model.publishingDate = childText(current,"publishingDate");
-            model.precursorVersion = childText(current,"precursorVersion");
-            model.md5 = childText(current,"md5");
-            model.repository = repository;
-            model.browseOnly = childText(current,"browseOnly") == "true";
-            for (xmlNode *child = current->children; child != nullptr; child = child->next) {
-               if (child->type == XML_ELEMENT_NODE && xmlStrEqual(child->name,BAD_CAST "dependsOnModel"))
-                  descendantValues(child,model.dependencies);
-            }
-            if (!model.name.empty() && !model.file.empty()) models.push_back(std::move(model));
-         }
-         else collectMetadata(current->children,repository,models);
-      }
-   }
-}
-
-std::vector<std::string> parseSiteLinks(const std::string &xml)
-{
-   std::vector<std::string> links;
-   xmlDocPtr document = xmlReadMemory(xml.data(),static_cast<int>(xml.size()),"ilisite.xml",nullptr,
-      XML_PARSE_NONET | XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
-   if (document == nullptr) return links;
-   std::function<void(xmlNode *,bool)> visit = [&](xmlNode *node,bool inLink) {
-      for (xmlNode *current = node; current != nullptr; current = current->next) {
-         bool link = inLink;
-         if (current->type == XML_ELEMENT_NODE) {
-            link = link || xmlStrEqual(current->name,BAD_CAST "parentSite")
-               || xmlStrEqual(current->name,BAD_CAST "subsidiarySite");
-            if (link && xmlStrEqual(current->name,BAD_CAST "value")) links.push_back(nodeText(current));
-            visit(current->children,link);
-         }
-      }
-   };
-   visit(xmlDocGetRootElement(document),false);
-   xmlFreeDoc(document);
-   return links;
-}
-
-Diagnostic repositoryError(const std::string &code,const std::string &message)
+Diagnostic repositoryDiagnostic(DiagnosticSeverity severity,std::string code,std::string message)
 {
    Diagnostic diagnostic;
-   diagnostic.code = code;
-   diagnostic.message = message;
+   diagnostic.severity = severity;
+   diagnostic.code = std::move(code);
+   diagnostic.message = std::move(message);
    return diagnostic;
 }
 
-struct Catalog {
-   std::vector<ModelMetadata> models;
-   std::vector<Diagnostic> diagnostics;
+bool hasErrors(const std::vector<Diagnostic> &diagnostics)
+{
+   return std::any_of(diagnostics.begin(),diagnostics.end(),[](const Diagnostic &diagnostic) {
+      return diagnostic.severity == DiagnosticSeverity::Error;
+   });
+}
+
+template<typename Value>
+struct LoadState {
+   enum class Status { NotLoaded, Available, Unavailable };
+   Status status = Status::NotLoaded;
+   Value value;
 };
 
-Catalog loadCatalog(const RepositoryOptions &options)
+struct ResolutionState {
+   std::unordered_set<std::string> resolvedModels;
+   std::vector<std::string> stack;
+   std::unordered_map<std::string,std::string> emittedFileChecksums;
+};
+
+std::string lower(std::string value)
 {
-   Catalog catalog;
-   std::queue<std::string> pending;
-   for (const auto &repository : options.repositories) pending.push(repository);
-   std::set<std::string> visited;
-   while (!pending.empty()) {
-      std::string repository = pending.front();
-      pending.pop();
-      while (repository.size() > 1 && repository.back() == '/') repository.pop_back();
-      if (!visited.insert(repository).second) continue;
-
-      FetchResult index = fetch(options,joinUri(repository,"ilimodels.xml"),options.metadataTtl);
-      if (!index.success) {
-         catalog.diagnostics.push_back(repositoryError("ILIC-REPO-INDEX",
-            "unable to read ilimodels.xml from " + repository + ": " + index.error));
-         continue;
-      }
-      auto parsed = RepositoryManager::parseIliModelsXml(index.text,repository,&catalog.diagnostics);
-      catalog.models.insert(catalog.models.end(),parsed.begin(),parsed.end());
-
-      if (options.followSiteLinks) {
-         FetchResult site = fetch(options,joinUri(repository,"ilisite.xml"),options.metadataTtl,true);
-         if (site.success) for (const auto &link : parseSiteLinks(site.text)) pending.push(link);
-      }
-   }
-   return catalog;
+   std::transform(value.begin(),value.end(),value.begin(),[](unsigned char character) {
+      return static_cast<char>(std::tolower(character));
+   });
+   return value;
 }
 
-const ModelMetadata *selectModel(const std::vector<ModelMetadata> &models,
-   const std::string &name,const std::string &schemaLanguage)
-{
-   const ModelMetadata *selected = nullptr;
-   for (const auto &model : models) {
-      if (model.name != name || model.browseOnly) continue;
-      if (!schemaLanguage.empty() && model.schemaLanguage != schemaLanguage) continue;
-      if (selected == nullptr) selected = &model;
-      else if (selected->repository == model.repository && selected->version < model.version) selected = &model;
-   }
-   return selected;
-}
+class StackGuard {
+public:
+   explicit StackGuard(std::vector<std::string> &stack) : stack_(stack) {}
+   ~StackGuard() { stack_.pop_back(); }
+private:
+   std::vector<std::string> &stack_;
+};
 
 } // namespace
 
-RepositoryManager::RepositoryManager(RepositoryOptions options) : options_(std::move(options))
+class RepositoryManager::Impl final : public repository::RepositoryBackend {
+public:
+   explicit Impl(RepositoryOptions configured)
+      : options(std::move(configured)),cache(options.cacheDirectory.empty()
+           ? repository::defaultCacheDirectory() : options.cacheDirectory),
+        loader(options,transport,cache),crawler(*this)
+   {
+      if (options.cacheDirectory.empty()) options.cacheDirectory = cache.root();
+   }
+
+   const repository::RepositoryIndex *loadIndex(const std::string &repositoryUri,
+      std::vector<Diagnostic> *diagnostics) override
+   {
+      auto &state = repositoryIndexes[repositoryUri];
+      if (state.status == LoadState<repository::RepositoryIndex>::Status::Available) return &state.value;
+      if (state.status == LoadState<repository::RepositoryIndex>::Status::Unavailable) return nullptr;
+      state.status = LoadState<repository::RepositoryIndex>::Status::Unavailable;
+
+      std::string uriError;
+      auto repositoryRoot = repository::RepositoryUri::parse(repositoryUri,&uriError);
+      if (!repositoryRoot) {
+         diagnostics->push_back(repositoryDiagnostic(DiagnosticSeverity::Warning,"ILIC-REPO-INDEX",
+            "invalid repository URI " + repositoryUri + ": " + uriError));
+         return nullptr;
+      }
+      const auto indexUri = repositoryRoot->resolve("ilimodels.xml");
+      auto resource = loader.load(indexUri,{options.metadataTtl,false});
+      appendResourceWarnings(resource,"ILIC-REPO-CACHE",diagnostics);
+      if (!resource.success) {
+         diagnostics->push_back(repositoryDiagnostic(DiagnosticSeverity::Warning,"ILIC-REPO-INDEX",
+            "unable to read ilimodels.xml from " + repositoryUri + ": " + resource.error));
+         return nullptr;
+      }
+      std::vector<Diagnostic> parseDiagnostics;
+      state.value = repository::RepositoryXml::parseModelIndex(resource.content,repositoryUri,
+         &parseDiagnostics);
+      for (auto &diagnostic : parseDiagnostics) {
+         // A broken repository is recoverable while later repositories remain.
+         diagnostic.severity = DiagnosticSeverity::Warning;
+         diagnostics->push_back(std::move(diagnostic));
+      }
+      if (state.value.models.empty()) return nullptr;
+      state.status = LoadState<repository::RepositoryIndex>::Status::Available;
+      return &state.value;
+   }
+
+   const repository::RepositorySite *loadSite(const std::string &repositoryUri,
+      std::vector<Diagnostic> *diagnostics) override
+   {
+      if (!options.followSiteLinks) return nullptr;
+      auto &state = repositorySites[repositoryUri];
+      if (state.status == LoadState<repository::RepositorySite>::Status::Available) return &state.value;
+      if (state.status == LoadState<repository::RepositorySite>::Status::Unavailable) return nullptr;
+      state.status = LoadState<repository::RepositorySite>::Status::Unavailable;
+      auto repositoryRoot = repository::RepositoryUri::parse(repositoryUri);
+      if (!repositoryRoot) return nullptr;
+      auto resource = loader.load(repositoryRoot->resolve("ilisite.xml"),
+         {options.metadataTtl,true});
+      appendResourceWarnings(resource,"ILIC-REPO-CACHE",diagnostics);
+      if (!resource.success) return nullptr; // ilisite.xml is optional.
+      state.value = repository::RepositoryXml::parseSite(resource.content,repositoryUri,diagnostics);
+      state.status = LoadState<repository::RepositorySite>::Status::Available;
+      return &state.value;
+   }
+
+   bool resolveOne(const std::string &name,const std::string &schemaLanguage,
+      ResolutionState &state,RepositoryResult &result)
+   {
+      if (name == "INTERLIS" || state.resolvedModels.count(name) != 0) return true;
+      const auto cycle = std::find(state.stack.begin(),state.stack.end(),name);
+      if (cycle != state.stack.end()) {
+         std::string path;
+         for (auto current = cycle; current != state.stack.end(); ++current) {
+            if (!path.empty()) path += " -> ";
+            path += *current;
+         }
+         path += " -> " + name;
+         result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,
+            "ILIC-REPO-CYCLE","dependency cycle: " + path));
+         return false;
+      }
+      state.stack.push_back(name);
+      StackGuard guard(state.stack);
+
+      auto lookup = crawler.findModel(options.repositories,name,schemaLanguage);
+      result.diagnostics.insert(result.diagnostics.end(),lookup.diagnostics.begin(),
+         lookup.diagnostics.end());
+      if (!lookup.found) {
+         result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,
+            "ILIC-REPO-NOT-FOUND","model " + name + " not found in configured repositories"));
+         return false;
+      }
+
+      bool dependenciesOk = true;
+      for (const auto &dependency : lookup.metadata.dependencies)
+         dependenciesOk = resolveOne(dependency,schemaLanguage,state,result) && dependenciesOk;
+      if (!dependenciesOk) return false;
+
+      const auto path = repository::validateRepositoryRelativePath(lookup.metadata.file);
+      if (!path.valid) {
+         result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,
+            "ILIC-REPO-PATH","unsafe repository path " + lookup.metadata.file + ": " + path.error));
+         return false;
+      }
+      auto root = repository::RepositoryUri::parse(lookup.metadata.repository);
+      if (!root) {
+         result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,
+            "ILIC-REPO-PATH","invalid repository root " + lookup.metadata.repository));
+         return false;
+      }
+      repository::RepositoryUri uri = root->resolve(path.normalized);
+      if (root->isLocal() && (!uri.isLocal()
+         || !repository::isPathWithin(root->toLocalPath(),uri.toLocalPath()))) {
+         result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,
+            "ILIC-REPO-PATH","repository path escapes its root: " + lookup.metadata.file));
+         return false;
+      }
+
+      const auto emitted = state.emittedFileChecksums.find(uri.normalized());
+      if (emitted == state.emittedFileChecksums.end()) {
+         auto resource = loader.loadModel(uri,lookup.metadata.md5);
+         appendResourceWarnings(resource,"ILIC-REPO-CACHE",&result.diagnostics);
+         if (!resource.success) {
+            const std::string code = resource.error.rfind("MD5 mismatch",0) == 0
+               ? "ILIC-REPO-CHECKSUM" : "ILIC-REPO-DOWNLOAD";
+            result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,code,
+               "unable to fetch " + uri.normalized() + ": " + resource.error));
+            return false;
+         }
+         if (!std::filesystem::is_regular_file(resource.localPath)) {
+            result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,
+               "ILIC-REPO-DOWNLOAD","downloaded model has no readable local path: "
+                  + uri.normalized()));
+            return false;
+         }
+         state.emittedFileChecksums.emplace(uri.normalized(),repository::md5(resource.content));
+         result.models.push_back({lookup.metadata,uri.normalized(),resource.localPath,
+            std::move(resource.content),resource.fromCache,resource.stale});
+      }
+      else if (options.validateChecksums && !lookup.metadata.md5.empty()
+         && lower(emitted->second) != lower(lookup.metadata.md5)) {
+         result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,
+            "ILIC-REPO-CHECKSUM","unable to fetch " + uri.normalized() + ": MD5 mismatch for "
+               + uri.normalized() + ": expected " + lookup.metadata.md5 + ", actual "
+               + emitted->second));
+         return false;
+      }
+      state.resolvedModels.insert(name);
+      return true;
+   }
+
+   void appendResourceWarnings(const repository::RepositoryResource &resource,
+      const std::string &code,std::vector<Diagnostic> *diagnostics)
+   {
+      for (const auto &message : resource.warnings) diagnostics->push_back(
+         repositoryDiagnostic(DiagnosticSeverity::Warning,code,message));
+   }
+
+   RepositoryOptions options;
+   repository::CurlRepositoryTransport transport;
+   repository::RepositoryCache cache;
+   repository::RepositoryResourceLoader loader;
+   repository::RepositoryCrawler crawler;
+   std::unordered_map<std::string,LoadState<repository::RepositoryIndex>> repositoryIndexes;
+   std::unordered_map<std::string,LoadState<repository::RepositorySite>> repositorySites;
+};
+
+RepositoryManager::RepositoryManager(RepositoryOptions options)
+   : impl_(std::make_unique<Impl>(std::move(options)))
 {
-   if (options_.cacheDirectory.empty()) options_.cacheDirectory = defaultCacheDirectory();
-   curl_global_init(CURL_GLOBAL_DEFAULT);
 }
 
-const RepositoryOptions &RepositoryManager::options() const { return options_; }
+RepositoryManager::~RepositoryManager() = default;
+RepositoryManager::RepositoryManager(RepositoryManager &&) noexcept = default;
+RepositoryManager &RepositoryManager::operator=(RepositoryManager &&) noexcept = default;
 
-std::vector<ModelMetadata> RepositoryManager::parseIliModelsXml(
-   const std::string &xml,const std::string &repository,std::vector<Diagnostic> *diagnostics)
+const RepositoryOptions &RepositoryManager::options() const { return impl_->options; }
+
+std::vector<std::string> RepositoryManager::defaultRepositories()
 {
-   std::vector<ModelMetadata> models;
-   xmlDocPtr document = xmlReadMemory(xml.data(),static_cast<int>(xml.size()),"ilimodels.xml",nullptr,
-      XML_PARSE_NONET | XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
-   if (document == nullptr) {
-      if (diagnostics != nullptr) diagnostics->push_back(repositoryError(
-         "ILIC-REPO-INDEX","invalid ilimodels.xml in " + repository));
-      return models;
-   }
-   collectMetadata(xmlDocGetRootElement(document),repository,models);
-   xmlFreeDoc(document);
-   return models;
+   return {"https://models.interlis.ch"};
+}
+
+std::vector<ModelMetadata> RepositoryManager::parseIliModelsXml(const std::string &xml,
+   const std::string &repository,std::vector<Diagnostic> *diagnostics)
+{
+   return repository::RepositoryXml::parseModelIndex(xml,repository,diagnostics).models;
 }
 
 std::vector<ModelMetadata> RepositoryManager::listModels()
 {
-   return loadCatalog(options_).models;
+   return impl_->crawler.listModels(impl_->options.repositories);
 }
 
-RepositoryResult RepositoryManager::resolve(const std::string &model,const std::string &schemaLanguage)
+RepositoryResult RepositoryManager::resolve(const std::string &model,
+   const std::string &schemaLanguage)
 {
    return resolve(std::vector<std::string>{model},schemaLanguage);
 }
@@ -333,60 +269,11 @@ RepositoryResult RepositoryManager::resolve(const std::vector<std::string> &requ
    const std::string &schemaLanguage)
 {
    RepositoryResult result;
-   Catalog catalog = loadCatalog(options_);
-   result.diagnostics = std::move(catalog.diagnostics);
-   if (!result.diagnostics.empty() && catalog.models.empty()) return result;
-
-   std::set<std::string> resolved;
-   std::set<std::string> visiting;
-   std::set<std::string> fetchedFiles;
-   std::function<bool(const std::string &)> resolveOne = [&](const std::string &name) {
-      if (name == "INTERLIS" || resolved.count(name) != 0) return true;
-      if (!visiting.insert(name).second) {
-         result.diagnostics.push_back(repositoryError("ILIC-REPO-CYCLE",
-            "dependency cycle involving model " + name));
-         return false;
-      }
-      const ModelMetadata *metadata = selectModel(catalog.models,name,schemaLanguage);
-      if (metadata == nullptr) {
-         result.diagnostics.push_back(repositoryError("ILIC-REPO-NOT-FOUND",
-            "model " + name + " not found in configured repositories"));
-         visiting.erase(name);
-         return false;
-      }
-      bool dependenciesOk = true;
-      for (const auto &dependency : metadata->dependencies) dependenciesOk = resolveOne(dependency) && dependenciesOk;
-      if (!safeRelativePath(metadata->file)) {
-         result.diagnostics.push_back(repositoryError("ILIC-REPO-PATH",
-            "unsafe repository path " + metadata->file));
-         visiting.erase(name);
-         return false;
-      }
-      const std::string uri = joinUri(metadata->repository,metadata->file);
-      if (fetchedFiles.insert(uri).second) {
-         FetchResult file = fetch(options_,uri,options_.modelTtl);
-         if (!file.success) {
-            result.diagnostics.push_back(repositoryError("ILIC-REPO-DOWNLOAD",
-               "unable to fetch " + uri + ": " + file.error));
-            visiting.erase(name);
-            return false;
-         }
-         if (!metadata->md5.empty() && repository::md5(file.text) != metadata->md5) {
-            result.diagnostics.push_back(repositoryError("ILIC-REPO-CHECKSUM",
-               "MD5 mismatch for " + uri));
-            visiting.erase(name);
-            return false;
-         }
-         result.models.push_back({*metadata,uri,file.path,std::move(file.text),file.fromCache});
-      }
-      visiting.erase(name);
-      resolved.insert(name);
-      return dependenciesOk;
-   };
-
-   bool success = true;
-   for (const auto &model : requested) success = resolveOne(model) && success;
-   result.success = success;
+   result.success = true;
+   ResolutionState state;
+   for (const auto &model : requested)
+      result.success = impl_->resolveOne(model,schemaLanguage,state,result) && result.success;
+   result.success = result.success && !hasErrors(result.diagnostics);
    return result;
 }
 

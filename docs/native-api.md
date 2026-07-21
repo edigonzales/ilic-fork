@@ -260,4 +260,6 @@ target_link_libraries(my_c_host PRIVATE ilic::capi)
 ```
 
 Für Repository-Zugriff wird zusätzlich `ilic::repository` gelinkt. Der
-Repository-Target bringt libcurl und libxml2 transitiv mit.
+Repository-Target verwendet libcurl und die intern statisch gebaute
+pugixml-Implementierung privat; seine öffentlichen Header exponieren keine
+Transport- oder XML-Abhängigkeit.

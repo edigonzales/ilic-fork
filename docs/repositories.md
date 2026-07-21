@@ -1,114 +1,131 @@
 # Modell-Repositories
 
-[Dokumentationsindex](README.md) · [CLI](cli.md) · [WASM](wasm.md)
+[Dokumentationsindex](README.md) · [CLI](cli.md) · [Build](build-und-installation.md)
 
-`ilic` enthält eine native C++-Repository-Implementierung. Ein Benutzer des
-Kommandozeilenprogramms muss benötigte Modelle deshalb nicht manuell suchen und
-herunterladen. Für Browser und Node stellt `@ilic/tools` denselben
-Beschaffungsschritt als Hostbibliothek bereit.
+`ilic` kann INTERLIS-Modelle aus lokalen Verzeichnissen, `file://`-URIs und
+HTTP(S)-Repositories beziehen. Die native C++-Implementierung und
+`@ilic/tools` verwenden dabei dieselben Regeln für Suche, Versionen,
+Abhängigkeiten, Pfade und Prüfsummen.
 
-```mermaid
-flowchart TD
-    Seeds["geordnete Start-Repositories"] --> Index["ilimodels.xml"]
-    Index --> Site["optionales ilisite.xml"]
-    Site --> Catalog["zusammengeführter Katalog"]
-    Catalog --> Select["Name + SchemaLanguage + Priorität"]
-    Select --> Dependencies["Abhängigkeiten dependency-first"]
-    Dependencies --> Integrity["sicherer Pfad + MD5"]
-    Integrity --> Cache["lokaler Cache"]
-    Cache --> Sources["Compiler-Quellen"]
-```
+## Konfiguration und Priorität
 
-## Nativer CLI-Aufruf
+Die Library arbeitet ausschließlich mit den in `RepositoryOptions.repositories`
+übergebenen Seed-Repositories. Sie fügt keine versteckten Defaults ein. Die CLI
+stellt dagegen `https://models.interlis.ch` als Default bereit. Explizite Werte
+aus `-repositories` stehen davor; `--no-default-repositories` unterdrückt den
+Default. Trivial identische URIs wie eine HTTP-URL mit oder ohne abschließenden
+Slash werden unter Erhalt der ersten Position dedupliziert.
 
 ```sh
-build/macos/ilic -silent \
-  -repositories https://models.interlis.ch \
-  -models DatasetIdx16
+build/final/ilic -silent \
+  -repositories '/srv/company-models;https://example.org/models' \
+  --no-default-repositories \
+  -models CompanyModel \
+  --ili-version 2.4
 ```
 
-Mehrere Repositories werden in Prioritätsreihenfolge angegeben:
+Jeder Seed enthält ein `ilimodels.xml`; `ilisite.xml` ist optional. Unterstützt
+werden absolute und relative lokale Pfade, Windows- und UNC-Pfade,
+`file:///tmp/models`, `file:///C:/models`, `file://server/share/models` sowie
+HTTP und HTTPS. Percent-Encoding wie `%20` wird in `file://`-Pfaden dekodiert.
+Query und Fragment einer HTTP(S)-URI bleiben bei der Normalisierung erhalten.
 
-```sh
-build/macos/ilic -silent \
-  -repositories '/srv/company-models;https://models.interlis.ch' \
-  -models CompanyModel
-```
+## Lazy Suchreihenfolge
 
-Ein Repository kann ein lokaler Pfad, eine `file://`-URI oder eine HTTP(S)-URI
-sein. Es muss ein `ilimodels.xml` bereitstellen. `ilisite.xml` ist optional.
+Eine Modellauflösung baut keinen globalen Katalog auf. Indizes und Site-Dateien
+werden erst geladen, wenn die Suche das Repository tatsächlich besucht:
 
-```sh
-build/macos/ilic -silent \
-  -repositories test/repository/fixture \
-  -models RepositoryRoot
-```
+1. Alle Seeds werden in ihrer konfigurierten Reihenfolge nach dem Modell
+   durchsucht. Ein Treffer beendet die Suche; spätere Seeds und Site-Links
+   bleiben ungeladen.
+2. Falls kein Seed trifft, werden die Parent-Links der Seeds breadth-first in
+   XML-Reihenfolge durchsucht.
+3. Danach folgen Subsidiaries breadth-first. Bei jedem Subsidiary werden dessen
+   Parent-Links vor dem nächsten Subsidiary breadth-first abgearbeitet.
+4. Normalisierte, bereits besuchte Repository-URIs werden übersprungen.
 
-Der letzte Befehl ist Teil der automatisierten Tests und benötigt kein
-Netzwerk.
+`listModels()` besucht dagegen bewusst alle erreichbaren Repositories und gibt
+alle gültig geparsten `ModelMetadata`-Einträge einschließlich älterer und
+`browseOnly`-Versionen zurück. Geladene Indizes, Site-Metadaten und für diese
+Manager-Instanz bekannte Ausfälle werden im Speicher wiederverwendet.
 
-## Auflösungsalgorithmus
+Ein nicht erreichbares Repository erzeugt während einer fortsetzbaren Suche
+eine Warning `ILIC-REPO-INDEX`. Findet ein späteres Repository das Modell, kann
+das Resultat deshalb `success=true` und dennoch Warnings enthalten. Wird das
+Modell nirgends gefunden, kommt `ILIC-REPO-NOT-FOUND` als Error hinzu. Ein
+fehlendes optionales `ilisite.xml` ist kein Fehler.
 
-1. Die konfigurierten Start-Repositories werden in der angegebenen Reihenfolge
-   in eine Queue gelegt.
-2. Pro Repository ist `ilimodels.xml` obligatorisch. Ungültige oder nicht
-   erreichbare Indizes erzeugen `ILIC-REPO-INDEX`.
-3. Falls Site-Following aktiv ist, werden `parentSite` und `subsidiarySite` aus
-   `ilisite.xml` angehängt. Bereits besuchte URIs werden nicht erneut geladen.
-4. Gesucht wird ein exakt übereinstimmender Modellname. `browseOnly=true` wird
-   ausgeschlossen; ein angegebenes `SchemaLanguage` muss exakt passen.
-5. Ein Treffer aus einem früheren Repository behält Vorrang. Nur mehrere
-   Versionen innerhalb desselben Repository werden verglichen; aktuell erfolgt
-   dieser Vergleich lexikografisch, nicht als semantische Version.
-6. `dependsOnModel` wird rekursiv aufgelöst. Abhängigkeiten stehen im Resultat
-   vor dem anfordernden Modell. Das eingebaute Modell `INTERLIS` wird nicht
-   heruntergeladen.
-7. Ein Modellzyklus erzeugt `ILIC-REPO-CYCLE`; ein fehlendes Modell
-   `ILIC-REPO-NOT-FOUND`.
-8. Absolute Modellpfade und Pfade mit `..` werden als `ILIC-REPO-PATH`
-   abgelehnt.
-9. Dieselbe Datei wird nur einmal geladen. Ein vorhandener MD5-Wert wird vor
-   Übergabe an den Compiler geprüft; Abweichungen erzeugen
-   `ILIC-REPO-CHECKSUM`.
+## Modell- und Sprachversionen
 
-## Zusammenspiel mit `-ilidirs`
+Versionen werden weder lexikografisch noch als SemVer verglichen. Für die
+Kombination aus Modellname und `SchemaLanguage` wird die aktuelle Version über
+die in Indexreihenfolge stabile Kette ermittelt:
 
-Für Imports einer explizit geladenen Datei gilt:
+1. `browseOnly=true` ausfiltern;
+2. erste Version ohne `precursorVersion` als Wurzel wählen;
+3. jeweils dem ersten Eintrag folgen, dessen `precursorVersion` der aktuellen
+   `Version` entspricht;
+4. am letzten verbundenen Eintrag stoppen.
 
-1. bereits geladene Modelle und Dateien derselben Session;
-2. `<Modellname>.ili` in `-ilidirs`;
-3. Scan anderer `.ili`-Dateien in `-ilidirs`;
-4. konfiguriertes Repository.
+Weitere Wurzeln, mehrere Nachfolger, unverbundene Versionen oder eine fehlende
+Wurzel erzeugen Warnings. `publishingDate` wird nicht als Ersatzheuristik
+verwendet. Damit folgt beispielsweise `2.10 precursorVersion=2.9` auf `2.9`,
+ohne die Strings numerisch oder lexikografisch zu vergleichen.
 
-`-no_auto` stoppt die lokale automatische Suche. Explizit als Roots geladene
-Dateien bleiben verfügbar. Repository-Roots werden über `-models` beschafft.
+Bei expliziter Sprache wird exakt `ili1`, `ili2_3` oder `ili2_4` verwendet.
+Ohne Einschränkung gilt in jedem besuchten Repository die deterministische
+Reihenfolge:
 
-## Nativer Cache
+1. `ili2_4`
+2. `ili2_3`
+3. `ili1`
 
-Der Standardpfad wird in dieser Reihenfolge bestimmt:
+INTERLIS 2.2 wird nicht automatisch gewählt, weil der Compiler diese Sprache
+nicht unterstützt.
 
-1. `ILIC_CACHE`, unverändert als Cacheverzeichnis;
-2. `ILI_CACHE/ilic-v1` als Kompatibilitätsvariante;
-3. `$HOME/.ilicache/ilic-v1`;
-4. als letzter Fallback das temporäre Systemverzeichnis unter
-   `ilic-cache-v1`.
+## Abhängigkeiten und Pfadsicherheit
 
-```sh
-ILIC_CACHE=/var/cache/ilic \
-build/macos/ilic -silent \
-  -repositories https://models.interlis.ch \
-  -models DatasetIdx16
-```
+`dependsOnModel` wird rekursiv in deklarierter Reihenfolge aufgelöst. Das
+eingebaute Modell `INTERLIS` benötigt keine Datei. Abhängigkeiten erscheinen im
+Resultat vor dem anfordernden Modell. Ein Zyklus meldet den vollständigen Pfad,
+beispielsweise `A -> B -> C -> A`, als `ILIC-REPO-CYCLE`.
 
-Metadaten gelten standardmäßig 24 Stunden, Modelldateien sieben Tage als
-frisch. Remote-Ressourcen werden unter einem MD5 des vollständigen URI und mit
-der ursprünglichen Erweiterung gespeichert. Downloads werden zuerst als
-`.tmp` geschrieben und anschließend atomar umbenannt.
+Mehrere Modelle dürfen dieselbe `.ili`-Datei referenzieren. Sie wird anhand der
+normalisierten vollständigen URI nur einmal materialisiert, während alle
+Modellnamen als aufgelöst gelten.
 
-Wenn ein Download fehlschlägt, verwendet die Library standardmäßig einen
-vorhandenen abgelaufenen Cacheeintrag und protokolliert einen Warning-Logevent.
-Der CLI stellt aktuell keine Schalter für TTL, `offline` oder
-`allowStaleOnError` bereit; diese Werte sind über die C++-API konfigurierbar.
+Repository-Dateipfade dürfen nur relativ sein. Absolute Pfade, andere URIs,
+Laufwerks- und UNC-Pfade sowie `..`-Segmente werden als `ILIC-REPO-PATH`
+abgelehnt. Bei lokalen Roots wird zusätzlich komponentenweise geprüft, dass
+der normalisierte Zielpfad tatsächlich unterhalb des Roots liegt.
+
+## Cache, Offline-Modus und MD5
+
+Der native Cachepfad wird in dieser Reihenfolge bestimmt:
+
+1. `ILIC_CACHE`;
+2. `ILI_CACHE/ilic-v1`;
+3. `$HOME/.ilicache/ilic-v1`, unter Windows ersatzweise `USERPROFILE`;
+4. System-Tempverzeichnis unter `ilic-cache-v1`.
+
+Metadaten sind standardmäßig 24 Stunden und Modelle sieben Tage frisch. Jeder
+Schreibvorgang verwendet eine eindeutige temporäre Datei mit Prozess-ID,
+Zufallsanteil und Sequenznummer. Erst nach erfolgreichem Schreiben, Flush und
+Close wird atomar veröffentlicht. Ist der konfigurierte Cache nicht
+beschreibbar, materialisiert ein verwalteter temporärer Store den erfolgreichen
+Download, sodass `ResolvedModel.localPath` stets auf eine lesbare Datei zeigt.
+
+Bei `allowStaleOnError=true` kann ein abgelaufener Eintrag nach einem
+Transportfehler als `stale=true` mit Warning verwendet werden. Im Offline-Modus
+finden keine Downloads statt; nur vorhandene Cacheeinträge sind verfügbar.
+Diese Optionen sind derzeit C++-/JavaScript-API-Optionen, keine CLI-Schalter.
+
+Ist in den Metadaten eine MD5-Prüfsumme angegeben, wird sie bei Netz-, frischem
+Cache- und stale Cache-Inhalt case-insensitiv geprüft. Ein beschädigter
+Cacheeintrag wird online invalidiert und genau einmal neu geladen. Offline oder
+nach einem erfolglosen Retry entsteht `ILIC-REPO-CHECKSUM` mit URI, erwarteter
+und tatsächlicher Prüfsumme. `validateChecksums=false` deaktiviert diese Prüfung
+in der C++-API.
 
 ## C++-API
 
@@ -124,31 +141,26 @@ options.cacheDirectory = "/var/cache/ilic";
 options.offline = false;
 options.allowStaleOnError = true;
 options.followSiteLinks = true;
+options.validateChecksums = true;
 
-ilic::RepositoryManager repositories(options);
-ilic::RepositoryResult result = repositories.resolve("DatasetIdx16", "ili2_3");
-if (!result.success) {
-   for (const auto &diagnostic : result.diagnostics)
-      std::cerr << diagnostic.code << ": " << diagnostic.message << '\n';
-}
+ilic::RepositoryManager manager(std::move(options));
+auto result = manager.resolve("DatasetIdx16", "ili2_3");
+for (const auto &diagnostic : result.diagnostics)
+   std::cerr << diagnostic.code << ": " << diagnostic.message << '\n';
+if (!result.success)
+   return 1;
 ```
 
-Für einen vollständig offline ausgeführten Lauf muss der Cache zuvor gefüllt
-sein und `options.offline=true` gesetzt werden. Lokale Repository-Dateien werden
-direkt gelesen und nicht in den HTTP-Cache kopiert.
+`RepositoryManager::defaultRepositories()` liefert die CLI-Defaultliste nur
+als Konstante; der Konstruktor wendet sie nicht automatisch an.
 
-## `@ilic/tools` in Node
-
-Nach dem einmaligen [npm-Bootstrap](npm-publikation.md#einmaliger-bootstrap-auf-npm)
-kann die aktuelle Vorabversion mit `npm install @ilic/tools@snapshot`
-installiert werden. Der lokale Paketweg steht unter
-[Build und Installation](build-und-installation.md#lokale-npm-pakete).
+## JavaScript und Browser
 
 ```js
 import { RepositoryManager } from "@ilic/tools";
 import { NodeFileCache } from "@ilic/tools/node";
 
-const repositories = new RepositoryManager({
+const manager = new RepositoryManager({
   repositories: ["https://models.interlis.ch"],
   cache: new NodeFileCache(".cache/ilic"),
   metadataTtlMs: 24 * 60 * 60 * 1000,
@@ -157,60 +169,12 @@ const repositories = new RepositoryManager({
   followSiteLinks: true
 });
 
-const workspace = await repositories.resolveModel("DatasetIdx16", "ili2_3");
+const workspace = await manager.resolveModel("DatasetIdx16", "ili2_3");
 console.log(workspace.models.map(model => model.metadata.name));
 ```
 
-Ein ephemerer Cache ist nützlich für Tests:
-
-```js
-import { MemoryCache, RepositoryManager } from "@ilic/tools";
-
-const repositories = new RepositoryManager({
-  repositories: [fixtureDirectory],
-  cache: new MemoryCache(),
-  load: uri => readFile(uri),
-  followSiteLinks: false
-});
-```
-
-Mit `offline: true` erfolgen keine neuen Loads; fehlt ein Cacheeintrag, wird
-eine Exception ausgelöst.
-
-## Browser und IndexedDB
-
-```js
-import { RepositoryManager } from "@ilic/tools";
-import { BrowserCache } from "@ilic/tools/browser";
-
-const repositories = new RepositoryManager({
-  repositories: ["https://models.interlis.ch"],
-  cache: new BrowserCache("my-interlis-models")
-});
-const workspace = await repositories.resolveModel("DatasetIdx16", "ili2_3");
-```
-
-`BrowserCache` speichert Ressourcen und Ablagezeit in IndexedDB. Cross-Origin-
-Downloads funktionieren nur, wenn das Repository passende CORS-Header liefert.
-
-## Eigener Transport
-
-`load(uri)` kann Authentisierung, einen Proxy oder ein anwendungsspezifisches
-Dateisystem anbinden:
-
-```js
-const repositories = new RepositoryManager({
-  repositories: ["https://internal.example/models"],
-  load: async uri => {
-    const response = await fetch(uri, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    return new Uint8Array(await response.arrayBuffer());
-  }
-});
-```
-
-Die Hostbibliothek gibt einen `ResolvedWorkspace` mit Metadaten, URI, Source und
-`fromCache` zurück. Wie dieser Workspace in WASM kompiliert wird, zeigt
-[`examples/wasm-repository.mjs`](examples/wasm-repository.mjs).
+`MemoryCache` eignet sich für Tests; `BrowserCache` persistiert in IndexedDB
+und benötigt bei fremden Origins passende CORS-Header. Ein eigenes `load(uri)`
+kann Authentisierung, Proxy oder anwendungsspezifische Dateisystemzugriffe
+bereitstellen. Der `NodeFileCache` publiziert Content und Metadaten über je
+eindeutige temporäre Pfade; unvollständige Paare werden als Cache-Miss behandelt.

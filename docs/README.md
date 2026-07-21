@@ -29,8 +29,9 @@ build/macos/ilic -silent \
 
 Den WASM-Compiler bauen und das geprüfte Node-Beispiel ausführen:
 
-Auf einem neuen Entwicklungsrechner zuerst das
-[Emscripten SDK installieren und aktivieren](build-und-installation.md#emscripten-sdk-einmalig-installieren).
+Auf einem neuen Entwicklungsrechner zuerst die unter
+[WebAssembly](build-und-installation.md#webassembly) genannte gepinnte
+Emscripten-Version installieren und aktivieren.
 
 ```sh
 source /pfad/zu/emsdk/emsdk_env.sh
@@ -44,6 +45,7 @@ node docs/examples/wasm-session.mjs
 | --- | --- |
 | Unterstützte Sprachversionen und Features | [Funktionsumfang](funktionsumfang.md) |
 | Native und WASM-Builds | [Build und Installation](build-und-installation.md) |
+| CI, Release-Train und Publikationsgrenzen | [Build- und Publikationspipeline](build-und-publikationspipeline.md) |
 | Alle Parameter von `ilic` und `ilic-format` | [CLI-Referenz](cli.md) |
 | Standardformatierung und Kommentarerhalt | [Formatter](formatter.md) |
 | Modell-Repositories, Auflösung und Cache | [Repositories](repositories.md) |

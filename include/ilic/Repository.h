@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,7 @@ struct RepositoryOptions {
    bool offline = false;
    bool allowStaleOnError = true;
    bool followSiteLinks = true;
+   bool validateChecksums = true;
 };
 
 struct ResolvedModel {
@@ -38,6 +40,7 @@ struct ResolvedModel {
    std::filesystem::path localPath;
    std::string source;
    bool fromCache = false;
+   bool stale = false;
 };
 
 struct RepositoryResult {
@@ -49,6 +52,13 @@ struct RepositoryResult {
 class RepositoryManager {
 public:
    explicit RepositoryManager(RepositoryOptions options = {});
+   ~RepositoryManager();
+
+   RepositoryManager(RepositoryManager &&) noexcept;
+   RepositoryManager &operator=(RepositoryManager &&) noexcept;
+
+   RepositoryManager(const RepositoryManager &) = delete;
+   RepositoryManager &operator=(const RepositoryManager &) = delete;
 
    const RepositoryOptions &options() const;
    std::vector<ModelMetadata> listModels();
@@ -56,11 +66,14 @@ public:
       const std::string &schemaLanguage);
    RepositoryResult resolve(const std::string &model,const std::string &schemaLanguage);
 
+   static std::vector<std::string> defaultRepositories();
+
    static std::vector<ModelMetadata> parseIliModelsXml(
       const std::string &xml,const std::string &repository,std::vector<Diagnostic> *diagnostics = nullptr);
 
 private:
-   RepositoryOptions options_;
+   class Impl;
+   std::unique_ptr<Impl> impl_;
 };
 
 } // namespace ilic

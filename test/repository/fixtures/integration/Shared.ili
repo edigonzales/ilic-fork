@@ -1,0 +1,3 @@
+INTERLIS 2.4;
+MODEL SharedA = END SharedA.
+MODEL SharedB = END SharedB.

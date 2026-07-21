@@ -7,12 +7,18 @@ ilic is maintained by [infoGrips Ltd. Zürich](https://www.infogrips.ch).
 Source files and binaries can be copied, changed, integrated in other software (commercial or non commercial) without any license restrictions. 
 On foreign libraries contained in folder /lib some license restrictions may apply (see folder for details).
 
-## System Requirements
-Windows 7 or higher is required for the prebuilt Windows distribution.
-macOS builds can be created from source as described below.
+## Release platforms
+
+The native release workflow produces self-contained compiler archives for
+macOS ARM64, Linux x86_64 (fully static musl), and Windows x86_64. Runtime
+dependency checks are part of each release job. macOS x86_64 is not a release
+target.
 
 ## Installation
 In order to install ilic, extract the [.zip](https://www.infogrips.ch/products/ilic.zip) file into a directory.
+
+Current source builds and the three reproducible static-distribution modes are
+documented in [Build und Installation](./docs/build-und-installation.md).
 
 ## Building on macOS
 
@@ -53,6 +59,11 @@ embedded into the `ilic` executable and is not required at runtime. The normal
 build uses only the checked-in generated parser sources and therefore does not
 require Java or an extracted ANTLR JAR.
 
+Native repository support uses statically embedded pugixml instead of libxml2.
+Normal developer builds link the system libcurl; release builds compile a
+pinned HTTP(S)-only curl and select the platform TLS backend. Repository support
+can be excluded completely with `-DILIC_ENABLE_NATIVE_REPOSITORY=OFF`.
+
 ### Checking parser regeneration
 
 The parser sources in `source/input/parser/generated` were generated with the
@@ -83,6 +94,7 @@ for object-path resolution in graphics and views.
   - use the verified [CLI reference](./docs/cli.md) for command line options
   - see the [native APIs](./docs/native-api.md) and [WASM SDK](./docs/wasm.md) for embedding
   - see the [language-tooling snapshots](./docs/language-tooling-snapshots.md) for editor integrations
+  - see the [build and publication pipeline](./docs/build-und-publikationspipeline.md) for CI and the coordinated release train
   - see [npm snapshot publication](./docs/npm-publikation.md) for package builds and authentication
 + reference material:
   - consult the [changelog](./doc/changelog.txt) for historical changes

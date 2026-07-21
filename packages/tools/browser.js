@@ -22,5 +22,6 @@ export class BrowserCache {
   put(key, value) {
     return this.#transaction("readwrite", store => store.put({ value, storedAt: Date.now() }, key));
   }
+  delete(key) { return this.#transaction("readwrite", store => store.delete(key)); }
   clear() { return this.#transaction("readwrite", store => store.clear()); }
 }
