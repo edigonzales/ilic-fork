@@ -105,6 +105,13 @@ Value logs(const std::vector<ilic::LogEvent> &logs)
    return values;
 }
 
+Value transcript(const std::vector<std::string> &lines)
+{
+   Value::Array values;
+   for (const auto &line : lines) values.emplace_back(line);
+   return values;
+}
+
 Value errorResult(const char *kind,const std::string &message,
    const std::string &uri = std::string(),std::uint64_t documentVersion = 0)
 {
@@ -144,6 +151,7 @@ Value errorResult(const char *kind,const std::string &message,
       result["missingModels"] = Value::Array{};
       result["models"] = Value::Array{};
       result["logs"] = Value::Array{};
+      result["transcript"] = Value::Array{};
    }
    else if (value == "formatting") {
       result["applicable"] = false;
@@ -212,7 +220,8 @@ Value compileResult(const ilic::CompilationResult &result)
       {"kind","compilation"},{"success",result.success},{"cancelled",result.cancelled},
       {"errorCount",result.errorCount},{"warningCount",result.warningCount},
       {"missingModels",std::move(missing)},{"models",std::move(models)},
-      {"diagnostics",diagnostics(result.diagnostics)},{"logs",logs(result.logs)}
+      {"diagnostics",diagnostics(result.diagnostics)},{"logs",logs(result.logs)},
+      {"transcript",transcript(result.transcript)}
    };
 }
 
@@ -307,6 +316,15 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
       {"documentation",Value::Object{{"title",result.documentation.title},
          {"sections",std::move(sections)}}},
       {"diagnostics",diagnostics(result.diagnostics)},{"logs",logs(result.logs)}};
+}
+
+Value compilationAnalysisResult(const ilic::CompilationAnalysisResult &result)
+{
+   Value::Array syntax;
+   for (const auto &snapshot : result.syntax) syntax.push_back(syntaxResult(snapshot));
+   return Value::Object{{"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
+      {"kind","compilation-analysis"},{"compilation",compileResult(result.compilation)},
+      {"semantic",semanticResult(result.semantic)},{"syntax",std::move(syntax)}};
 }
 
 } // namespace
@@ -409,6 +427,25 @@ std::uint32_t ilic_analyze(std::uint32_t session,const char *requestJson,std::si
       return store(errorResult("semantic",error.what()));
    }
    catch (...) { return store(errorResult("semantic","unknown C++ exception")); }
+}
+
+std::uint32_t ilic_compile_and_analyze(std::uint32_t session,const char *requestJson,
+   std::size_t requestLength)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return store(errorResult("compilation-analysis","invalid session handle"));
+   if (requestJson == nullptr)
+      return store(errorResult("compilation-analysis","request JSON is null"));
+   try {
+      Value json = ilic::json::parse(std::string(requestJson,requestLength));
+      return store(compilationAnalysisResult(value->compileAndAnalyze(compileRequest(json))));
+   }
+   catch (const std::exception &error) {
+      return store(errorResult("compilation-analysis",error.what()));
+   }
+   catch (...) {
+      return store(errorResult("compilation-analysis","unknown C++ exception"));
+   }
 }
 
 std::uint32_t ilic_format(std::uint32_t session,const char *requestJson,std::size_t requestLength)

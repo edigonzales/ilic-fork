@@ -92,7 +92,15 @@ struct SemanticSnapshot {
    std::vector<LogEvent> logs;
 };
 
+struct CompilationAnalysisResult {
+   CompilationResult compilation;
+   SemanticSnapshot semantic;
+   std::vector<SyntaxSnapshot> syntax;
+};
+
 SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
-   const CompilationRequest &request,const CompilationResult &compilation);
+   const CompilationRequest &request,const CompilationResult &compilation,
+   const std::vector<std::string> &compilationSourceUris = {},
+   std::vector<SyntaxSnapshot> *syntaxSnapshots = nullptr);
 
 } // namespace ilic

@@ -43,6 +43,8 @@ export interface CompilationResult {
   }>;
   diagnostics: Diagnostic[];
   logs: LogEvent[];
+  /** CLI-compatible human-readable compiler transcript, including the final status line. */
+  transcript?: string[];
 }
 export interface SyntaxToken { kind: string; text: string; channel: number; range: SourceRange; }
 export interface SyntaxNode { id: number; parent: number | null; kind: string; range: SourceRange; }
@@ -107,6 +109,15 @@ export interface SemanticSnapshot {
   diagnostics: Diagnostic[];
   logs: LogEvent[];
 }
+export interface CompilationAnalysisResult {
+  schemaVersion: 1;
+  abiVersion: 1;
+  compilerVersion: string;
+  kind: "compilation-analysis";
+  compilation: CompilationResult;
+  semantic: SemanticSnapshot;
+  syntax: SyntaxSnapshot[];
+}
 export interface FormatResult {
   schemaVersion: 1;
   abiVersion: 1;
@@ -135,6 +146,7 @@ export interface EmscriptenIlicModule {
   _ilic_compile(session: number, request: number, requestLength: number): number;
   _ilic_parse(session: number, request: number, requestLength: number): number;
   _ilic_analyze(session: number, request: number, requestLength: number): number;
+  _ilic_compile_and_analyze(session: number, request: number, requestLength: number): number;
   _ilic_format(session: number, request: number, requestLength: number): number;
   _ilic_result_json(result: number, resultLength: number): number;
   _ilic_result_destroy(result: number): void;
@@ -147,6 +159,7 @@ export class CompilerSession {
   compile(request: CompilationRequest): CompilationResult;
   parse(uri: string): SyntaxSnapshot;
   analyze(request: CompilationRequest): SemanticSnapshot;
+  compileAndAnalyze(request: CompilationRequest): CompilationAnalysisResult;
   format(uri: string, options?: { indentSize?: number; requireValidSyntax?: boolean }): FormatResult;
   dispose(): void;
 }

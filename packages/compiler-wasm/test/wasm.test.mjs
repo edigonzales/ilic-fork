@@ -7,7 +7,7 @@ import { createCompiler } from "../index.js";
 const modulePath = resolve(import.meta.dirname, "../ilic.mjs");
 
 test("compiles and formats through the real WASM ABI", {
-  skip: existsSync(modulePath) ? false : "build/wasm/ilic.mjs has not been built"
+  skip: existsSync(modulePath) ? false : "WASM package artifacts have not been built"
 }, async () => {
   const compiler = await createCompiler();
   const session = compiler.createSession();
@@ -22,6 +22,7 @@ END WasmModel.
   assert.ok(result.models.some(model => model.name === "WasmModel"));
   assert.equal(result.schemaVersion, 1);
   assert.equal(result.abiVersion, 1);
+  assert.match(result.transcript.join("\n"), /ilic completed with no errors, no warnings\./);
 
   const syntax = session.parse(uri);
   assert.equal(syntax.kind, "syntax");
@@ -35,6 +36,13 @@ END WasmModel.
   assert.equal(semantic.success, true, JSON.stringify(semantic.diagnostics));
   assert.ok(semantic.symbols.some(symbol => symbol.qualifiedName === "WasmModel"));
   assert.equal(semantic.documentVersions[uri], 7);
+
+  const combined = session.compileAndAnalyze({ roots: [uri] });
+  assert.equal(combined.kind, "compilation-analysis");
+  assert.equal(combined.compilation.success, true);
+  assert.equal(combined.semantic.success, true);
+  assert.deepEqual(combined.semantic.diagnostics, combined.compilation.diagnostics);
+  assert.deepEqual(combined.syntax.map(snapshot => snapshot.uri), [uri]);
 
   const formatted = session.format(uri);
   assert.equal(formatted.success, true);
@@ -52,13 +60,14 @@ END WaesmInvalid.
 `);
   const invalid = session.compile({ roots: [invalidUri] });
   assert.equal(invalid.success, false);
+  assert.match(invalid.transcript.join("\n"), /ilic completed with \d+ errors?, no warnings\./);
   assert.ok(invalid.diagnostics.some(diagnostic =>
     diagnostic.range?.uri === invalidUri && diagnostic.range.start.line === 4));
   session.dispose();
 });
 
 test("keeps the WASM session usable while an editor buffer is incomplete", {
-  skip: existsSync(modulePath) ? false : "build/wasm/ilic.mjs has not been built"
+  skip: existsSync(modulePath) ? false : "WASM package artifacts have not been built"
 }, async () => {
   const compiler = await createCompiler();
   const session = compiler.createSession();
@@ -82,5 +91,39 @@ END LiveEdit.
     true,
     JSON.stringify(compilation.diagnostics),
   );
+  session.dispose();
+});
+
+test("exports inheritance references for EXTENDED attributes", {
+  skip: existsSync(modulePath) ? false : "WASM package artifacts have not been built"
+}, async () => {
+  const compiler = await createCompiler();
+  const session = compiler.createSession();
+  const uri = "memory:///Extended.ili";
+  session.putSource(uri, `INTERLIS 2.4;
+MODEL Extended AT "https://example.invalid/ilic/tests" VERSION "1" =
+  TOPIC Data =
+    CLASS Base (ABSTRACT) =
+      Name : TEXT * 80;
+    END Base;
+    CLASS Child EXTENDS Base =
+      Name (EXTENDED) : TEXT * 80;
+    END Child;
+  END Data;
+END Extended.
+`, 1);
+  const result = session.compileAndAnalyze({ roots: [uri] });
+  assert.equal(result.compilation.success, true, JSON.stringify(result.compilation.diagnostics));
+  const base = result.semantic.symbols.find(symbol =>
+    symbol.qualifiedName === "Extended.Data.Base.Name");
+  const child = result.semantic.symbols.find(symbol =>
+    symbol.qualifiedName === "Extended.Data.Child.Name");
+  assert.ok(base);
+  assert.ok(child);
+  assert.ok(result.semantic.references.some(reference =>
+    reference.kind === "inheritance" &&
+    reference.sourceId === child.id &&
+    reference.targetId === base.id &&
+    reference.range?.uri === uri));
   session.dispose();
 });

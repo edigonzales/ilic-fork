@@ -89,6 +89,12 @@ export class CompilerSession {
       this.#handle, { schemaVersion: 1, ...request });
   }
 
+  compileAndAnalyze(request) {
+    this.#active();
+    return callJson(this.#module, this.#module._ilic_compile_and_analyze,
+      this.#handle, { schemaVersion: 1, ...request });
+  }
+
   format(uri, options = {}) {
     this.#active();
     return callJson(this.#module, this.#module._ilic_format,

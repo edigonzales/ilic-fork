@@ -86,15 +86,79 @@ std::string joinDirectories(const std::vector<std::string> &directories)
    return value.str();
 }
 
+std::string diagnosticTranscriptLine(const Diagnostic &diagnostic)
+{
+   const bool error = diagnostic.treatedAsError ||
+      diagnostic.severity == DiagnosticSeverity::Error;
+   std::string prefix = error ? "err:" :
+      (diagnostic.severity == DiagnosticSeverity::Warning ? "wrn:" : "inf:");
+   std::string line = prefix + (error || diagnostic.severity == DiagnosticSeverity::Warning ?
+      "    " : " ");
+   if (diagnostic.range.valid) {
+      line += diagnostic.range.uri + ":" +
+         std::to_string(diagnostic.range.start.line + 1) + ":" +
+         std::to_string(diagnostic.range.start.character + 1) + ": ";
+   }
+   line += diagnostic.message;
+   return line;
+}
+
+void appendNewEvents(std::vector<std::string> &transcript,
+   std::size_t &diagnosticIndex,std::size_t &logIndex)
+{
+   const auto &diagnostics = Log.getDiagnostics();
+   while (diagnosticIndex < diagnostics.size())
+      transcript.push_back(diagnosticTranscriptLine(diagnostics[diagnosticIndex++]));
+
+   const auto &events = Log.getLogEvents();
+   while (logIndex < events.size()) {
+      const auto &event = events[logIndex++];
+      const std::string prefix = event.level == LogLevel::Error ? "err:" :
+         (event.level == LogLevel::Warning ? "wrn:" :
+         (event.level == LogLevel::Debug ? "dbg:" : "inf:"));
+      transcript.push_back(prefix + "    " + event.message);
+   }
+}
+
+std::string completionTranscriptLine(int errorCount,int warningCount)
+{
+   std::string line = "inf: ilic completed with";
+   if (errorCount == 0) line += " no errors";
+   else if (errorCount == 1) line += " 1 error";
+   else line += " " + std::to_string(errorCount) + " errors";
+   if (warningCount == 0) line += ", no warnings";
+   else if (warningCount == 1) line += ", 1 warning";
+   else line += ", " + std::to_string(warningCount) + " warnings";
+   return line + ".";
+}
+
+void appendInputFileTranscript(std::vector<std::string> &transcript,
+   util::IliFile *file)
+{
+   if (file == nullptr || file->getFilePath() == "INTERLIS") return;
+   std::string models;
+   for (const auto &model : file->getModels()) {
+      if (!models.empty()) models += ",";
+      models += model;
+   }
+   transcript.push_back("inf:    " + file->getFilePath() + ", iliversion=" +
+      file->getIliVersion() + ", models=" + models + ", " +
+      (file->getAutoSearch() ? "auto search" : "command line"));
+}
+
 bool compileFile(
    util::IliFile *file,
    std::list<util::IliFile *> &compiledFiles,
-   std::set<std::string> &compiledModels)
+   std::set<std::string> &compiledModels,
+   std::vector<std::string> &transcript,
+   std::size_t &diagnosticIndex,
+   std::size_t &logIndex)
 {
    if (file == nullptr) return false;
    if (file->getIliVersion() != "1.0" && file->getIliVersion() != "2.3"
        && file->getIliVersion() != "2.4") {
       Log.error(file->getFilePath() + ": unsupported iliversion " + file->getIliVersion());
+      appendNewEvents(transcript,diagnosticIndex,logIndex);
       return true;
    }
    for (auto *compiled : compiledFiles) if (compiled == file) return true;
@@ -105,11 +169,16 @@ bool compileFile(
       if (!found) return false;
    }
 
+   transcript.push_back("inf: compiling " + file->getFilePath() + " ...");
+   const int errorsBefore = Log.getErrorCount();
    if (file->getIliVersion() == "1.0") input::parseIli1(file->getFilePath());
    else input::parseIli2(file->getFilePath());
+   appendNewEvents(transcript,diagnosticIndex,logIndex);
    compiledFiles.push_back(file);
    if (file->getFilePath() == "INTERLIS") compiledModels.insert("INTERLIS");
    for (const auto &model : file->getModels()) compiledModels.insert(model);
+   transcript.push_back("inf: " + file->getFilePath() +
+      (Log.getErrorCount() > errorsBefore ? " compiled with errors." : " compiled."));
    return true;
 }
 
@@ -142,14 +211,51 @@ CompilationResult CompilerSession::compile(const CompilationRequest &request)
 SemanticSnapshot CompilerSession::analyze(const CompilationRequest &request)
 {
    std::lock_guard<std::mutex> lock(compilerMutex);
-   const CompilationResult compilation = compileUnlocked(request);
-   return buildSemanticSnapshot(sources_,request,compilation);
+   return compileAndAnalyzeUnlocked(request).semantic;
+}
+
+CompilationAnalysisResult CompilerSession::compileAndAnalyze(const CompilationRequest &request)
+{
+   std::lock_guard<std::mutex> lock(compilerMutex);
+   return compileAndAnalyzeUnlocked(request);
+}
+
+CompilationAnalysisResult CompilerSession::compileAndAnalyzeUnlocked(
+   const CompilationRequest &request)
+{
+   CompilationAnalysisResult result;
+   result.compilation = compileUnlocked(request);
+   result.semantic = buildSemanticSnapshot(sources_,request,result.compilation,
+      lastCompilationSourceUris_,&result.syntax);
+   return result;
 }
 
 CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &request)
 {
+   ++compileInvocationCount_;
+   lastCompilationSourceUris_.clear();
    ActiveSourceManagerScope sourceScope(&sources_);
    CompilationResult result;
+   std::vector<std::string> transcript{
+      "inf: ilic " + std::string(version()),
+      "inf:",
+      "inf: loading ili files from command line ...",
+   };
+   std::size_t transcriptedDiagnostics = 0;
+   std::size_t transcriptedLogs = 0;
+
+   auto finish = [&]() {
+      appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
+      result.errorCount = Log.getErrorCount();
+      result.warningCount = Log.getWarningCount();
+      result.diagnostics = Log.getDiagnostics();
+      result.logs = Log.getLogEvents();
+      result.success = result.errorCount == 0;
+      transcript.push_back("inf:");
+      transcript.push_back(completionTranscriptLine(result.errorCount,result.warningCount));
+      result.transcript = std::move(transcript);
+      return result;
+   };
 
    try {
    Log.reset();
@@ -164,19 +270,27 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
    util::set_ilidirs(joinDirectories(request.options.modelDirectories));
 
    for (const auto &root : request.roots) {
+      transcript.push_back("inf:    loading " + root + " ...");
       if (util::load_ilifiles_by_file(root) == nullptr) {
          Log.error("unable to load root source " + root);
+         appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
+         transcript.push_back("inf:    not done.");
+      }
+      else {
+         transcript.push_back("inf:    done.");
       }
    }
+   transcript.push_back("inf: done.");
    if (util::all_ilifiles.empty()) {
-      result.errorCount = Log.getErrorCount();
-      result.warningCount = Log.getWarningCount();
-      return result;
+      return finish();
    }
 
    const std::string iliVersion = util::all_ilifiles.back()->getIliVersion();
    metamodel::init(iliVersion);
+   transcript.push_back("inf:");
+   transcript.push_back("inf: loading imported models ...");
    std::map<std::string, bool> loaded;
+   std::set<std::string> reportedMissing;
    bool progress = true;
    while (progress) {
       progress = false;
@@ -186,32 +300,52 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
             if (model == "INTERLIS" || loaded[model]) continue;
             util::IliFile *resolved = util::load_ilifiles_by_model(model, iliVersion);
             if (resolved == nullptr) {
-               result.missingModels.push_back(model);
-               Log.error("model " + model + " not found.");
+               if (reportedMissing.insert(model).second) {
+                  result.missingModels.push_back(model);
+                  Log.error("model " + model + " not found.");
+                  appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
+                  transcript.push_back("inf:    model " + model + " not found.");
+               }
             }
             else {
                loaded[model] = true;
+               transcript.push_back("inf:    found in " + resolved->getFilePath() + ".");
             }
          }
       }
       progress = util::all_ilifiles.size() > before;
    }
+   transcript.push_back("inf: done.");
+
+   for (auto *file : util::all_ilifiles)
+      if (file != nullptr) lastCompilationSourceUris_.push_back(file->getFilePath());
+
+   transcript.push_back("inf:");
+   transcript.push_back("inf: all input files are:");
+   for (auto *file : util::all_ilifiles) appendInputFileTranscript(transcript,file);
+   transcript.push_back("inf: done.");
 
    std::list<util::IliFile *> compiledFiles;
    std::set<std::string> compiledModels;
-   compileFile(util::load_ilifiles_by_model("INTERLIS", iliVersion), compiledFiles, compiledModels);
+   compileFile(util::load_ilifiles_by_model("INTERLIS", iliVersion), compiledFiles,
+      compiledModels,transcript,transcriptedDiagnostics,transcriptedLogs);
    for (std::size_t pass = 0; pass <= util::all_ilifiles.size(); ++pass) {
       bool allCompiled = true;
       for (auto *file : util::all_ilifiles) {
-         allCompiled = compileFile(file, compiledFiles, compiledModels) && allCompiled;
+         allCompiled = compileFile(file,compiledFiles,compiledModels,transcript,
+            transcriptedDiagnostics,transcriptedLogs) && allCompiled;
       }
       if (allCompiled) break;
-      if (pass == util::all_ilifiles.size()) Log.error("unable to order model dependencies");
+      if (pass == util::all_ilifiles.size()) {
+         Log.error("unable to order model dependencies");
+         appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
+      }
    }
 
    applyExternalMetaAttributes(request);
    metamodel::check_model_semantics();
    metamodel::check_model_translations();
+   appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
    for (auto *model : metamodel::get_all_models()) {
       CompiledModel compiled{model->Name, model->iliVersion, model->_ilifile, {}};
       for (auto *attribute : model->MetaAttribute) {
@@ -219,20 +353,17 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
       }
       result.models.push_back(std::move(compiled));
    }
-   result.errorCount = Log.getErrorCount();
-   result.warningCount = Log.getWarningCount();
-   result.diagnostics = Log.getDiagnostics();
-   result.logs = Log.getLogEvents();
-   result.success = result.errorCount == 0;
-   return result;
+   transcript.push_back("inf:");
+   transcript.push_back("inf: all models are:");
+   for (const auto &model : result.models)
+      transcript.push_back("inf:    model " + model.name + ", iliversion=" +
+         model.iliVersion + ", file=" + model.uri);
+   transcript.push_back("inf: done.");
+   return finish();
    }
    catch (const util::CompilerAbort &error) {
       Log.error(std::string("internal compiler failure: ") + error.what());
-      result.errorCount = Log.getErrorCount();
-      result.warningCount = Log.getWarningCount();
-      result.diagnostics = Log.getDiagnostics();
-      result.logs = Log.getLogEvents();
-      return result;
+      return finish();
    }
 }
 

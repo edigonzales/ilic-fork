@@ -134,7 +134,7 @@ if(EMSCRIPTEN)
         "-sWASM_BIGINT=1"
         "-sASSERTIONS=1"
         "-fexceptions"
-        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_parse','_ilic_analyze','_ilic_compile','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
+        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_parse','_ilic_analyze','_ilic_compile','_ilic_compile_and_analyze','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
     )
     set_target_properties(ilic-wasm PROPERTIES OUTPUT_NAME "ilic" SUFFIX ".mjs")
 endif()

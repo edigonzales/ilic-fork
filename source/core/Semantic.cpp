@@ -91,6 +91,7 @@ public:
             addReference(sourceId,extendable->Super,"inheritance",element);
          }
          if (auto *attribute = dynamic_cast<metamodel::AttrOrParam *>(element)) {
+            addReference(sourceId,attribute->Extending,"inheritance",element);
             addReference(sourceId,typeTarget(attribute->Type),"type",element);
          }
          if (auto *role = dynamic_cast<metamodel::Role *>(element)) {
@@ -223,7 +224,9 @@ private:
 } // namespace
 
 SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
-   const CompilationRequest &request,const CompilationResult &compilation)
+   const CompilationRequest &request,const CompilationResult &compilation,
+   const std::vector<std::string> &compilationSourceUris,
+   std::vector<SyntaxSnapshot> *syntaxSnapshots)
 {
    SemanticSnapshot snapshot;
    snapshot.success = compilation.success;
@@ -232,7 +235,11 @@ SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
    snapshot.diagnostics = compilation.diagnostics;
    snapshot.logs = compilation.logs;
    snapshot.missingModels = compilation.missingModels;
-   for (const auto &uri : sources.uris()) {
+   std::set<std::string> reachableUris(request.roots.begin(),request.roots.end());
+   reachableUris.insert(compilationSourceUris.begin(),compilationSourceUris.end());
+   for (const auto &model : compilation.models)
+      if (sources.get(model.uri) != nullptr) reachableUris.insert(model.uri);
+   for (const auto &uri : reachableUris) {
       if (const SourceBuffer *source = sources.get(uri))
          snapshot.documentVersions[uri] = source->version;
    }
@@ -242,7 +249,8 @@ SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
    for (const auto &model : compilation.models) modelUris[model.name] = model.uri;
    for (const auto &model : compilation.models) uriModels[model.uri] = model.name;
    std::map<std::string,SyntaxSnapshot> syntaxByUri;
-   for (const auto &uri : sources.uris()) {
+   for (const auto &uri : reachableUris) {
+      if (sources.get(uri) == nullptr) continue;
       SyntaxSnapshot syntax = parseSyntax(sources,uri);
       for (const auto &reference : syntax.importReferences) {
          auto found = modelUris.find(reference.model);
@@ -285,6 +293,11 @@ SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
                "qualifier",tokens[index].range});
          }
       }
+   }
+   if (syntaxSnapshots != nullptr) {
+      syntaxSnapshots->reserve(syntaxByUri.size());
+      for (auto &entry : syntaxByUri)
+         syntaxSnapshots->push_back(std::move(entry.second));
    }
    return snapshot;
 }

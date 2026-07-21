@@ -5,11 +5,13 @@
 #include "Syntax.h"
 
 #include <string>
+#include <cstdint>
 #include <vector>
 
 namespace ilic {
 
 struct SemanticSnapshot;
+struct CompilationAnalysisResult;
 
 struct CompilerOptions {
    bool autoSearch = true;
@@ -48,6 +50,7 @@ struct CompilationResult {
    std::vector<CompiledModel> models;
    std::vector<Diagnostic> diagnostics;
    std::vector<LogEvent> logs;
+   std::vector<std::string> transcript;
 };
 
 class CompilerSession {
@@ -61,11 +64,16 @@ public:
    const SourceManager &sources() const;
    SyntaxSnapshot parse(const std::string &uri);
    SemanticSnapshot analyze(const CompilationRequest &request);
+   CompilationAnalysisResult compileAndAnalyze(const CompilationRequest &request);
    CompilationResult compile(const CompilationRequest &request);
 
 private:
+   friend struct CompilerSessionTestAccess;
    CompilationResult compileUnlocked(const CompilationRequest &request);
+   CompilationAnalysisResult compileAndAnalyzeUnlocked(const CompilationRequest &request);
    SourceManager sources_;
+   std::uint64_t compileInvocationCount_ = 0;
+   std::vector<std::string> lastCompilationSourceUris_;
 };
 
 const char *version();

@@ -45,6 +45,7 @@ END AbiModel.
    assert(compilation.find("\"kind\":\"compilation\"") != std::string::npos);
    assert(compilation.find("\"success\":true") != std::string::npos);
    assert(compilation.find("\"displayName\"") != std::string::npos);
+   assert(compilation.find("ilic completed with no errors, no warnings.") != std::string::npos);
 
    const std::string parseRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili"})json";
@@ -57,6 +58,14 @@ END AbiModel.
    assert(semantic.find("\"kind\":\"semantic\"") != std::string::npos);
    assert(semantic.find("\"qualifiedName\":\"AbiModel\"") != std::string::npos);
    assert(semantic.find("\"title\":\"AbiModel\"") != std::string::npos);
+
+   std::string combined = resultJson(
+      ilic_compile_and_analyze(session,compileRequest.data(),compileRequest.size()));
+   assert(combined.find("\"kind\":\"compilation-analysis\"") != std::string::npos);
+   assert(combined.find("\"compilation\":{\"abiVersion\":1") != std::string::npos);
+   assert(combined.find("\"semantic\":{\"abiVersion\":1") != std::string::npos);
+   assert(combined.find("\"syntax\":[{") != std::string::npos);
+   assert(combined.find("\"transcript\":[") != std::string::npos);
 
    const std::string formatRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili","options":{"indentSize":2}})json";
