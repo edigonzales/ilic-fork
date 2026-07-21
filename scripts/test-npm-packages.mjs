@@ -105,7 +105,17 @@ const { MemoryCache, RepositoryManager } = toolsPackage;
 assert.deepEqual(Object.keys(compilerPackage).sort(),
   ["Compiler", "CompilerSession", "createCompiler"]);
 assert.deepEqual(Object.keys(toolsPackage).sort(),
-  ["MemoryCache", "RepositoryManager", "parseIliModelsXml"]);
+  [
+    "MemoryCache",
+    "RepositoryManager",
+    "normalizeRepositoryUri",
+    "parseIliModelsXml",
+    "parseIliSiteXml",
+    "resolveRepositoryUri",
+    "selectLatestModelVersion",
+    "supportedSchemaLanguagePreference",
+    "validateRepositoryRelativePath"
+  ]);
 assert.equal(typeof BrowserCache, "function");
 assert.equal(typeof MemoryCache, "function");
 assert.equal(typeof NodeFileCache, "function");

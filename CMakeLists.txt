@@ -21,6 +21,8 @@ add_library(antlr4-runtime STATIC
     ${ANTLR_RUNTIME_SOURCES}
 )
 
+target_compile_definitions(antlr4-runtime PUBLIC ANTLR4CPP_STATIC)
+
 target_include_directories(antlr4-runtime
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/include"
