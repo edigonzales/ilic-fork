@@ -69,6 +69,30 @@ test("stages both packages with one snapshot version without mutating sources", 
   ]), before);
 });
 
+test("adds a numeric build ID to both compiler package versions", async t => {
+  const root = await createFixture(t);
+  const result = await prepareNpmSnapshot({
+    projectRoot: root,
+    outputRoot: join(root, "build/npm"),
+    timestamp: fixedTimestamp,
+    buildId: "12345"
+  });
+
+  assert.equal(result.snapshotVersion, `0.9.9-SNAPSHOT.${fixedTimestamp}.12345`);
+  const manifest = JSON.parse(await readFile(join(result.directories.tools, "package.json"), "utf8"));
+  assert.equal(manifest.version, result.snapshotVersion);
+});
+
+test("rejects non-numeric build IDs", async t => {
+  const root = await createFixture(t);
+  await assert.rejects(() => prepareNpmSnapshot({
+    projectRoot: root,
+    outputRoot: join(root, "build/npm"),
+    timestamp: fixedTimestamp,
+    buildId: "run-123"
+  }), /build ID/i);
+});
+
 test("rejects a package version that differs from CMake", async t => {
   const root = await createFixture(t);
   const path = join(root, "packages/tools/package.json");

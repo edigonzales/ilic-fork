@@ -14,10 +14,11 @@ noch als GitHub Release veröffentlicht.
 ## Version und Dist-Tag
 
 Die Basisversion ist die CMake-Projektversion aus `CMakeLists.txt`, aktuell
-`0.9.9`. Ein Publish erhält einen UTC-Zeitstempel:
+`0.9.9`. Ein koordinierter Publish erhält einen UTC-Zeitstempel und eine
+eindeutige GitHub-Run-ID:
 
 ```text
-0.9.9-SNAPSHOT.20260718143152
+0.9.9-SNAPSHOT.20260718143152.123456789
 ```
 
 Der Zeitstempel hat das Format `YYYYMMDDHHmmss`. Beide Pakete erhalten in einem
@@ -137,7 +138,7 @@ unter `Package → Settings → Trusted Publisher` eingetragen:
 | --- | --- |
 | Provider | GitHub Actions |
 | GitHub user/organization | `edigonzales` |
-| Repository | `ilic-fork` |
+| Repository | `interlis-language-tools` |
 | Workflow filename | `publish-npm-snapshot.yml` |
 | Environment | leer |
 | Allowed action | `npm publish` |
@@ -169,8 +170,21 @@ Publisher funktioniert weiterhin, traditionelle Publish-Tokens dagegen nicht.
 
 ## GitHub Action starten
 
-Der Workflow liegt unter `.github/workflows/publish-npm-snapshot.yml` und wird
-ausschliesslich manuell ausgeführt:
+Der Workflow liegt unter `.github/workflows/publish-npm-snapshot.yml` und bleibt
+als manueller Compiler-only-Bootstrap-/Recovery-Weg erhalten. Der normale
+automatische Publish läuft über den koordinierten Release-Train in
+`interlis-language-tools`.
+
+Nach erfolgreicher `main`-CI wird der Release-Train mit dem exakten Compiler-SHA
+per `repository_dispatch` angefordert. Der zentrale Workflow baut und
+publiziert Compiler und Language-Tools gemeinsam.
+
+Dafür muss im Repository ein `RELEASE_DISPATCH_TOKEN` mit Schreibzugriff auf
+das Repository `interlis-language-tools` hinterlegt sein. Der npm-Trusted-
+Publisher des zentralen Workflows benötigt zusätzlich die in diesem Dokument
+beschriebene Umstellung auf das Language-Tools-Repository.
+
+Für einen manuellen Compiler-only-Lauf:
 
 1. GitHub-Repository öffnen.
 2. `Actions → Publish npm snapshot → Run workflow` wählen.

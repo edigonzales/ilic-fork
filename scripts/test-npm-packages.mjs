@@ -51,7 +51,7 @@ function expectedFiles(manifest) {
 async function verifyPackList(directory, expectedName) {
   const manifest = JSON.parse(await readFile(resolve(directory, "package.json"), "utf8"));
   assert.equal(manifest.name, expectedName);
-  assert.match(manifest.version, /^\d+\.\d+\.\d+-SNAPSHOT\.\d{14}$/);
+  assert.match(manifest.version, /^\d+\.\d+\.\d+-SNAPSHOT\.\d{14}(?:\.\d+)?$/);
   assert.equal(manifest.author, "edigonzales");
   assert.equal(manifest.license, "MIT");
   assert.equal(manifest.repository?.url, "https://github.com/edigonzales/ilic-fork.git");

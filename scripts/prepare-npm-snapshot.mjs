@@ -48,6 +48,15 @@ function validateTimestamp(timestamp) {
   }
 }
 
+export function validateBuildId(buildId) {
+  if (buildId === undefined || buildId === null || buildId === "") return undefined;
+  const normalized = String(buildId);
+  if (!/^\d+$/.test(normalized)) {
+    throw new Error("Snapshot build ID must contain only digits");
+  }
+  return normalized;
+}
+
 function isSameOrParent(parent, child) {
   const path = relative(parent, child);
   return path === "" || (!path.startsWith(`..${sep}`) && path !== "..");
@@ -97,15 +106,17 @@ function projectVersion(cmake) {
 export async function prepareNpmSnapshot({
   projectRoot = resolve(import.meta.dirname, ".."),
   outputRoot = resolve(projectRoot, "build/npm"),
-  timestamp = formatUtcTimestamp()
+  timestamp = formatUtcTimestamp(),
+  buildId
 } = {}) {
   projectRoot = resolve(projectRoot);
   outputRoot = resolve(outputRoot);
   validateTimestamp(timestamp);
+  const normalizedBuildId = validateBuildId(buildId);
   validateOutputRoot(projectRoot, outputRoot);
 
   const baseVersion = projectVersion(await readFile(resolve(projectRoot, "CMakeLists.txt"), "utf8"));
-  const snapshotVersion = `${baseVersion}-SNAPSHOT.${timestamp}`;
+  const snapshotVersion = `${baseVersion}-SNAPSHOT.${timestamp}${normalizedBuildId ? `.${normalizedBuildId}` : ""}`;
   const packages = [];
 
   for (const spec of PACKAGE_SPECS) {
@@ -154,12 +165,13 @@ function parseArguments(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     const value = argv[index + 1];
-    if (["--project-root", "--output", "--timestamp", "--github-output"].includes(argument)) {
+    if (["--project-root", "--output", "--timestamp", "--build-id", "--github-output"].includes(argument)) {
       if (!value) throw new Error(`${argument} requires a value`);
       index += 1;
       if (argument === "--project-root") options.projectRoot = resolve(value);
       else if (argument === "--output") options.outputRoot = resolve(value);
       else if (argument === "--timestamp") options.timestamp = value;
+      else if (argument === "--build-id") options.buildId = value;
       else githubOutput = value;
     } else {
       throw new Error(`Unknown argument ${argument}`);
