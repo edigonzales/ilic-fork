@@ -124,8 +124,12 @@ Ist in den Metadaten eine MD5-Prüfsumme angegeben, wird sie bei Netz-, frischem
 Cache- und stale Cache-Inhalt case-insensitiv geprüft. Ein beschädigter
 Cacheeintrag wird online invalidiert und genau einmal neu geladen. Offline oder
 nach einem erfolglosen Retry entsteht `ILIC-REPO-CHECKSUM` mit URI, erwarteter
-und tatsächlicher Prüfsumme. `validateChecksums=false` deaktiviert diese Prüfung
-in der C++-API.
+und tatsächlicher Prüfsumme. Die Prüfung verwendet die tatsächlichen Bytes der
+Modelldatei; Zeilenenden werden nicht vorher normalisiert. Repository-
+Modelldateien im Quellbaum müssen deshalb mit stabilen LF-Zeilenenden ausgecheckt
+werden. Das Repository erzwingt dieses Format für versionierte `.ili`-Dateien
+über [`.gitattributes`](../.gitattributes). `validateChecksums=false` deaktiviert
+diese Prüfung in der C++-API.
 
 ## C++-API
 
