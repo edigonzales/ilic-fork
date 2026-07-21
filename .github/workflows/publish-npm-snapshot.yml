@@ -57,7 +57,7 @@ jobs:
 
       - name: Stage snapshot packages
         id: stage
-        run: node scripts/prepare-npm-snapshot.mjs --github-output "$GITHUB_OUTPUT"
+        run: node scripts/prepare-npm-snapshot.mjs --build-id "$GITHUB_RUN_ID" --github-output "$GITHUB_OUTPUT"
 
       - name: Verify packed and installed packages
         run: node scripts/test-npm-packages.mjs
