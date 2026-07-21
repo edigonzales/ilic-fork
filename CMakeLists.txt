@@ -263,10 +263,10 @@ if(BUILD_TESTING)
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
         target_link_libraries(ilic_repository_cli_config_test PRIVATE ilic-repository)
         add_test(NAME ilic_repository_cli_config COMMAND ilic_repository_cli_config_test)
-        add_test(NAME ilic_repository_cli COMMAND ilic -silent
+        add_test(NAME ilic_repository_cli COMMAND ilic -no_info -no_warnings
             -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
             -models RepositoryRoot --ili-version 2.3 --no-default-repositories)
-        add_test(NAME ilic_repository_cli_import_fallback COMMAND ilic -silent
+        add_test(NAME ilic_repository_cli_import_fallback COMMAND ilic -no_info -no_warnings
             -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
             --no-default-repositories
             "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/import-fallback/RepositoryConsumer.ili")
