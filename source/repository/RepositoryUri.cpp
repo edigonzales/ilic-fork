@@ -273,7 +273,7 @@ std::filesystem::path RepositoryUri::toLocalPath() const
 #ifdef _WIN32
    if (kind_ == RepositoryUriKind::FileUri && value.size() >= 3 && value[0] == '/'
       && std::isalpha(static_cast<unsigned char>(value[1])) && value[2] == ':') value.erase(0,1);
-   std::replace(value.begin(),value.end(),'/',std::filesystem::path::preferred_separator);
+   std::replace(value.begin(),value.end(),'/','\\');
 #endif
    return std::filesystem::path(value);
 }

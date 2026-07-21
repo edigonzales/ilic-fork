@@ -35,6 +35,9 @@ int main()
    auto file = RepositoryUri::parse("file:///tmp/my%20models");
    assert(file && file->kind() == RepositoryUriKind::FileUri);
    assert(file->toLocalPath().generic_string() == "/tmp/my models");
+#ifdef _WIN32
+   assert(file->toLocalPath().string() == "\\tmp\\my models");
+#endif
    assert(file->resolve("Model.ili").normalized() == "file:///tmp/my models/Model.ili");
    assert(RepositoryUri::parse("file:///C:/models")->normalized() == "file:///C:/models");
    assert(RepositoryUri::parse("file://server/share/models")->normalized()
