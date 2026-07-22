@@ -55,6 +55,10 @@ Distribution setzt CMake die statische MSVC-Runtime (`/MT`), baut curl mit
 Windows Schannel und prüft anschließend mit
 `scripts/check-windows-runtime-deps.ps1`, dass keine curl-, XML- oder
 MSVC-Runtime-DLL neben dem Programm benötigt wird.
+Die Prüfung benötigt kein vorher initialisiertes Visual-Studio-Terminal:
+`dumpbin.exe` wird zuerst über `PATH` und andernfalls über `vswhere.exe` aus
+dem Visual-Studio-Installer gesucht. Dafür müssen die Visual-Studio-C++-Tools
+(`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`) installiert sein.
 
 Das ist ein anderer Buildpfad als im ursprünglichen
 [`infogrips/ilic`](https://github.com/infogrips/ilic). Dort beschreibt
