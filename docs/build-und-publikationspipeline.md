@@ -28,12 +28,18 @@ Pakete.
 
 | Workflow | Trigger | Ergebnis |
 | --- | --- | --- |
-| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Push auf `main`, Pull Request, manuell | Native Matrix, CTest, WASM- und npm-Prüfungen |
+| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Push auf `main` (ausser reine Markdown-Änderungen), Pull Request (ausser reine Markdown-Änderungen), manuell | Native Matrix, CTest, WASM- und npm-Prüfungen |
 | [`.github/workflows/build-native-release.yml`](../.github/workflows/build-native-release.yml) | manuell oder `v*`-Tag | geprüfte Einzelbinary-Archive für macOS ARM64, Linux x86_64 und Windows x86_64 |
 | [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | erfolgreiche `CI` auf `main`, manuell | Compiler-only-Snapshot der beiden npm-Pakete und Dispatch des exakten Release-Inputs |
 
 Beide Workflows checken ohne persistierte GitHub-Credentials aus. Normale
 Build-Jobs besitzen nur Leserechte auf den Repository-Inhalt.
+
+Die CI-Trigger verwenden `paths-ignore: "**/*.md"`: Änderungen, die
+ausschliesslich Markdown-Dateien betreffen, benötigen keinen Compiler- oder
+WASM-Build. Sobald ein Commit zusätzlich eine andere Datei ändert, läuft die
+CI wie gewohnt; manuelle Läufe und `v*`-Release-Tags bleiben ebenfalls
+unverändert.
 
 ## CI: nativer Compiler und JavaScript-Pakete
 
