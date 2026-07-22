@@ -188,13 +188,21 @@ bleiben. Der konkrete Asset-Pfad ist eine Entscheidung des verwendeten Bundlers.
 
 ## LSP-Zielarchitektur
 
+Für den offiziellen LSP in `interlis-language-tools` werden Änderungen zwar
+bei `didOpen`/`didChange` als Buffer registriert, aber nicht sofort kompiliert.
+Ein autoritativer Lauf erfolgt beim Speichern, über den manuellen Compile-Befehl
+und beim Start der Extension für die aktive INTERLIS-Datei. Die folgende
+Architektur beschreibt diese Host-Grenze; ein anderer Host kann seine
+Lebenszyklussteuerung separat festlegen.
+
 Ein LSP-Host sollte:
 
 1. pro Workspace einen Worker und eine Compiler-Session führen;
 2. bei `didOpen`/`didChange` den aktuellen UTF-8-Text mit Dokumentversion
    registrieren;
 3. Repository-Quellen einmal auflösen und ebenfalls registrieren;
-4. `compile` debouncen;
+4. `compile` nur für ein explizites Compile-Ereignis aufrufen (im offiziellen
+   LSP: Save, manueller Compile oder Startup-Compile);
 5. Diagnostics nach URI gruppieren und auf LSP-Severity abbilden;
 6. bei einer harten Cancellation den Worker terminieren und den Workspace aus
    Host-Cache und offenen Dokumenten rekonstruieren.
