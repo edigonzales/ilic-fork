@@ -46,12 +46,10 @@ Snapshot gesetzt. Danach bezeichnet `latest` die stabile Version, während
 ## Lokales Erzeugen und Prüfen
 
 Zuerst muss der WASM-Build mit der in `.emscripten-version` festgelegten
-Emscripten-Version erstellt werden. Die vollständige Erstinstallation ist unter
-[Emscripten SDK einmalig installieren](build-und-installation.md#emscripten-sdk-einmalig-installieren)
-dokumentiert:
+Emscripten-Version erstellt werden. Das Build-Skript richtet das SDK bei Bedarf
+automatisch ein:
 
 ```sh
-source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh
 ```
 
@@ -114,7 +112,6 @@ interaktiv gebootstrapped:
 npm login
 npm whoami
 
-source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh
 npm test --prefix packages/tools
 npm test --prefix packages/compiler-wasm
@@ -134,14 +131,14 @@ Einmalcode werden in Dateien oder GitHub-Secrets geschrieben.
 Nach dem ersten Publish wird für **jedes** der beiden Pakete auf npmjs.com
 unter `Package → Settings → Trusted Publisher` eingetragen:
 
-| Feld | Wert |
-| --- | --- |
-| Provider | GitHub Actions |
-| GitHub user/organization | `edigonzales` |
-| Repository | `ilic-fork` |
-| Workflow filename | `publish-npm-snapshot.yml` |
-| Environment | leer |
-| Allowed action | `npm publish` |
+| Feld                     | Wert                       |
+| ------------------------ | -------------------------- |
+| Provider                 | GitHub Actions             |
+| GitHub user/organization | `edigonzales`              |
+| Repository               | `ilic-fork`                |
+| Workflow filename        | `publish-npm-snapshot.yml` |
+| Environment              | leer                       |
+| Allowed action           | `npm publish`              |
 
 Der Dateiname muss exakt übereinstimmen; es wird nur der Dateiname und nicht
 `.github/workflows/` eingetragen. Die `repository.url` beider Pakete verweist

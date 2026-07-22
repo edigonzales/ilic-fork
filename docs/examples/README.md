@@ -9,12 +9,12 @@ Repository-Fixtures und benötigen kein Netzwerk.
 
 ## Modelle
 
-| Datei | Zweck |
-| --- | --- |
-| [`models/Legacy.ili`](models/Legacy.ili) | minimales gültiges INTERLIS-1-Modell |
-| [`models/Base.ili`](models/Base.ili) | importiertes INTERLIS-2.3-Basismodell |
+| Datei                                      | Zweck                                                   |
+| ------------------------------------------ | ------------------------------------------------------- |
+| [`models/Legacy.ili`](models/Legacy.ili)   | minimales gültiges INTERLIS-1-Modell                    |
+| [`models/Base.ili`](models/Base.ili)       | importiertes INTERLIS-2.3-Basismodell                   |
 | [`models/Example.ili`](models/Example.ili) | Root-Modell mit Import, `!!`-Kommentar und Metaattribut |
-| [`models/Invalid.ili`](models/Invalid.ili) | absichtlich unbekannter Typ für Diagnostics |
+| [`models/Invalid.ili`](models/Invalid.ili) | absichtlich unbekannter Typ für Diagnostics             |
 
 ```sh
 build/macos/ilic -silent models/Legacy.ili
@@ -76,12 +76,11 @@ die intern in C++ implementierte statische Bibliothek.
 [`wasm-session.mjs`](wasm-session.mjs) kompiliert und formatiert eine virtuelle
 Quelle über das reale WASM-Modul:
 
-Die [einmalige Installation und Aktivierung des Emscripten
-SDKs](../build-und-installation.md#emscripten-sdk-einmalig-installieren) ist in
-der Build-Dokumentation beschrieben.
+Das Build-Skript installiert und aktiviert die gepinnte Emscripten-Version bei
+Bedarf automatisch. Der Standardpfad ist `../emsdk`; mit `ILIC_EMSDK_DIR` kann
+ein anderer Pfad gesetzt werden.
 
 ```sh
-source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh
 node docs/examples/wasm-session.mjs
 ```
@@ -104,7 +103,6 @@ cmake -S . -B build/macos -DBUILD_TESTING=ON
 cmake --build build/macos --parallel
 ctest --test-dir build/macos -R '^ilic_docs_' --output-on-failure
 
-source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh
 npm test --prefix packages/compiler-wasm
 ```

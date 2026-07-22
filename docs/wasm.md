@@ -8,19 +8,19 @@ neu implementiert.
 
 ## Build
 
-Für einen neuen Entwicklungsrechner zuerst das
-[Emscripten SDK installieren und aktivieren](build-und-installation.md#emscripten-sdk-einmalig-installieren).
-Danach genügt in jedem neuen Terminal:
+Das Build-Skript richtet auf einem neuen Entwicklungsrechner die gepinnte
+Emscripten-Version automatisch ein. Danach genügt in jedem Terminal:
 
 ```sh
-source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh
 npm test --prefix packages/compiler-wasm
 ```
 
 Die Emscripten-Version ist mit `.emscripten-version` auf `3.1.64` gepinnt. Das
 Resultat besteht aus `ilic.mjs` und `ilic.wasm`; der Build kopiert beide Dateien
-in `packages/compiler-wasm`.
+in `packages/compiler-wasm`. Der Standardpfad für das SDK ist `../emsdk`; mit
+`ILIC_EMSDK_DIR` kann ein anderer Pfad verwendet werden. Für Umgebungen ohne
+automatische Installation steht `ILIC_WASM_AUTO_SETUP=0` zur Verfügung.
 
 Das Paket ist für öffentliche Snapshot-Versionen vorbereitet. Nach dem
 einmaligen npm-Bootstrap kann die jeweils aktuelle Vorabversion installiert
@@ -44,13 +44,17 @@ const compiler = await createCompiler();
 const session = compiler.createSession();
 const uri = "memory:///Example.ili";
 
-session.putSource(uri, `INTERLIS 2.3;
+session.putSource(
+  uri,
+  `INTERLIS 2.3;
 MODEL Example AT "https://example.invalid" VERSION "1" =
 END Example.
-`, 1);
+`,
+  1,
+);
 
 const result = session.compile({ roots: [uri] });
-console.log(result.success,result.diagnostics);
+console.log(result.success, result.diagnostics);
 session.dispose();
 ```
 
@@ -71,7 +75,7 @@ node docs/examples/wasm-session.mjs
 ```js
 const formatted = session.format(uri, {
   indentSize: 2,
-  requireValidSyntax: true
+  requireValidSyntax: true,
 });
 if (formatted.success) editor.replaceDocument(formatted.text);
 ```
@@ -103,10 +107,12 @@ import { createCompiler } from "@ilic/compiler-wasm";
 
 const repositories = new RepositoryManager({
   repositories: ["https://models.interlis.ch"],
-  cache: new NodeFileCache(".cache/ilic")
+  cache: new NodeFileCache(".cache/ilic"),
 });
-const workspace = await repositories.resolveModel("DatasetIdx16","ili2_3");
-const root = workspace.models.find(model => model.metadata.name === "DatasetIdx16");
+const workspace = await repositories.resolveModel("DatasetIdx16", "ili2_3");
+const root = workspace.models.find(
+  (model) => model.metadata.name === "DatasetIdx16",
+);
 
 const compiler = await createCompiler();
 const session = compiler.createSession();
@@ -134,8 +140,8 @@ const [compiler, workspace] = await Promise.all([
   createCompiler(),
   new RepositoryManager({
     repositories: ["https://models.interlis.ch"],
-    cache: new BrowserCache()
-  }).resolveModel("DatasetIdx16","ili2_3")
+    cache: new BrowserCache(),
+  }).resolveModel("DatasetIdx16", "ili2_3"),
 ]);
 ```
 
@@ -147,7 +153,7 @@ Das Remote-Repository muss CORS für den Ursprung der Anwendung erlauben.
 
 ```js
 // Der Build kopiert worker.js, ilic.mjs und ilic.wasm nach /assets/ilic/.
-const worker = new Worker("/assets/ilic/worker.js",{ type: "module" });
+const worker = new Worker("/assets/ilic/worker.js", { type: "module" });
 
 let sequence = 0;
 const pending = new Map();
@@ -155,19 +161,23 @@ worker.onmessage = ({ data }) => {
   const request = pending.get(data.id);
   if (!request) return;
   pending.delete(data.id);
-  data.error ? request.reject(new Error(data.error)) : request.resolve(data.value);
+  data.error
+    ? request.reject(new Error(data.error))
+    : request.resolve(data.value);
 };
 
-function call(method,...args) {
+function call(method, ...args) {
   const id = ++sequence;
   worker.postMessage({ id, method, args });
-  return new Promise((resolve,reject) => pending.set(id,{ resolve,reject }));
+  return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
 }
 
 const sessionId = await call("createSession");
-await call("putSource",sessionId,"memory:///Example.ili",source,1);
-const result = await call("compile",sessionId,{ roots: ["memory:///Example.ili"] });
-await call("disposeSession",sessionId);
+await call("putSource", sessionId, "memory:///Example.ili", source, 1);
+const result = await call("compile", sessionId, {
+  roots: ["memory:///Example.ili"],
+});
+await call("disposeSession", sessionId);
 ```
 
 Unterstützte Methoden sind `createSession`, `disposeSession`, `putSource`,

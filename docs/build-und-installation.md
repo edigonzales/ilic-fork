@@ -127,11 +127,11 @@ gelinkt; Linux erhält einen vollständig statischen Link.
 
 Unterstützte Release-Artefakte:
 
-| Plattform | Artefakt | Prüfung |
-| --- | --- | --- |
-| macOS ARM64 | `ilic-macos-arm64.tar.gz` | nur Apple-Systemframeworks und `/usr/lib` laut `otool -L` |
-| Linux x86_64 (musl) | `ilic-linux-x86_64.tar.gz` | kein dynamischer Interpreter und keine `NEEDED`-Einträge |
-| Windows x86_64 | `ilic-windows-x86_64.zip` | keine curl-, XML- oder MSVC-Runtime-DLL |
+| Plattform           | Artefakt                   | Prüfung                                                   |
+| ------------------- | -------------------------- | --------------------------------------------------------- |
+| macOS ARM64         | `ilic-macos-arm64.tar.gz`  | nur Apple-Systemframeworks und `/usr/lib` laut `otool -L` |
+| Linux x86_64 (musl) | `ilic-linux-x86_64.tar.gz` | kein dynamischer Interpreter und keine `NEEDED`-Einträge  |
+| Windows x86_64      | `ilic-windows-x86_64.zip`  | keine curl-, XML- oder MSVC-Runtime-DLL                   |
 
 Die Prüfskripte sind `scripts/check-macos-runtime-deps.sh`,
 `scripts/check-linux-static.sh` und `scripts/check-windows-runtime-deps.ps1`.
@@ -148,26 +148,36 @@ cmake --build build/native --target check-parser-regeneration
 Das Target verwendet den mitgelieferten ANTLR-4.7.1-Generator in einem
 temporären Buildverzeichnis und überschreibt keine eingecheckten Parserdateien.
 
-## Emscripten SDK einmalig installieren
+## Emscripten SDK
 
-Die unterstützte Version steht in `.emscripten-version`. Das SDK kann außerhalb
-des Repositories installiert und für das aktuelle Terminal aktiviert werden:
+Die unterstützte Version steht in `.emscripten-version`. Der WASM-Build richtet
+die passende Emscripten-Umgebung automatisch ein. Ohne weitere Konfiguration
+wird ein vorhandenes SDK aus `../emsdk` verwendet; alternativ kann der Pfad mit
+`ILIC_EMSDK_DIR` gesetzt werden:
 
 ```sh
-export ILIC_EMSDK_DIR=/pfad/zu/emsdk
-git clone https://github.com/emscripten-core/emsdk.git "$ILIC_EMSDK_DIR"
-ILIC_EMSCRIPTEN_VERSION="$(tr -d '[:space:]' < .emscripten-version)"
-"$ILIC_EMSDK_DIR/emsdk" install "$ILIC_EMSCRIPTEN_VERSION"
-"$ILIC_EMSDK_DIR/emsdk" activate "$ILIC_EMSCRIPTEN_VERSION"
-source "$ILIC_EMSDK_DIR/emsdk_env.sh"
+./scripts/build-wasm.sh
 ```
 
-Die Aktivierung verändert nur die aktuelle Shell und muss in einem neuen
-Terminal wiederholt werden.
+Wenn am gewählten Pfad noch kein SDK liegt, klont das Skript emsdk und
+installiert die gepinnte Version automatisch. Der erste Lauf benötigt deshalb
+Netzwerkzugriff und kann länger dauern. Nachfolgende Builds verwenden das
+vorhandene SDK und benötigen keine erneute Shell-Aktivierung.
+
+Für Umgebungen ohne automatische Installation kann der Fallback abgeschaltet
+werden:
+
+```sh
+ILIC_WASM_AUTO_SETUP=0 ./scripts/build-wasm.sh
+```
+
+Dann muss entweder ein passendes `emcc` im `PATH` liegen oder ein bereits
+installiertes SDK über `ILIC_EMSDK_DIR` beziehungsweise `EMSDK` verfügbar sein.
 
 ## WebAssembly
 
-Mit aktivierter, zu `.emscripten-version` passender Umgebung:
+Der Build richtet die zu `.emscripten-version` passende Umgebung bei Bedarf
+selbst ein:
 
 ```sh
 ./scripts/build-wasm.sh

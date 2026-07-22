@@ -26,11 +26,11 @@ Pakete.
 
 ## Workflows und Trigger
 
-| Workflow | Trigger | Ergebnis |
-| --- | --- | --- |
-| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Push auf `main` (ausser reine Markdown-Änderungen), Pull Request (ausser reine Markdown-Änderungen), manuell | Native Matrix, CTest, WASM- und npm-Prüfungen |
-| [`.github/workflows/build-native-release.yml`](../.github/workflows/build-native-release.yml) | manuell oder `v*`-Tag | geprüfte Einzelbinary-Archive für macOS ARM64, Linux x86_64 und Windows x86_64 |
-| [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | erfolgreiche `CI` auf `main`, manuell | Compiler-only-Snapshot der beiden npm-Pakete und Dispatch des exakten Release-Inputs |
+| Workflow                                                                                      | Trigger                                                                                                      | Ergebnis                                                                             |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)                                     | Push auf `main` (ausser reine Markdown-Änderungen), Pull Request (ausser reine Markdown-Änderungen), manuell | Native Matrix, CTest, WASM- und npm-Prüfungen                                        |
+| [`.github/workflows/build-native-release.yml`](../.github/workflows/build-native-release.yml) | manuell oder `v*`-Tag                                                                                        | geprüfte Einzelbinary-Archive für macOS ARM64, Linux x86_64 und Windows x86_64       |
+| [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | erfolgreiche `CI` auf `main`, manuell                                                                        | Compiler-only-Snapshot der beiden npm-Pakete und Dispatch des exakten Release-Inputs |
 
 Beide Workflows checken ohne persistierte GitHub-Credentials aus. Normale
 Build-Jobs besitzen nur Leserechte auf den Repository-Inhalt.
@@ -202,7 +202,8 @@ Trusted-Publisher-Abweichungen abgelehnt wird.
 
 ## Lokal dieselben Gates ausführen
 
-Mit aktivierter, zu `.emscripten-version` passender Emscripten-Umgebung:
+Das Build-Skript richtet die zu `.emscripten-version` passende Emscripten-
+Umgebung bei Bedarf automatisch ein:
 
 ```sh
 cmake -S . -B build/local-release -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -217,8 +218,9 @@ node scripts/prepare-npm-snapshot.mjs --timestamp 20260101000000
 node scripts/test-npm-packages.mjs
 ```
 
-Die Installation des Emscripten SDK und plattformspezifische Build-Hinweise
-sind unter [Build und Installation](build-und-installation.md) beschrieben.
+Die SDK-Pfadauflösung, automatische Installation und plattformspezifischen
+Build-Hinweise sind unter [Build und Installation](build-und-installation.md)
+beschrieben.
 
 ## Fehlerbehandlung
 

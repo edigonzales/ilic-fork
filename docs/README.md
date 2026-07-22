@@ -27,35 +27,32 @@ build/macos/ilic -silent \
   -models DatasetIdx16
 ```
 
-Den WASM-Compiler bauen und das geprüfte Node-Beispiel ausführen:
-
-Auf einem neuen Entwicklungsrechner zuerst die unter
-[WebAssembly](build-und-installation.md#webassembly) genannte gepinnte
-Emscripten-Version installieren und aktivieren.
+Den WASM-Compiler bauen und das geprüfte Node-Beispiel ausführen. Das Build-
+Skript installiert und aktiviert die gepinnte Emscripten-Version bei Bedarf
+automatisch:
 
 ```sh
-source /pfad/zu/emsdk/emsdk_env.sh
 ./scripts/build-wasm.sh
 node docs/examples/wasm-session.mjs
 ```
 
 ## Orientierung
 
-| Thema | Dokumentation |
-| --- | --- |
-| Unterstützte Sprachversionen und Features | [Funktionsumfang](funktionsumfang.md) |
-| Native und WASM-Builds | [Build und Installation](build-und-installation.md) |
-| CI, Release-Train und Publikationsgrenzen | [Build- und Publikationspipeline](build-und-publikationspipeline.md) |
-| Alle Parameter von `ilic` und `ilic-format` | [CLI-Referenz](cli.md) |
-| Standardformatierung und Kommentarerhalt | [Formatter](formatter.md) |
-| Modell-Repositories, Auflösung und Cache | [Repositories](repositories.md) |
-| Fehlerpositionen und strukturierte Logs | [Diagnostik und Logging](diagnostik-und-logging.md) |
-| C++-API, C-ABI und JSON-Protokoll | [Native APIs](native-api.md) |
-| Versionierte Syntax-/Semantik-Snapshots | [Language-Tooling-Snapshots](language-tooling-snapshots.md) |
-| WebAssembly, Node, Browser, Worker und LSP | [WASM](wasm.md) |
-| npm-Snapshots, OIDC und Bootstrap | [npm-Publikation](npm-publikation.md) |
-| 571 ili2c-Referenzfälle und ihre Bedeutung | [Compiler-Conformance](conformance.md) |
-| Vollständige, ausführbare Programme | [Beispiele](examples/README.md) |
+| Thema                                       | Dokumentation                                                        |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| Unterstützte Sprachversionen und Features   | [Funktionsumfang](funktionsumfang.md)                                |
+| Native und WASM-Builds                      | [Build und Installation](build-und-installation.md)                  |
+| CI, Release-Train und Publikationsgrenzen   | [Build- und Publikationspipeline](build-und-publikationspipeline.md) |
+| Alle Parameter von `ilic` und `ilic-format` | [CLI-Referenz](cli.md)                                               |
+| Standardformatierung und Kommentarerhalt    | [Formatter](formatter.md)                                            |
+| Modell-Repositories, Auflösung und Cache    | [Repositories](repositories.md)                                      |
+| Fehlerpositionen und strukturierte Logs     | [Diagnostik und Logging](diagnostik-und-logging.md)                  |
+| C++-API, C-ABI und JSON-Protokoll           | [Native APIs](native-api.md)                                         |
+| Versionierte Syntax-/Semantik-Snapshots     | [Language-Tooling-Snapshots](language-tooling-snapshots.md)          |
+| WebAssembly, Node, Browser, Worker und LSP  | [WASM](wasm.md)                                                      |
+| npm-Snapshots, OIDC und Bootstrap           | [npm-Publikation](npm-publikation.md)                                |
+| 571 ili2c-Referenzfälle und ihre Bedeutung  | [Compiler-Conformance](conformance.md)                               |
+| Vollständige, ausführbare Programme         | [Beispiele](examples/README.md)                                      |
 
 ## Architektur
 
