@@ -4,6 +4,7 @@
 #include "../metamodel/MetaModelInput.h"
 
 #include <algorithm>
+#include <functional>
 #include <map>
 #include <set>
 #include <sstream>
@@ -43,8 +44,27 @@ std::string semanticKind(metamodel::MetaElement *element)
 
 bool isAbstract(metamodel::MetaElement *element)
 {
+   if (auto *topic = dynamic_cast<metamodel::SubModel *>(element))
+      return topic->_dataunit != nullptr && topic->_dataunit->Abstract;
    auto *extendable = dynamic_cast<metamodel::ExtendableME *>(element);
    return extendable != nullptr && extendable->Abstract;
+}
+
+void enumValues(metamodel::EnumType *type,std::vector<std::string> &values)
+{
+   if (type == nullptr || type->TopNode == nullptr) return;
+   std::function<void(metamodel::EnumNode *,const std::string &)> visit =
+      [&](metamodel::EnumNode *node,const std::string &prefix) {
+         if (node == nullptr) return;
+         if (node == type->TopNode) {
+            for (auto *child : node->Node) visit(child,prefix);
+            return;
+         }
+         const std::string value = join(prefix,node->Name);
+         if (!value.empty()) values.push_back(value);
+         for (auto *child : node->Node) visit(child,value);
+      };
+   visit(type->TopNode,"");
 }
 
 std::string documentation(metamodel::MetaElement *element)
@@ -68,16 +88,61 @@ std::string cardinality(const metamodel::Multiplicity &value)
    return "{" + lower + ".." + upper + "}";
 }
 
+std::string diagramTypeName(metamodel::Type *type)
+{
+   if (type == nullptr) return "Unknown";
+   if (!type->Name.empty() && type->Name != "Type" && type->Name != "TYPE") return type->Name;
+   if (auto *related = dynamic_cast<metamodel::ClassRelatedType *>(type)) {
+      if (related->_baseclass != nullptr && !related->_baseclass->Name.empty())
+         return related->_baseclass->Name;
+   }
+   if (dynamic_cast<metamodel::BooleanType *>(type) != nullptr) return "BOOLEAN";
+   if (auto *text = dynamic_cast<metamodel::TextType *>(type)) {
+      switch (text->Kind) {
+         case metamodel::TextType::MText: return "MTEXT";
+         case metamodel::TextType::NameVal: return "NAME";
+         case metamodel::TextType::Uri: return "URI";
+         case metamodel::TextType::Text: return "TEXT";
+      }
+   }
+   if (dynamic_cast<metamodel::NumType *>(type) != nullptr) return "NUMERIC";
+   if (auto *coord = dynamic_cast<metamodel::CoordType *>(type))
+      return coord->Multi ? "MULTICOORD" : "COORD";
+   if (auto *line = dynamic_cast<metamodel::LineType *>(type)) {
+      switch (line->Kind) {
+         case metamodel::LineType::Polyline: return "POLYLINE";
+         case metamodel::LineType::DirectedPolyline: return "DIRECTED POLYLINE";
+         case metamodel::LineType::Surface: return "SURFACE";
+         case metamodel::LineType::Area: return "AREA";
+         case metamodel::LineType::MultiPolyline: return "MULTIPOLYLINE";
+         case metamodel::LineType::DirectedMultiPolyline: return "DIRECTED MULTIPOLYLINE";
+         case metamodel::LineType::MultiSurface: return "MULTISURFACE";
+         case metamodel::LineType::MultiArea: return "MULTIAREA";
+      }
+   }
+   if (dynamic_cast<metamodel::EnumType *>(type) != nullptr ||
+       dynamic_cast<metamodel::EnumTreeValueType *>(type) != nullptr)
+      return "ENUMERATION";
+   if (dynamic_cast<metamodel::AnyOIDType *>(type) != nullptr) return "ANY OID";
+   if (dynamic_cast<metamodel::AttributeRefType *>(type) != nullptr) return "ATTRIBUTE";
+   if (auto *multi = dynamic_cast<metamodel::MultiValue *>(type))
+      return "LIST OF " + diagramTypeName(multi->BaseType);
+   if (dynamic_cast<metamodel::BlackboxType *>(type) != nullptr) return "BLACKBOX";
+   return type->getClass();
+}
+
 class SnapshotBuilder {
 public:
-   explicit SnapshotBuilder(SemanticSnapshot &snapshot) : snapshot_(snapshot) {}
+   SnapshotBuilder(SemanticSnapshot &snapshot,
+      const std::set<std::string> &diagramRootFiles)
+      : snapshot_(snapshot),diagramRootFiles_(diagramRootFiles) {}
 
    void addModel(metamodel::Model *model)
    {
       if (model == nullptr) return;
       if (snapshot_.documentation.title.empty() && model->_ilifile != "internal")
          snapshot_.documentation.title = model->Name;
-      addElement(model,"","",1);
+      addElement(model,"","",1,diagramRootFiles_.count(model->_ilifile) != 0);
    }
 
    void finishReferences()
@@ -103,6 +168,7 @@ public:
 
 private:
    SemanticSnapshot &snapshot_;
+   const std::set<std::string> &diagramRootFiles_;
    std::map<metamodel::MetaElement *,std::string> ids_;
    std::vector<metamodel::MetaElement *> ordered_;
    std::set<std::string> diagramNodeIds_;
@@ -127,8 +193,14 @@ private:
       return found == ids_.end() ? "" : found->second;
    }
 
+   void addDiagramNode(DiagramNode node)
+   {
+      diagramNodeIds_.insert(node.id);
+      snapshot_.diagram.nodes.push_back(std::move(node));
+   }
+
    void addElement(metamodel::MetaElement *element,const std::string &prefix,
-      const std::string &containerId,int level)
+      const std::string &containerId,int level,bool diagramVisible)
    {
       if (element == nullptr || ids_.find(element) != ids_.end()) return;
       const std::string qualifiedName = join(prefix,element->Name.empty() ? element->getClass() : element->Name);
@@ -142,23 +214,38 @@ private:
          element->Name.empty() ? element->getClass() : element->Name,
          kind,documentation(element),level});
 
-      if (dynamic_cast<metamodel::Model *>(element) != nullptr ||
-          dynamic_cast<metamodel::SubModel *>(element) != nullptr) {
-         snapshot_.diagram.nodes.push_back({symbolId,containerId,element->Name,"container",
-            false,element->_source,{}});
-         diagramNodeIds_.insert(symbolId);
+      if (diagramVisible && dynamic_cast<metamodel::Model *>(element) != nullptr) {
+         addDiagramNode({symbolId,containerId,element->Name,"model",isAbstract(element),
+            element->_source,{},{}});
       }
-      else if (auto *viewable = dynamic_cast<metamodel::Class *>(element)) {
+      else if (diagramVisible && dynamic_cast<metamodel::SubModel *>(element) != nullptr) {
+         addDiagramNode({symbolId,containerId,element->Name,"topic",isAbstract(element),
+            element->_source,{},{}});
+      }
+      else if (auto *viewable = dynamic_cast<metamodel::Class *>(element);
+               diagramVisible && viewable != nullptr) {
          if (viewable->Kind != metamodel::Class::Association) {
             DiagramNode node{symbolId,containerId,element->Name,classKind(*viewable),
-               isAbstract(element),element->_source,{}};
+               isAbstract(element),element->_source,{},{}};
             for (auto *attribute : viewable->ClassAttribute) {
                if (attribute == nullptr) continue;
-               const std::string type = attribute->Type != nullptr ? attribute->Type->getClass() : "Unknown";
+               const std::string type = diagramTypeName(attribute->Type);
                node.members.push_back({attribute->Name,type,false});
             }
-            snapshot_.diagram.nodes.push_back(std::move(node));
-            diagramNodeIds_.insert(symbolId);
+            addDiagramNode(std::move(node));
+         }
+      }
+      else if (diagramVisible) {
+         metamodel::EnumType *enumeration = dynamic_cast<metamodel::EnumType *>(element);
+         if (enumeration == nullptr) {
+            auto *tree = dynamic_cast<metamodel::EnumTreeValueType *>(element);
+            enumeration = tree != nullptr ? tree->ET : nullptr;
+         }
+         if (enumeration != nullptr) {
+            DiagramNode node{symbolId,containerId,element->Name,"enumeration",false,
+               element->_source,{},{}};
+            enumValues(enumeration,node.enumValues);
+            addDiagramNode(std::move(node));
          }
       }
 
@@ -166,17 +253,17 @@ private:
          dynamic_cast<metamodel::Package *>(element) != nullptr ? symbolId : containerId;
       if (auto *package = dynamic_cast<metamodel::Package *>(element)) {
          for (auto *child : package->Element)
-            addElement(child,qualifiedName,childContainer,level + 1);
+            addElement(child,qualifiedName,childContainer,level + 1,diagramVisible);
       }
       if (auto *viewable = dynamic_cast<metamodel::Class *>(element)) {
          for (auto *attribute : viewable->ClassAttribute)
-            addElement(attribute,qualifiedName,symbolId,level + 1);
+            addElement(attribute,qualifiedName,symbolId,level + 1,diagramVisible);
          for (auto *parameter : viewable->ClassParameter)
-            addElement(parameter,qualifiedName,symbolId,level + 1);
+            addElement(parameter,qualifiedName,symbolId,level + 1,diagramVisible);
          for (auto *role : viewable->Role)
-            addElement(role,qualifiedName,symbolId,level + 1);
+            addElement(role,qualifiedName,symbolId,level + 1,diagramVisible);
          for (auto *constraint : viewable->Constraint)
-            addElement(constraint,qualifiedName,symbolId,level + 1);
+            addElement(constraint,qualifiedName,symbolId,level + 1,diagramVisible);
       }
    }
 
@@ -261,7 +348,8 @@ SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
    }
 
    if (compilation.success) {
-      SnapshotBuilder builder(snapshot);
+      const std::set<std::string> diagramRootFiles(request.roots.begin(),request.roots.end());
+      SnapshotBuilder builder(snapshot,diagramRootFiles);
       for (auto *model : metamodel::get_all_models()) builder.addModel(model);
       builder.finishReferences();
 

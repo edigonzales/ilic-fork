@@ -289,9 +289,12 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
       for (const auto &member : node.members)
          members.push_back(Value::Object{{"name",member.name},{"type",member.type},
             {"inherited",member.inherited}});
+      Value::Array enumValues;
+      for (const auto &value : node.enumValues) enumValues.emplace_back(value);
       diagramNodes.push_back(Value::Object{{"id",node.id},{"containerId",node.containerId},
          {"label",node.label},{"kind",node.kind},{"abstract",node.abstract},
-         {"range",range(node.range)},{"members",std::move(members)}});
+         {"range",range(node.range)},{"members",std::move(members)},
+         {"enumValues",std::move(enumValues)}});
    }
    Value::Array diagramEdges;
    for (const auto &edge : result.diagram.edges) {

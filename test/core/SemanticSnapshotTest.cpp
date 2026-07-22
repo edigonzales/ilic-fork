@@ -173,6 +173,84 @@ END Root23.
          reference.range.end.character == 23;
    }));
 
+   ilic::CompilerSession diagramSession;
+   const std::string diagramLibraryUri = "memory:///DiagramLibrary.ili";
+   const std::string diagramRootUri = "memory:///DiagramRoot.ili";
+   diagramSession.putSource(diagramLibraryUri,R"ili(INTERLIS 2.4;
+MODEL DiagramLibrary (en) AT "https://example.invalid" VERSION "1" =
+  DOMAIN ImportedColors = (red, blue);
+  TOPIC ImportedData =
+    CLASS ImportedClass =
+      Name : TEXT * 20;
+    END ImportedClass;
+  END ImportedData;
+END DiagramLibrary.
+)ili",1);
+   diagramSession.putSource(diagramRootUri,R"ili(INTERLIS 2.4;
+MODEL DiagramRoot (en) AT "https://example.invalid" VERSION "1" =
+  IMPORTS DiagramLibrary;
+  DOMAIN RootColors = (red, blue);
+  STRUCTURE RootStruct (ABSTRACT) =
+    Value : TEXT * 20;
+  END RootStruct;
+  CLASS RootClass (ABSTRACT) =
+    Name : TEXT * 20;
+  END RootClass;
+  TOPIC Data (ABSTRACT) =
+    DOMAIN TopicColors = (one, two);
+    DOMAIN TopicTree = ALL OF RootColors;
+    STRUCTURE TopicStruct (ABSTRACT) =
+      Value : TEXT * 20;
+    END TopicStruct;
+    CLASS TopicClass (ABSTRACT) =
+      Name : TEXT * 20;
+    END TopicClass;
+  END Data;
+END DiagramRoot.
+)ili",2);
+   ilic::CompilationRequest diagramRequest;
+   diagramRequest.roots = {diagramRootUri};
+   const ilic::SemanticSnapshot diagram = diagramSession.analyze(diagramRequest);
+   assert(diagram.success);
+   assert(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
+      return symbol.qualifiedName == "DiagramLibrary.ImportedData.ImportedClass";
+   }));
+   const auto rootModel = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "model" && node.label == "DiagramRoot"; });
+   assert(rootModel != diagram.diagram.nodes.end());
+   assert(rootModel->containerId.empty());
+   const auto rootColors = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "enumeration" && node.label == "RootColors"; });
+   assert(rootColors != diagram.diagram.nodes.end());
+   assert((rootColors->enumValues == std::vector<std::string>{"red","blue"}));
+   const auto topicTree = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "enumeration" && node.label == "TopicTree"; });
+   assert(topicTree != diagram.diagram.nodes.end());
+   assert((topicTree->enumValues == std::vector<std::string>{"red","blue"}));
+   const auto rootClass = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "class" && node.label == "RootClass"; });
+   assert(rootClass != diagram.diagram.nodes.end());
+   assert(rootClass->members.size() == 1 && rootClass->members.front().type == "TEXT");
+   const auto topic = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "topic" && node.label == "Data"; });
+   assert(topic != diagram.diagram.nodes.end());
+   assert(topic->containerId == rootModel->id);
+   assert(topic->abstract);
+   const auto topicClass = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "class" && node.label == "TopicClass"; });
+   const auto topicStruct = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "structure" && node.label == "TopicStruct"; });
+   assert(topicClass != diagram.diagram.nodes.end() && topicClass->abstract);
+   assert(topicStruct != diagram.diagram.nodes.end() && topicStruct->abstract);
+   assert(topicClass->containerId == topic->id);
+   assert(topicStruct->containerId == topic->id);
+   assert(std::none_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),[](const auto &node) {
+      return node.id.find("DiagramLibrary") != std::string::npos;
+   }));
+   assert(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
+      return symbol.qualifiedName == "DiagramLibrary.ImportedColors";
+   }));
+
    ilic::CompilerSession missingSession;
    const std::string missingUri = "memory:///Missing.ili";
    missingSession.putSource(missingUri,R"ili(INTERLIS 2.4;

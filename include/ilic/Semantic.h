@@ -48,6 +48,7 @@ struct DiagramNode {
    bool abstract = false;
    SourceRange range;
    std::vector<DiagramMember> members;
+   std::vector<std::string> enumValues;
 };
 
 struct DiagramEdge {

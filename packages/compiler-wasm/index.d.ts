@@ -82,7 +82,7 @@ export interface SemanticDependency {
 export interface DiagramMember { name: string; type: string; inherited: boolean; }
 export interface DiagramNode {
   id: string; containerId: string; label: string; kind: string; abstract: boolean;
-  range: SourceRange | null; members: DiagramMember[];
+  range: SourceRange | null; members: DiagramMember[]; enumValues: string[];
 }
 export interface DiagramEdge {
   id: string; sourceId: string; targetId: string; kind: string;
