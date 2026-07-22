@@ -10,25 +10,27 @@ koordinierten Release-Trains:
 ```mermaid
 flowchart LR
   Compiler["ilic-fork\nBuild und Tests"]
-  Coordinator["interlis-language-tools\n7 npm-Pakete publizieren"]
+  Coordinator["interlis-language-tools\n5 Language-Pakete publizieren"]
   WebIde["interlis-web-ide\nGitHub Pages deployen"]
 
-  Compiler -->|"release-train-requested\nCompiler-SHA"| Coordinator
+  Compiler -->|"nach Compiler-Publish\nSHA + npm-Version"| Coordinator
   Coordinator -->|"release-train-published\nSHAs und Version"| WebIde
 ```
 
-Die CI dieses Repositories publiziert nicht selbst. Nach einem erfolgreichen
-`main`-Build fordert sie beim Language-Tools-Repository einen Release-Train für
-den exakt geprüften Compiler-Commit an. Dort werden Compiler und Language Tools
-noch einmal gemeinsam gebaut, geprüft und publiziert.
+Die erfolgreiche `main`-CI startet danach den separaten Compiler-Publish-
+Workflow. Dieser publiziert aus diesem Repository nur `@ilic/tools` und
+`@ilic/compiler-wasm`. Erst wenn beide unveränderlichen npm-Versionen vorhanden
+sind, fordert er im Language-Tools-Repository den nächsten Release-Schritt an.
+Das Language-Tools-Repository publiziert anschliessend nur seine fünf eigenen
+Pakete.
 
 ## Workflows und Trigger
 
 | Workflow | Trigger | Ergebnis |
 | --- | --- | --- |
-| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Push auf `main`, Pull Request, manuell | Native Matrix, CTest, WASM- und npm-Prüfungen; auf `main` anschliessend Release-Anforderung |
+| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Push auf `main`, Pull Request, manuell | Native Matrix, CTest, WASM- und npm-Prüfungen |
 | [`.github/workflows/build-native-release.yml`](../.github/workflows/build-native-release.yml) | manuell oder `v*`-Tag | geprüfte Einzelbinary-Archive für macOS ARM64, Linux x86_64 und Windows x86_64 |
-| [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | nur manuell | Compiler-only-Snapshot der beiden npm-Pakete als Bootstrap-/Recovery-Weg |
+| [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | erfolgreiche `CI` auf `main`, manuell | Compiler-only-Snapshot der beiden npm-Pakete und Dispatch des exakten Release-Inputs |
 
 Beide Workflows checken ohne persistierte GitHub-Credentials aus. Normale
 Build-Jobs besitzen nur Leserechte auf den Repository-Inhalt.
@@ -96,29 +98,33 @@ tatsächlich auslieferbare Paketoberfläche geprüft.
 
 ## Übergabe an den koordinierten Release-Train
 
-Nur bei einem Push auf `main` und nur nach erfolgreichem
-`native-and-packages`-Job läuft `request-release-train`. Der Job sendet ein
-GitHub-`repository_dispatch` mit dem Ereignis `release-train-requested` an
-`edigonzales/interlis-language-tools`:
+Nach erfolgreichem `CI`-Workflow auf `main` startet `publish-npm-snapshot.yml`
+über `workflow_run`. Der Publish-Workflow checkt den exakten
+`workflow_run.head_sha` aus, baut und prüft die Compiler-Pakete nochmals und
+sendet danach ein GitHub-`repository_dispatch` mit dem Ereignis
+`release-train-requested` an `edigonzales/interlis-language-tools`:
 
 ```json
 {
   "compiler_sha": "<vollständiger GITHUB_SHA>",
+  "compiler_version": "0.9.9-SNAPSHOT.<timestamp>.<publish-run-id>",
+  "compiler_publish_run_id": "<GitHub-Run-ID>",
   "compiler_ci_run_id": "<GitHub-Run-ID>"
 }
 ```
 
 Das Ziel-Repository baut diesen vollständigen SHA erneut. Dadurch hängt die
 Publikation nicht von einem später verschobenen Branch oder npm-Dist-Tag ab.
-Die Run-ID dient der Nachverfolgbarkeit der anfordernden CI; die koordinierte
-Snapshot-Version verwendet die Run-ID des zentralen Publish-Workflows.
+Die Compiler-Version wird beim Compiler-Publish mit UTC-Zeitstempel und
+Compiler-Publish-Run-ID erzeugt. Sie wird danach nicht neu berechnet und nicht
+aus einem bewegten npm-Dist-Tag abgeleitet.
 
 Für den Dispatch ist das Repository-Secret `RELEASE_DISPATCH_TOKEN` mit
 Schreibzugriff auf `interlis-language-tools` erforderlich. Fehlt es, schlägt
 nur die Übergabe nach erfolgreicher Compiler-Prüfung fehl; es wurde bis dahin
 nichts publiziert.
 
-Der zentrale Ablauf, seine sieben Pakete und der nachgelagerte Pages-Deploy
+Der nachgelagerte Ablauf für die fünf Language-Pakete und der Pages-Deploy
 sind im
 [Language-Tools-Repository](https://github.com/edigonzales/interlis-language-tools/blob/main/docs/build-und-publikationspipeline.md)
 dokumentiert.
@@ -152,8 +158,8 @@ Teilpublikationen stehen in [npm-Publikation](npm-publikation.md).
 ## Versionen und Artefakte
 
 Die Basisversion kommt aus `CMakeLists.txt`; die Quell-Manifeste behalten diese
-unveränderte Version. Ein Release-Train ergänzt denselben UTC-Zeitstempel und
-dieselbe zentrale GitHub-Run-ID für beide Compiler-Pakete:
+unveränderte Version. Der Compiler-Publish ergänzt einen UTC-Zeitstempel und
+die Run-ID dieses Publish-Workflows:
 
 ```text
 0.9.9-SNAPSHOT.YYYYMMDDHHmmss.<run-id>
@@ -163,6 +169,21 @@ Staging-Verzeichnisse und Tarballs liegen unter `build/npm/` und werden nicht
 eingecheckt. Publiziert werden nur die beiden öffentlichen npm-Pakete. Nicht
 publiziert werden der native Compiler, statische Bibliotheken, CTest-Binaries,
 WASM-Zwischenverzeichnisse oder ein GitHub Release.
+
+## Pinning und lokale Abweichungen
+
+In CI wird der Quellstand beim `workflow_run` mit `workflow_run.head_sha`
+festgehalten. Die Emscripten-Version kommt aus `.emscripten-version`, Node und
+npm aus der Workflow-Datei. Die erzeugte npm-Version ist nach dem Publish
+unveränderlich; sie wird zusammen mit `compiler_sha` an
+`interlis-language-tools` übergeben.
+
+Lokal gibt es keinen GitHub-OIDC- oder Trusted-Publisher-Kontext. Das lokale
+Staging verwendet standardmässig die aktuelle UTC-Zeit und kann optional eine
+eigene numerische Build-ID erhalten. Die Web-IDE verwendet lokal lokale
+Tarballs, sodass kein npm-Publish beteiligt ist. Deshalb kann ein lokaler Build
+funktionieren, obwohl eine zentrale CI-Publikation wegen Repository-, SHA- oder
+Trusted-Publisher-Abweichungen abgelehnt wird.
 
 ## Lokal dieselben Gates ausführen
 
@@ -189,9 +210,9 @@ sind unter [Build und Installation](build-und-installation.md) beschrieben.
 - Schlägt ein Build oder Test fehl, erfolgt weder Dispatch noch Publikation.
 - Schlägt der Dispatch fehl, zuerst Berechtigung und Gültigkeit von
   `RELEASE_DISPATCH_TOKEN` prüfen und danach die CI erneut starten.
-- Schlägt der zentrale Release-Train fehl, wird er im
-  `interlis-language-tools`-Repository untersucht; der dortige Manifest-Artefakt
-  enthält beide Quell-SHAs.
+- Schlägt der nachgelagerte Release-Train fehl, wird er im
+  `interlis-language-tools`-Repository untersucht; sein Manifest enthält den
+  bereits publizierten Compiler-SHA und die exakte Compiler-Version.
 - npm-Publikationen über mehrere Pakete sind nicht atomar. Ein erneuter
   zentraler Lauf überspringt bereits vorhandene identische Paketversionen; ein
   neuer Lauf erzeugt wegen Zeitstempel und Run-ID eine neue Version.

@@ -138,7 +138,7 @@ unter `Package → Settings → Trusted Publisher` eingetragen:
 | --- | --- |
 | Provider | GitHub Actions |
 | GitHub user/organization | `edigonzales` |
-| Repository | `interlis-language-tools` |
+| Repository | `ilic-fork` |
 | Workflow filename | `publish-npm-snapshot.yml` |
 | Environment | leer |
 | Allowed action | `npm publish` |
@@ -170,19 +170,20 @@ Publisher funktioniert weiterhin, traditionelle Publish-Tokens dagegen nicht.
 
 ## GitHub Action starten
 
-Der Workflow liegt unter `.github/workflows/publish-npm-snapshot.yml` und bleibt
-als manueller Compiler-only-Bootstrap-/Recovery-Weg erhalten. Der normale
-automatische Publish läuft über den koordinierten Release-Train in
-`interlis-language-tools`.
-
-Nach erfolgreicher `main`-CI wird der Release-Train mit dem exakten Compiler-SHA
-per `repository_dispatch` angefordert. Der zentrale Workflow baut und
-publiziert Compiler und Language-Tools gemeinsam.
+Der Workflow liegt unter `.github/workflows/publish-npm-snapshot.yml`. Nach
+erfolgreicher `main`-CI startet er automatisch über `workflow_run`, checkt den
+exakten geprüften Compiler-SHA aus und publiziert **nur** die beiden Compiler-
+Pakete. Erst nach erfolgreicher npm-Publikation wird
+`interlis-language-tools` mit `compiler_sha` und der bereits publizierten
+`compiler_version` per `repository_dispatch` gestartet.
 
 Dafür muss im Repository ein `RELEASE_DISPATCH_TOKEN` mit Schreibzugriff auf
-das Repository `interlis-language-tools` hinterlegt sein. Der npm-Trusted-
-Publisher des zentralen Workflows benötigt zusätzlich die in diesem Dokument
-beschriebene Umstellung auf das Language-Tools-Repository.
+das Repository `interlis-language-tools` hinterlegt sein. Der Trusted Publisher
+für beide Compiler-Pakete bleibt dagegen auf `edigonzales/ilic-fork` gesetzt.
+
+Der manuelle `workflow_dispatch`-Lauf bleibt als Bootstrap- und Recovery-Weg
+erhalten und sendet nach erfolgreicher Publikation ebenfalls den exakten
+Compiler-SHA und die exakte npm-Version weiter.
 
 Für einen manuellen Compiler-only-Lauf:
 
