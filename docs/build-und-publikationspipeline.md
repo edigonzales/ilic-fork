@@ -124,6 +124,15 @@ Schreibzugriff auf `interlis-language-tools` erforderlich. Fehlt es, schlägt
 nur die Übergabe nach erfolgreicher Compiler-Prüfung fehl; es wurde bis dahin
 nichts publiziert.
 
+Das Secret enthält ein GitHub-API-Token für einen Cross-Repository-
+`repository_dispatch`, kein npm-Publishing-Token. Es wird im sendenden
+Repository `ilic-fork` unter `Settings → Secrets and variables → Actions` als
+`RELEASE_DISPATCH_TOKEN` gespeichert. Ein empfohlenes Fine-grained Token hat
+Zugriff ausschließlich auf `edigonzales/interlis-language-tools` und die
+Repository-Berechtigung `Contents: Read and write`. Das Gegenstück im
+Language-Tools-Repository ist ein separates Secret gleichen Namens für den
+Dispatch an die Web IDE.
+
 Der nachgelagerte Ablauf für die fünf Language-Pakete und der Pages-Deploy
 sind im
 [Language-Tools-Repository](https://github.com/edigonzales/interlis-language-tools/blob/main/docs/build-und-publikationspipeline.md)

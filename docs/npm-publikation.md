@@ -181,6 +181,29 @@ Dafür muss im Repository ein `RELEASE_DISPATCH_TOKEN` mit Schreibzugriff auf
 das Repository `interlis-language-tools` hinterlegt sein. Der Trusted Publisher
 für beide Compiler-Pakete bleibt dagegen auf `edigonzales/ilic-fork` gesetzt.
 
+### `RELEASE_DISPATCH_TOKEN`
+
+`RELEASE_DISPATCH_TOKEN` ist **kein npm-Token**. Es ist ein GitHub-API-Token,
+den der Compiler-Workflow verwendet, um nach der npm-Publikation ein
+`repository_dispatch` im Repository `edigonzales/interlis-language-tools`
+auszulösen. Der Token verändert dort keinen Quellcode; er darf nur den
+Repository-Dispatch auf dem Ziel-Repository ausführen.
+
+Für den Token wird ein Fine-grained Personal Access Token empfohlen:
+
+1. persönliche GitHub-Settings öffnen: [Personal access tokens](https://github.com/settings/personal-access-tokens/new);
+2. als Resource owner `edigonzales` wählen;
+3. nur `interlis-language-tools` als Repository auswählen;
+4. `Repository permissions → Contents → Read and write` setzen;
+5. im Repository `ilic-fork` unter `Settings → Secrets and variables → Actions`
+   ein Secret mit dem exakten Namen `RELEASE_DISPATCH_TOKEN` anlegen.
+
+Der Tokenwert gehört nur in dieses Secret und niemals in Dateien, Commits oder
+Logs. Für die Gegenrichtung existiert ein **separates** Secret gleichen Namens
+im Repository `interlis-language-tools`; dieses darf nur
+`interlis-web-ide` dispatchen. Das npm-Publishing selbst läuft weiterhin über
+GitHub-OIDC (`id-token: write`) und benötigt dieses Secret nicht.
+
 Der manuelle `workflow_dispatch`-Lauf bleibt als Bootstrap- und Recovery-Weg
 erhalten und sendet nach erfolgreicher Publikation ebenfalls den exakten
 Compiler-SHA und die exakte npm-Version weiter.
