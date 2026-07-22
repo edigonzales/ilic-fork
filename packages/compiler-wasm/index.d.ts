@@ -71,7 +71,8 @@ export interface SyntaxSnapshot {
 export interface SemanticSymbol {
   id: string; name: string; qualifiedName: string; kind: string;
   containerId: string; range: SourceRange | null; abstract: boolean;
-  selectionRange?: SourceRange | null;
+  selectionRange: SourceRange | null;
+  endRange: SourceRange | null;
 }
 export interface SemanticReference {
   sourceId: string; targetId: string; kind: string; range: SourceRange | null;

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <regex>
 #include <string>
 
 namespace {
@@ -45,7 +46,8 @@ END AbiModel.
    assert(compilation.find("\"kind\":\"compilation\"") != std::string::npos);
    assert(compilation.find("\"success\":true") != std::string::npos);
    assert(compilation.find("\"displayName\"") != std::string::npos);
-   assert(compilation.find("ilic completed with no errors, no warnings.") != std::string::npos);
+   assert(std::regex_search(compilation,
+      std::regex("ilic completed with no errors, no warnings [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}")));
 
    const std::string parseRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili"})json";

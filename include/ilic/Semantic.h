@@ -17,6 +17,7 @@ struct SemanticSymbol {
    std::string containerId;
    SourceRange range;
    SourceRange selectionRange;
+   SourceRange endRange;
    bool abstract = false;
 };
 

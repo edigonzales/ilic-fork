@@ -269,6 +269,7 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
          {"qualifiedName",symbol.qualifiedName},{"kind",symbol.kind},
          {"containerId",symbol.containerId},{"range",range(symbol.range)},
          {"selectionRange",range(symbol.selectionRange)},
+         {"endRange",range(symbol.endRange)},
          {"abstract",symbol.abstract}});
    }
    Value::Array references;

@@ -202,6 +202,11 @@ namespace metamodel {
       if (element != nullptr) element->_selectionSource = token_source(token);
    }
 
+   void set_end_selection_source(MetaElement *element,antlr4::Token *token)
+   {
+      if (element != nullptr) element->_endSelectionSource = token_source(token);
+   }
+
    void set_reference_source(MMObject *object,const string &kind,antlr4::Token *token)
    {
       if (object == nullptr) return;

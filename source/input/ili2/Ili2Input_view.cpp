@@ -115,6 +115,7 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
    v->Kind = Class::ViewVal;
    init_class(v,get_line(ctx));
    set_selection_source(v,ctx->viewname1);
+   set_end_selection_source(v,ctx->viewname2);
    add_class(v); 
 
    map<string,bool> properties = get_properties(ctx->properties(),vector({ABSTRACT,FINAL,TRANSIENT,EXTENDED}));

@@ -1,7 +1,9 @@
 #include "ilic/Compiler.h"
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <regex>
 
 int main()
 {
@@ -44,6 +46,11 @@ END UnknownDomain.
    ilic::CompilationResult invalid = session.compile(invalidRequest);
    assert(!invalid.success);
    assert(!invalid.diagnostics.empty());
+   const std::regex completion("^inf: ilic completed with [0-9]+ errors?, no warnings [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$");
+   assert(std::any_of(invalid.transcript.begin(),invalid.transcript.end(),
+      [&completion](const auto &line) { return std::regex_match(line,completion); }));
+   assert(std::none_of(invalid.transcript.begin(),invalid.transcript.end(),
+      [](const auto &line) { return line.find("compiler run failed") != std::string::npos; }));
    bool located = false;
    for (const auto &diagnostic : invalid.diagnostics) {
       if (diagnostic.range.valid && diagnostic.range.uri == invalidUri) located = true;

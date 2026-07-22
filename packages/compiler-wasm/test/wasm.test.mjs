@@ -15,6 +15,11 @@ test("compiles and formats through the real WASM ABI", {
   session.putSource(uri, `INTERLIS 2.3;
 !! kept
 MODEL WasmModel AT "https://example.invalid/ilic/tests" VERSION "1" =
+  TOPIC Topic =
+    CLASS Item =
+      value : TEXT;
+    END Item;
+  END Topic;
 END WasmModel.
 `, 7);
   const result = session.compile({ roots: [uri] });
@@ -22,7 +27,8 @@ END WasmModel.
   assert.ok(result.models.some(model => model.name === "WasmModel"));
   assert.equal(result.schemaVersion, 1);
   assert.equal(result.abiVersion, 1);
-  assert.match(result.transcript.join("\n"), /ilic completed with no errors, no warnings\./);
+  assert.match(result.transcript.join("\n"), /ilic completed with no errors, no warnings \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+  assert.doesNotMatch(result.transcript.join("\n"), /compiler run (done|failed)/);
 
   const syntax = session.parse(uri);
   assert.equal(syntax.kind, "syntax");
@@ -34,7 +40,19 @@ END WasmModel.
   const semantic = session.analyze({ roots: [uri] });
   assert.equal(semantic.kind, "semantic");
   assert.equal(semantic.success, true, JSON.stringify(semantic.diagnostics));
-  assert.ok(semantic.symbols.some(symbol => symbol.qualifiedName === "WasmModel"));
+  const model = semantic.symbols.find(symbol => symbol.qualifiedName === "WasmModel");
+  assert.ok(model);
+  assert.equal(model.endRange?.start.line, 8);
+  assert.equal(model.endRange?.start.character, 4);
+  assert.equal(model.endRange?.end.character, 13);
+  const topic = semantic.symbols.find(symbol => symbol.qualifiedName === "WasmModel.Topic");
+  assert.ok(topic);
+  assert.equal(topic.endRange?.start.line, 7);
+  assert.equal(topic.endRange?.start.character, 6);
+  const item = semantic.symbols.find(symbol => symbol.qualifiedName === "WasmModel.Topic.Item");
+  assert.ok(item);
+  assert.equal(item.endRange?.start.line, 6);
+  assert.equal(item.endRange?.start.character, 8);
   assert.equal(semantic.documentVersions[uri], 7);
 
   const combined = session.compileAndAnalyze({ roots: [uri] });
@@ -60,7 +78,8 @@ END WaesmInvalid.
 `);
   const invalid = session.compile({ roots: [invalidUri] });
   assert.equal(invalid.success, false);
-  assert.match(invalid.transcript.join("\n"), /ilic completed with \d+ errors?, no warnings\./);
+  assert.match(invalid.transcript.join("\n"), /ilic completed with \d+ errors?, no warnings \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+  assert.doesNotMatch(invalid.transcript.join("\n"), /compiler run (done|failed)/);
   assert.ok(invalid.diagnostics.some(diagnostic =>
     diagnostic.range?.uri === invalidUri && diagnostic.range.start.line === 4));
   session.dispose();

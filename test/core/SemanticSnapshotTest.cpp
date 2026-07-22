@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <regex>
 #include <string>
 
 namespace ilic {
@@ -53,8 +54,11 @@ END Semantic.
    const ilic::SemanticSnapshot &snapshot = analysis.semantic;
    assert(snapshot.success);
    assert(analysis.compilation.success);
+   const std::regex completion("^inf: ilic completed with no errors, no warnings [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$");
    assert(std::any_of(analysis.compilation.transcript.begin(),analysis.compilation.transcript.end(),
-      [](const auto &line) { return line == "inf: ilic completed with no errors, no warnings."; }));
+      [&completion](const auto &line) { return std::regex_match(line,completion); }));
+   assert(std::none_of(analysis.compilation.transcript.begin(),analysis.compilation.transcript.end(),
+      [](const auto &line) { return line.find("compiler run done") != std::string::npos; }));
    assert(snapshot.documentVersions.at(uri) == 9);
    assert(snapshot.documentVersions.count(unrelatedUri) == 0);
    assert(analysis.syntax.size() == 2);
@@ -68,7 +72,9 @@ END Semantic.
    assert(std::any_of(snapshot.symbols.begin(),snapshot.symbols.end(),[](const auto &symbol) {
       return symbol.qualifiedName == "Semantic.Data.Item" && symbol.kind == "class" &&
          symbol.selectionRange.valid && symbol.selectionRange.start.line == 7 &&
-         symbol.selectionRange.start.character == 10 && symbol.selectionRange.end.character == 14;
+         symbol.selectionRange.start.character == 10 && symbol.selectionRange.end.character == 14 &&
+         symbol.endRange.valid && symbol.endRange.start.line == 9 &&
+         symbol.endRange.start.character == 8 && symbol.endRange.end.character == 12;
    }));
    assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
       return reference.kind == "inheritance" && reference.range.valid &&

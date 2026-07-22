@@ -53,6 +53,8 @@ antlrcpp::Any Ili1Input::visitModelDef(Ili1Parser::ModelDefContext *ctx)
 
    Model *m = new Model();
    init_package(m,ctx->modelname1->getLine());
+   set_selection_source(m,ctx->modelname1);
+   set_end_selection_source(m,ctx->modelname2);
    m->_ilifile = input_file;
 
    // Model Attributes
@@ -127,6 +129,8 @@ antlrcpp::Any Ili1Input::visitTopicDef(Ili1Parser::TopicDefContext *ctx)
    // SubModel Attributes
    s->Name = name1;
    init_package(s,get_line(ctx));
+   set_selection_source(s,ctx->topicname1);
+   set_end_selection_source(s,ctx->topicname2);
 
    push_context(s);
 

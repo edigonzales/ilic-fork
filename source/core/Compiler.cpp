@@ -15,6 +15,8 @@
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <chrono>
+#include <ctime>
 
 namespace ilic {
 namespace {
@@ -120,7 +122,8 @@ void appendNewEvents(std::vector<std::string> &transcript,
    }
 }
 
-std::string completionTranscriptLine(int errorCount,int warningCount)
+std::string completionTranscriptLine(int errorCount,int warningCount,
+   const std::string &timestamp)
 {
    std::string line = "inf: ilic completed with";
    if (errorCount == 0) line += " no errors";
@@ -129,7 +132,23 @@ std::string completionTranscriptLine(int errorCount,int warningCount)
    if (warningCount == 0) line += ", no warnings";
    else if (warningCount == 1) line += ", 1 warning";
    else line += ", " + std::to_string(warningCount) + " warnings";
-   return line + ".";
+   return line + " " + timestamp;
+}
+
+std::string compilerRunTimestamp()
+{
+   const std::time_t now = std::chrono::system_clock::to_time_t(
+      std::chrono::system_clock::now());
+   std::tm local{};
+#if defined(_WIN32)
+   localtime_s(&local,&now);
+#else
+   localtime_r(&now,&local);
+#endif
+   char timestamp[20]{};
+   if (std::strftime(timestamp,sizeof(timestamp),"%Y-%m-%d %H:%M:%S",&local) == 0)
+      return "0000-00-00 00:00:00";
+   return timestamp;
 }
 
 void appendInputFileTranscript(std::vector<std::string> &transcript,
@@ -245,14 +264,15 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
    std::size_t transcriptedLogs = 0;
 
    auto finish = [&]() {
-      appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
       result.errorCount = Log.getErrorCount();
       result.warningCount = Log.getWarningCount();
+      result.success = result.errorCount == 0 && !result.cancelled;
+      appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
       result.diagnostics = Log.getDiagnostics();
       result.logs = Log.getLogEvents();
-      result.success = result.errorCount == 0;
       transcript.push_back("inf:");
-      transcript.push_back(completionTranscriptLine(result.errorCount,result.warningCount));
+      transcript.push_back(completionTranscriptLine(result.errorCount,result.warningCount,
+         compilerRunTimestamp()));
       result.transcript = std::move(transcript);
       return result;
    };

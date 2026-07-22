@@ -119,6 +119,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    c->Kind = Class::ClassVal;
    init_type(c,get_line(ctx->classname1));
    set_selection_source(c,ctx->classname1);
+   set_end_selection_source(c,ctx->classname2);
 
    // MetaElement Attributes
    c->Name = name1;
@@ -239,6 +240,7 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
    c->Kind = Class::Structure;
    init_type(c,ctx->structurename1->getLine());
    set_selection_source(c,ctx->structurename1);
+   set_end_selection_source(c,ctx->structurename2);
 
    // MetaElement Attributes
    c->Name = name1;

@@ -89,6 +89,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    c->Kind = Class::Association;
    init_type(c,get_line(ctx));
    set_selection_source(c,ctx->associationname1);
+   set_end_selection_source(c,ctx->associationname2);
 
    // MetaElement Attributes
    c->Name = name1;

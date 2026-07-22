@@ -55,6 +55,7 @@ namespace metamodel {
       // Exact parser-token locations used by editor-facing semantic snapshots.
       // They are internal metadata and are not part of the IlisMeta transfer model.
       ilic::SourceRange _selectionSource;
+      ilic::SourceRange _endSelectionSource;
       map<string,ilic::SourceRange> _referenceSources;
       virtual string getClass() { return "MMObject"; };
       virtual string getBaseClass() { return ""; };

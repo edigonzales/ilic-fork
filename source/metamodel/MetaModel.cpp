@@ -648,6 +648,7 @@ namespace metamodel {
       clone->_line = org->_line;
       clone->_source = org->_source;
       clone->_selectionSource = org->_selectionSource;
+      clone->_endSelectionSource = org->_endSelectionSource;
       clone->_referenceSources = org->_referenceSources;
    }
 

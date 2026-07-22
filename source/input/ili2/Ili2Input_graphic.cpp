@@ -75,6 +75,7 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
    Graphic *g = new Graphic();
    init_graphic(g,get_line(ctx));
    set_selection_source(g,ctx->graphicname1);
+   set_end_selection_source(g,ctx->graphicname2);
    g->Name = name1;
    add_graphic(g);
    push_context(g);

@@ -209,7 +209,8 @@ private:
       ids_[element] = symbolId;
       ordered_.push_back(element);
       snapshot_.symbols.push_back({symbolId,element->Name,qualifiedName,kind,containerId,
-         element->_source,element->_selectionSource,isAbstract(element)});
+         element->_source,element->_selectionSource,element->_endSelectionSource,
+         isAbstract(element)});
       snapshot_.documentation.sections.push_back({symbolId,
          element->Name.empty() ? element->getClass() : element->Name,
          kind,documentation(element),level});
