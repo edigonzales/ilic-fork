@@ -471,6 +471,13 @@ if(BUILD_TESTING)
     add_ilic_regression_test(ilic_regression_attribute_cardinality_invalid FALSE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/attribute_cardinality_invalid.ili"
     )
+    add_ilic_regression_test(ilic_regression_numeric_range_valid TRUE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/numeric_range_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_numeric_range_invalid FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/numeric_range_invalid.ili"
+        OUTPUT_REGEX "minimum value must not exceed maximum value"
+    )
     add_ilic_regression_test(ilic_regression_attribute_type_extension_invalid FALSE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/attribute_type_extension_invalid.ili"
     )
@@ -569,6 +576,14 @@ if(BUILD_TESTING)
     )
     add_ilic_regression_test(ilic_regression_unique_basket_global_valid TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/unique_basket_global_valid.ili"
+    )
+    add_ilic_regression_test(ilic_regression_numeric_range_invalid_ili24 FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/numeric_range_invalid.ili"
+        OUTPUT_REGEX "minimum value must not exceed maximum value"
+    )
+    add_ilic_regression_test(ilic_regression_numeric_range_invalid_ili1 FALSE
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili1/numeric_range_invalid.ili"
+        OUTPUT_REGEX "minimum value must not exceed maximum value"
     )
     add_ilic_regression_test(ilic_regression_generic_contexts_valid TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_contexts_valid.ili"

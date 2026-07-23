@@ -1,0 +1,16 @@
+INTERLIS 2.3;
+
+MODEL NumericRangeValid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    Equal = 0..0;
+    Negative = -9..0;
+    Scientific = 1.0E2..100;
+
+  TOPIC Topic =
+    CLASS Item =
+      equal : 0..0;
+      negative : -9..0;
+      scientific : 1.0E2..100;
+    END Item;
+  END Topic;
+END NumericRangeValid.

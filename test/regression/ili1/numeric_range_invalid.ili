@@ -1,0 +1,16 @@
+TRANSFER NumericRangeInvalid1;
+
+MODEL NumericRangeInvalid1
+  TOPIC Data =
+    TABLE Item =
+      attr1: [0..-9];
+      NO IDENT
+    END Item;
+  END Data.
+END NumericRangeInvalid1.
+
+FORMAT FREE;
+CODE
+  BLANK = DEFAULT, UNDEFINED = DEFAULT, CONTINUE = DEFAULT;
+  TID = ANY;
+END.

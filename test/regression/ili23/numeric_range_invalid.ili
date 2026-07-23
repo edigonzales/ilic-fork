@@ -1,0 +1,12 @@
+INTERLIS 2.3;
+
+MODEL NumericRangeInvalid AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    InvertedCoordinate = COORD 0..-9, 0..1;
+
+  TOPIC Topic =
+    CLASS Item =
+      attr1 : 0..-9;
+    END Item;
+  END Topic;
+END NumericRangeInvalid.

@@ -85,6 +85,43 @@ END WaesmInvalid.
   session.dispose();
 });
 
+test("validates numeric range bounds through the WASM ABI", {
+  skip: existsSync(modulePath) ? false : "WASM package artifacts have not been built"
+}, async () => {
+  const compiler = await createCompiler();
+  const session = compiler.createSession();
+  const validUri = "memory:///WasmNumericRangeValid.ili";
+  const invalidUri = "memory:///WasmNumericRangeInvalid.ili";
+  session.putSource(validUri, `INTERLIS 2.4;
+MODEL WasmNumericRangeValid (en) AT "https://example.invalid" VERSION "1" =
+  TOPIC Topic =
+    CLASS Item =
+      equal : 0..0;
+      negative : -9..0;
+      scientific : 1.0E2..100;
+    END Item;
+  END Topic;
+END WasmNumericRangeValid.
+`);
+  session.putSource(invalidUri, `INTERLIS 2.4;
+MODEL WasmNumericRangeInvalid (en) AT "https://example.invalid" VERSION "1" =
+  TOPIC Topic =
+    CLASS Item =
+      attr1 : 0..-9;
+    END Item;
+  END Topic;
+END WasmNumericRangeInvalid.
+`);
+
+  const valid = session.compile({ roots: [validUri] });
+  assert.equal(valid.success, true, JSON.stringify(valid.diagnostics));
+  const invalid = session.compile({ roots: [invalidUri] });
+  assert.equal(invalid.success, false, JSON.stringify(invalid.diagnostics));
+  assert.ok(invalid.diagnostics.some(diagnostic =>
+    diagnostic.message.includes("minimum value must not exceed maximum value")));
+  session.dispose();
+});
+
 test("keeps the WASM session usable while an editor buffer is incomplete", {
   skip: existsSync(modulePath) ? false : "WASM package artifacts have not been built"
 }, async () => {

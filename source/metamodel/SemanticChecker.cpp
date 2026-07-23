@@ -1497,7 +1497,17 @@ private:
             }
          }
       }
+      if (auto coordinate = dynamic_cast<CoordType *>(type)) {
+         for (NumType *axis : coordinate->Axis) {
+            check_type(axis,occurrenceModel);
+         }
+      }
       if (auto numeric = dynamic_cast<NumType *>(type)) {
+         if (dynamic_cast<FormattedType *>(numeric) == nullptr &&
+             !numeric->Min.empty() && !numeric->Max.empty() &&
+             compare_exact_decimal(numeric->Min,numeric->Max) > 0) {
+            Log.error("minimum value must not exceed maximum value",numeric->_line);
+         }
          require_model_import(occurrenceModel,
                               numeric->Unit == nullptr ? nullptr :
                                  containing_model(numeric->Unit),
