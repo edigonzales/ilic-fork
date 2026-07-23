@@ -88,6 +88,10 @@ antlrcpp::Any Ili2Input::visitMandatoryConstraint(parser::Ili2Parser::MandatoryC
    
    SimpleConstraint *c = new SimpleConstraint();
    init_constraint(c,get_line(ctx));
+   if (ctx->name != nullptr) {
+      c->Name = ctx->name->getText();
+      set_selection_source(c,ctx->name);
+   }
    c->Kind = SimpleConstraint::MandC;
    c->LogicalExpression = visitExpression(ctx->expression());
    if (c->LogicalExpression != nullptr && !is_boolean_expression(c->LogicalExpression)) {
@@ -121,6 +125,10 @@ antlrcpp::Any Ili2Input::visitPlausibilityConstraint(parser::Ili2Parser::Plausib
 
    SimpleConstraint *c = new SimpleConstraint();
    init_constraint(c,get_line(ctx));
+   if (ctx->name != nullptr) {
+      c->Name = ctx->name->getText();
+      set_selection_source(c,ctx->name);
+   }
    c->Kind = SimpleConstraint::MandC;
    c->LogicalExpression = visitExpression(ctx->expression());
    if (!is_boolean_expression(c->LogicalExpression)) {
@@ -172,6 +180,10 @@ antlrcpp::Any Ili2Input::visitExistenceConstraint(parser::Ili2Parser::ExistenceC
 
    ExistenceConstraint *c = new ExistenceConstraint();
    init_constraint(c,get_line(ctx));
+   if (ctx->name != nullptr) {
+      c->Name = ctx->name->getText();
+      set_selection_source(c,ctx->name);
+   }
    auto attributes = ctx->attributePath();
    auto viewables = ctx->path();
    if (!attributes.empty()) {

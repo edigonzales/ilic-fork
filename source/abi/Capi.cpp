@@ -287,21 +287,36 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
    Value::Array diagramNodes;
    for (const auto &node : result.diagram.nodes) {
       Value::Array members;
-      for (const auto &member : node.members)
+      for (const auto &member : node.members) {
+         Value::Array inlineEnumValues;
+         for (const auto &value : member.inlineEnumValues)
+            inlineEnumValues.emplace_back(value);
          members.push_back(Value::Object{{"name",member.name},{"type",member.type},
-            {"inherited",member.inherited}});
+            {"cardinality",member.cardinality},{"declaringType",member.declaringType},
+            {"inherited",member.inherited},
+            {"inlineEnumValues",std::move(inlineEnumValues)}});
+      }
+      Value::Array stereotypes;
+      for (const auto &stereotype : node.stereotypes)
+         stereotypes.emplace_back(stereotype);
       Value::Array enumValues;
       for (const auto &value : node.enumValues) enumValues.emplace_back(value);
+      Value::Array operations;
+      for (const auto &operation : node.operations)
+         operations.emplace_back(operation);
       diagramNodes.push_back(Value::Object{{"id",node.id},{"containerId",node.containerId},
          {"label",node.label},{"kind",node.kind},{"abstract",node.abstract},
-         {"range",range(node.range)},{"members",std::move(members)},
-         {"enumValues",std::move(enumValues)}});
+         {"range",range(node.range)},{"stereotypes",std::move(stereotypes)},
+         {"members",std::move(members)},{"enumValues",std::move(enumValues)},
+         {"operations",std::move(operations)}});
    }
    Value::Array diagramEdges;
    for (const auto &edge : result.diagram.edges) {
       diagramEdges.push_back(Value::Object{{"id",edge.id},{"sourceId",edge.sourceId},
          {"targetId",edge.targetId},{"kind",edge.kind},{"label",edge.label},
-         {"cardinality",edge.cardinality}});
+         {"cardinality",edge.cardinality},
+         {"sourceCardinality",edge.sourceCardinality},
+         {"targetCardinality",edge.targetCardinality}});
    }
    Value::Array sections;
    for (const auto &section : result.documentation.sections) {

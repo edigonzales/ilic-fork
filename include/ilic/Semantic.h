@@ -38,7 +38,10 @@ struct SemanticDependency {
 struct DiagramMember {
    std::string name;
    std::string type;
+   std::string cardinality;
+   std::string declaringType;
    bool inherited = false;
+   std::vector<std::string> inlineEnumValues;
 };
 
 struct DiagramNode {
@@ -48,8 +51,10 @@ struct DiagramNode {
    std::string kind;
    bool abstract = false;
    SourceRange range;
+   std::vector<std::string> stereotypes;
    std::vector<DiagramMember> members;
    std::vector<std::string> enumValues;
+   std::vector<std::string> operations;
 };
 
 struct DiagramEdge {
@@ -59,6 +64,8 @@ struct DiagramEdge {
    std::string kind;
    std::string label;
    std::string cardinality;
+   std::string sourceCardinality;
+   std::string targetCardinality;
 };
 
 struct DiagramProjection {

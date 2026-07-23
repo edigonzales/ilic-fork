@@ -2,6 +2,7 @@
 
 #include "../metamodel/MetaModel.h"
 #include "../metamodel/MetaModelInput.h"
+#include "../metamodel/SemanticChecker.h"
 
 #include <algorithm>
 #include <functional>
@@ -82,15 +83,18 @@ std::string documentation(metamodel::MetaElement *element)
 
 std::string cardinality(const metamodel::Multiplicity &value)
 {
-   if (value.Min < 0 && value.Max < 0) return "";
-   const std::string lower = value.Min < 0 ? "*" : std::to_string(value.Min);
+   if (value.Min < 0 && value.Max < 0) return "*";
+   const std::string lower = value.Min < 0 ? "0" : std::to_string(value.Min);
    const std::string upper = value.Max < 0 ? "*" : std::to_string(value.Max);
-   return "{" + lower + ".." + upper + "}";
+   if (value.Min >= 0 && value.Max >= 0 && value.Min == value.Max) return lower;
+   return lower + ".." + upper;
 }
 
 std::string diagramTypeName(metamodel::Type *type)
 {
    if (type == nullptr) return "Unknown";
+   if (auto *multi = dynamic_cast<metamodel::MultiValue *>(type))
+      return diagramTypeName(multi->BaseType);
    if (!type->Name.empty() && type->Name != "Type" && type->Name != "TYPE") return type->Name;
    if (auto *related = dynamic_cast<metamodel::ClassRelatedType *>(type)) {
       if (related->_baseclass != nullptr && !related->_baseclass->Name.empty())
@@ -125,10 +129,47 @@ std::string diagramTypeName(metamodel::Type *type)
       return "ENUMERATION";
    if (dynamic_cast<metamodel::AnyOIDType *>(type) != nullptr) return "ANY OID";
    if (dynamic_cast<metamodel::AttributeRefType *>(type) != nullptr) return "ATTRIBUTE";
-   if (auto *multi = dynamic_cast<metamodel::MultiValue *>(type))
-      return "LIST OF " + diagramTypeName(multi->BaseType);
    if (dynamic_cast<metamodel::BlackboxType *>(type) != nullptr) return "BLACKBOX";
    return type->getClass();
+}
+
+std::vector<std::string> stereotypes(metamodel::MetaElement *element,
+   const std::string &kind)
+{
+   std::vector<std::string> result;
+   if (isAbstract(element)) result.push_back("Abstract");
+   if (kind == "structure") result.push_back("Structure");
+   else if (kind == "view") result.push_back("View");
+   else if (kind == "enumeration") result.push_back("Enumeration");
+   else if (kind == "function") result.push_back("Function");
+   return result;
+}
+
+std::string containingModelName(metamodel::MetaElement *element)
+{
+   for (auto *current = element; current != nullptr; current = current->ElementInPackage) {
+      if (auto *model = dynamic_cast<metamodel::Model *>(current))
+         return model->Name;
+   }
+   return "";
+}
+
+void inlineEnumerationValues(metamodel::Type *type,
+   std::vector<std::string> &values)
+{
+   if (type == nullptr) return;
+   if (auto *multi = dynamic_cast<metamodel::MultiValue *>(type)) {
+      inlineEnumerationValues(multi->BaseType,values);
+      return;
+   }
+   if (!type->Name.empty() && type->Name != "Type" &&
+       type->Name != "TYPE") return;
+   if (auto *enumeration = dynamic_cast<metamodel::EnumType *>(type)) {
+      enumValues(enumeration,values);
+      return;
+   }
+   if (auto *tree = dynamic_cast<metamodel::EnumTreeValueType *>(type))
+      enumValues(tree->ET,values);
 }
 
 class SnapshotBuilder {
@@ -142,7 +183,7 @@ public:
       if (model == nullptr) return;
       if (snapshot_.documentation.title.empty() && model->_ilifile != "internal")
          snapshot_.documentation.title = model->Name;
-      addElement(model,"","",1,diagramRootFiles_.count(model->_ilifile) != 0);
+      addElement(model,"","",1,diagramRootFiles_.count(model->_ilifile) != 0,"");
    }
 
    void finishReferences()
@@ -172,6 +213,9 @@ private:
    std::map<metamodel::MetaElement *,std::string> ids_;
    std::vector<metamodel::MetaElement *> ordered_;
    std::set<std::string> diagramNodeIds_;
+   std::set<metamodel::MetaElement *> diagramVisibleElements_;
+   bool modelScopeAdded_ = false;
+   const std::string modelScopeId_ = "diagram:model-scope";
 
    metamodel::MetaElement *typeTarget(metamodel::Type *type) const
    {
@@ -199,8 +243,65 @@ private:
       snapshot_.diagram.nodes.push_back(std::move(node));
    }
 
+   void ensureModelScope()
+   {
+      if (modelScopeAdded_) return;
+      modelScopeAdded_ = true;
+      addDiagramNode({modelScopeId_,"","Model Scope","modelScope",false,
+         {},{}, {},{},{}});
+   }
+
+   void addDiagramMember(DiagramNode &node,metamodel::AttrOrParam *attribute,
+      bool inherited,const std::string &declaringType)
+   {
+      if (attribute == nullptr) return;
+      DiagramMember member;
+      member.name = attribute->Name;
+      member.type = diagramTypeName(attribute->Type);
+      member.cardinality =
+         cardinality(metamodel::attributeCardinality(attribute->Type));
+      member.declaringType = declaringType;
+      member.inherited = inherited;
+      inlineEnumerationValues(attribute->Type,member.inlineEnumValues);
+      node.members.push_back(std::move(member));
+   }
+
+   void addViewableMembers(DiagramNode &node,metamodel::Class *viewable)
+   {
+      for (auto *attribute : viewable->ClassAttribute)
+         addDiagramMember(node,attribute,false,"");
+
+      std::set<metamodel::Class *> visited;
+      for (auto *base = dynamic_cast<metamodel::Class *>(viewable->Super);
+           base != nullptr && visited.insert(base).second;
+           base = dynamic_cast<metamodel::Class *>(base->Super)) {
+         for (auto *attribute : base->ClassAttribute)
+            addDiagramMember(node,attribute,true,base->Name);
+      }
+
+      std::set<metamodel::Constraint *> constraints;
+      int unnamed = 1;
+      auto addConstraint = [&](metamodel::Constraint *constraint) {
+         if (constraint == nullptr || !constraints.insert(constraint).second) return;
+         std::string name = constraint->Name;
+         if (name.empty()) name = "constraint" + std::to_string(unnamed++);
+         node.operations.push_back(name + "()");
+      };
+      for (auto *constraint : viewable->Constraints) addConstraint(constraint);
+      for (auto *constraint : viewable->Constraint) addConstraint(constraint);
+   }
+
+   metamodel::EnumType *enumerationType(metamodel::MetaElement *element) const
+   {
+      if (auto *enumeration = dynamic_cast<metamodel::EnumType *>(element))
+         return enumeration;
+      auto *tree = dynamic_cast<metamodel::EnumTreeValueType *>(element);
+      return tree != nullptr ? tree->ET : nullptr;
+   }
+
    void addElement(metamodel::MetaElement *element,const std::string &prefix,
-      const std::string &containerId,int level,bool diagramVisible)
+      const std::string &containerId,int level,bool diagramVisible,
+      const std::string &diagramContainerId)
    {
       if (element == nullptr || ids_.find(element) != ids_.end()) return;
       const std::string qualifiedName = join(prefix,element->Name.empty() ? element->getClass() : element->Name);
@@ -215,36 +316,39 @@ private:
          element->Name.empty() ? element->getClass() : element->Name,
          kind,documentation(element),level});
 
+      if (diagramVisible) diagramVisibleElements_.insert(element);
       if (diagramVisible && dynamic_cast<metamodel::Model *>(element) != nullptr) {
-         addDiagramNode({symbolId,containerId,element->Name,"model",isAbstract(element),
-            element->_source,{},{}});
+         ensureModelScope();
       }
       else if (diagramVisible && dynamic_cast<metamodel::SubModel *>(element) != nullptr) {
-         addDiagramNode({symbolId,containerId,element->Name,"topic",isAbstract(element),
-            element->_source,{},{}});
+         const std::string modelName = containingModelName(element);
+         const std::string label = modelName.empty() ? element->Name :
+            element->Name + " (" + modelName + ")";
+         addDiagramNode({symbolId,"",label,"topic",isAbstract(element),
+            element->_source,stereotypes(element,"topic"),{},{},{}});
       }
       else if (auto *viewable = dynamic_cast<metamodel::Class *>(element);
                diagramVisible && viewable != nullptr) {
          if (viewable->Kind != metamodel::Class::Association) {
-            DiagramNode node{symbolId,containerId,element->Name,classKind(*viewable),
-               isAbstract(element),element->_source,{},{}};
-            for (auto *attribute : viewable->ClassAttribute) {
-               if (attribute == nullptr) continue;
-               const std::string type = diagramTypeName(attribute->Type);
-               node.members.push_back({attribute->Name,type,false});
-            }
+            const std::string nodeKind = classKind(*viewable);
+            DiagramNode node{symbolId,diagramContainerId,element->Name,nodeKind,
+               isAbstract(element),element->_source,stereotypes(element,nodeKind),
+               {},{},{}};
+            addViewableMembers(node,viewable);
             addDiagramNode(std::move(node));
          }
       }
+      else if (diagramVisible &&
+               dynamic_cast<metamodel::FunctionDef *>(element) != nullptr) {
+         addDiagramNode({symbolId,diagramContainerId,element->Name,"function",false,
+            element->_source,stereotypes(element,"function"),{},{},{}});
+      }
       else if (diagramVisible) {
-         metamodel::EnumType *enumeration = dynamic_cast<metamodel::EnumType *>(element);
-         if (enumeration == nullptr) {
-            auto *tree = dynamic_cast<metamodel::EnumTreeValueType *>(element);
-            enumeration = tree != nullptr ? tree->ET : nullptr;
-         }
+         metamodel::EnumType *enumeration = enumerationType(element);
          if (enumeration != nullptr) {
-            DiagramNode node{symbolId,containerId,element->Name,"enumeration",false,
-               element->_source,{},{}};
+            DiagramNode node{symbolId,diagramContainerId,element->Name,
+               "enumeration",isAbstract(element),element->_source,
+               stereotypes(element,"enumeration"),{},{},{}};
             enumValues(enumeration,node.enumValues);
             addDiagramNode(std::move(node));
          }
@@ -252,19 +356,35 @@ private:
 
       const std::string childContainer =
          dynamic_cast<metamodel::Package *>(element) != nullptr ? symbolId : containerId;
+      std::string childDiagramContainer = diagramContainerId;
+      if (dynamic_cast<metamodel::Model *>(element) != nullptr && diagramVisible)
+         childDiagramContainer = modelScopeId_;
+      else if (dynamic_cast<metamodel::SubModel *>(element) != nullptr && diagramVisible)
+         childDiagramContainer = symbolId;
       if (auto *package = dynamic_cast<metamodel::Package *>(element)) {
          for (auto *child : package->Element)
-            addElement(child,qualifiedName,childContainer,level + 1,diagramVisible);
+            addElement(child,qualifiedName,childContainer,level + 1,
+               diagramVisible,childDiagramContainer);
       }
       if (auto *viewable = dynamic_cast<metamodel::Class *>(element)) {
          for (auto *attribute : viewable->ClassAttribute)
-            addElement(attribute,qualifiedName,symbolId,level + 1,diagramVisible);
+            addElement(attribute,qualifiedName,symbolId,level + 1,
+               diagramVisible,diagramContainerId);
          for (auto *parameter : viewable->ClassParameter)
-            addElement(parameter,qualifiedName,symbolId,level + 1,diagramVisible);
+            addElement(parameter,qualifiedName,symbolId,level + 1,
+               diagramVisible,diagramContainerId);
          for (auto *role : viewable->Role)
-            addElement(role,qualifiedName,symbolId,level + 1,diagramVisible);
+            addElement(role,qualifiedName,symbolId,level + 1,
+               diagramVisible,diagramContainerId);
+         std::set<metamodel::Constraint *> constraints;
+         for (auto *constraint : viewable->Constraints)
+            if (constraint != nullptr && constraints.insert(constraint).second)
+               addElement(constraint,qualifiedName,symbolId,level + 1,
+                  diagramVisible,diagramContainerId);
          for (auto *constraint : viewable->Constraint)
-            addElement(constraint,qualifiedName,symbolId,level + 1,diagramVisible);
+            if (constraint != nullptr && constraints.insert(constraint).second)
+               addElement(constraint,qualifiedName,symbolId,level + 1,
+                  diagramVisible,diagramContainerId);
       }
    }
 
@@ -283,28 +403,52 @@ private:
 
    void addDiagramEdges()
    {
-      std::size_t edgeIndex = 0;
+      auto ensureExternal = [&](metamodel::Class *viewable) -> std::string {
+         if (viewable == nullptr) return "";
+         const std::string symbolId = id(viewable);
+         if (symbolId.empty()) return "";
+         if (diagramNodeIds_.count(symbolId) != 0) return symbolId;
+         ensureModelScope();
+         auto externalStereotypes = stereotypes(viewable,classKind(*viewable));
+         externalStereotypes.push_back("External");
+         addDiagramNode({symbolId,modelScopeId_,viewable->Name,"external",
+            isAbstract(viewable),viewable->_source,
+            std::move(externalStereotypes),{},{},{}});
+         return symbolId;
+      };
       for (auto *element : ordered_) {
          auto *viewable = dynamic_cast<metamodel::Class *>(element);
-         if (viewable == nullptr) continue;
+         if (viewable == nullptr ||
+             diagramVisibleElements_.count(element) == 0) continue;
          const std::string sourceId = id(element);
-         if (viewable->Super != nullptr && diagramNodeIds_.count(sourceId) != 0 &&
-             diagramNodeIds_.count(id(viewable->Super)) != 0) {
-            snapshot_.diagram.edges.push_back({"inheritance:" + std::to_string(edgeIndex++),
-               sourceId,id(viewable->Super),"inheritance","",""});
+         if (viewable->Super != nullptr && diagramNodeIds_.count(sourceId) != 0) {
+            auto *parent = dynamic_cast<metamodel::Class *>(viewable->Super);
+            const std::string targetId = ensureExternal(parent);
+            if (!targetId.empty()) {
+               snapshot_.diagram.edges.push_back({"inheritance:" + sourceId + "->" +
+                  targetId,sourceId,targetId,"inheritance","","","",""});
+            }
          }
-         if (viewable->Kind != metamodel::Class::Association || viewable->Role.size() < 2) continue;
+         if (viewable->Kind != metamodel::Class::Association ||
+             viewable->Role.size() != 2) continue;
          auto iterator = viewable->Role.begin();
          metamodel::Role *left = *iterator++;
          metamodel::Role *right = *iterator;
          if (left == nullptr || right == nullptr) continue;
-         const std::string leftId = id(left->_baseclass);
-         const std::string rightId = id(right->_baseclass);
-         if (diagramNodeIds_.count(leftId) == 0 || diagramNodeIds_.count(rightId) == 0) continue;
-         snapshot_.diagram.edges.push_back({"association:" + std::to_string(edgeIndex++),
-            leftId,rightId,"association",element->Name,
-            left->Name + " " + cardinality(left->Multiplicity) + " / " +
-               right->Name + " " + cardinality(right->Multiplicity)});
+         const std::string leftId = ensureExternal(left->_baseclass);
+         const std::string rightId = ensureExternal(right->_baseclass);
+         if (leftId.empty() || rightId.empty()) continue;
+         const std::string leftCardinality =
+            cardinality(metamodel::effectiveRoleCardinality(left));
+         const std::string rightCardinality =
+            cardinality(metamodel::effectiveRoleCardinality(right));
+         const std::string leftName = left->Name.empty() ? "role" : left->Name;
+         const std::string rightName = right->Name.empty() ? "role" : right->Name;
+         const std::string label = leftName + "\xE2\x80\x93" + rightName;
+         snapshot_.diagram.edges.push_back({"association:" + sourceId + ":" +
+            leftId + "->" + rightId,leftId,rightId,"association",label,
+            leftName + " " + leftCardinality + " / " + rightName + " " +
+               rightCardinality,leftCardinality,rightCardinality});
       }
    }
 };

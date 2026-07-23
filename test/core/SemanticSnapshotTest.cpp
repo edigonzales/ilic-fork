@@ -110,7 +110,9 @@ END Semantic.
          dependency.range.start.line == 2 && dependency.range.start.character == 10;
    }));
    assert(std::any_of(snapshot.diagram.edges.begin(),snapshot.diagram.edges.end(),[](const auto &edge) {
-      return edge.kind == "association" && edge.label == "Link";
+      return edge.kind == "association" && edge.label == "left–right" &&
+         edge.sourceCardinality == "1" && edge.targetCardinality == "0..*" &&
+         edge.cardinality == "left 1 / right 0..*";
    }));
    assert(!snapshot.documentation.title.empty());
 
@@ -185,6 +187,9 @@ END Root23.
    diagramSession.putSource(diagramLibraryUri,R"ili(INTERLIS 2.4;
 MODEL DiagramLibrary (en) AT "https://example.invalid" VERSION "1" =
   DOMAIN ImportedColors = (red, blue);
+  CLASS ImportedBase (ABSTRACT) =
+    ImportedName : MANDATORY TEXT * 40;
+  END ImportedBase;
   TOPIC ImportedData =
     CLASS ImportedClass =
       Name : TEXT * 20;
@@ -195,22 +200,40 @@ END DiagramLibrary.
    diagramSession.putSource(diagramRootUri,R"ili(INTERLIS 2.4;
 MODEL DiagramRoot (en) AT "https://example.invalid" VERSION "1" =
   IMPORTS DiagramLibrary;
-  DOMAIN RootColors = (red, blue);
+  DOMAIN RootColors (ABSTRACT) = (red, blue);
+  FUNCTION RootFunction(value : TEXT) : TEXT;
   STRUCTURE RootStruct (ABSTRACT) =
     Value : TEXT * 20;
   END RootStruct;
   CLASS RootClass (ABSTRACT) =
-    Name : TEXT * 20;
+    Name : MANDATORY TEXT * 20;
+    State : (open, closed, archived);
+    Values : LIST {1..*} OF TEXT;
+    States : LIST {1..*} OF (draft, final);
+    MANDATORY CONSTRAINT Named: DEFINED(Name);
+    MANDATORY CONSTRAINT DEFINED(Name);
   END RootClass;
+  CLASS RootChild (ABSTRACT) EXTENDS RootClass =
+    ChildName : TEXT;
+  END RootChild;
+  CLASS ExternalChild (ABSTRACT) EXTENDS DiagramLibrary.ImportedBase =
+    LocalName : TEXT;
+  END ExternalChild;
   TOPIC Data (ABSTRACT) =
     DOMAIN TopicColors = (one, two);
     DOMAIN TopicTree = ALL OF RootColors;
+    FUNCTION TopicFunction(value : TEXT) : TEXT;
     STRUCTURE TopicStruct (ABSTRACT) =
       Value : TEXT * 20;
     END TopicStruct;
     CLASS TopicClass (ABSTRACT) =
       Name : TEXT * 20;
     END TopicClass;
+    VIEW TopicView (ABSTRACT)
+      PROJECTION OF source ~ TopicClass;
+    =
+      ATTRIBUTE ALL OF source;
+    END TopicView;
   END Data;
 END DiagramRoot.
 )ili",2);
@@ -221,13 +244,16 @@ END DiagramRoot.
    assert(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
       return symbol.qualifiedName == "DiagramLibrary.ImportedData.ImportedClass";
    }));
-   const auto rootModel = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
-      [](const auto &node) { return node.kind == "model" && node.label == "DiagramRoot"; });
-   assert(rootModel != diagram.diagram.nodes.end());
-   assert(rootModel->containerId.empty());
+   const auto modelScope = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "modelScope" && node.label == "Model Scope"; });
+   assert(modelScope != diagram.diagram.nodes.end());
+   assert(modelScope->containerId.empty());
    const auto rootColors = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "enumeration" && node.label == "RootColors"; });
    assert(rootColors != diagram.diagram.nodes.end());
+   assert(rootColors->containerId == modelScope->id);
+   assert((rootColors->stereotypes ==
+      std::vector<std::string>{"Abstract","Enumeration"}));
    assert((rootColors->enumValues == std::vector<std::string>{"red","blue"}));
    const auto topicTree = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "enumeration" && node.label == "TopicTree"; });
@@ -236,22 +262,72 @@ END DiagramRoot.
    const auto rootClass = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "class" && node.label == "RootClass"; });
    assert(rootClass != diagram.diagram.nodes.end());
-   assert(rootClass->members.size() == 1 && rootClass->members.front().type == "TEXT");
+   assert(rootClass->containerId == modelScope->id);
+   assert((rootClass->stereotypes == std::vector<std::string>{"Abstract"}));
+   assert(rootClass->members.size() == 4 && rootClass->members.front().type == "TEXT" &&
+      rootClass->members.front().cardinality == "1");
+   assert((rootClass->members[1].inlineEnumValues ==
+      std::vector<std::string>{"open","closed","archived"}));
+   assert(rootClass->members[2].type == "TEXT" &&
+      rootClass->members[2].cardinality == "1..*");
+   assert(rootClass->members[3].type == "ENUMERATION" &&
+      rootClass->members[3].cardinality == "1..*" &&
+      rootClass->members[3].inlineEnumValues ==
+         std::vector<std::string>({"draft","final"}));
+   assert((rootClass->operations ==
+      std::vector<std::string>{"Named()","constraint1()"}));
+   const auto rootChild = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [](const auto &node) { return node.kind == "class" && node.label == "RootChild"; });
+   assert(rootChild != diagram.diagram.nodes.end());
+   assert(rootChild->members.size() == 5);
+   assert(rootChild->members[1].inherited &&
+      rootChild->members[1].declaringType == "RootClass");
+   assert(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [&modelScope](const auto &node) {
+         return node.kind == "external" && node.label == "ImportedBase" &&
+            node.containerId == modelScope->id &&
+            node.stereotypes ==
+               std::vector<std::string>{"Abstract","External"};
+      }));
+   assert(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [&modelScope](const auto &node) {
+         return node.kind == "function" && node.label == "RootFunction" &&
+            node.containerId == modelScope->id &&
+            node.stereotypes == std::vector<std::string>{"Function"};
+      }));
    const auto topic = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
-      [](const auto &node) { return node.kind == "topic" && node.label == "Data"; });
+      [](const auto &node) {
+         return node.kind == "topic" && node.label == "Data (DiagramRoot)";
+      });
    assert(topic != diagram.diagram.nodes.end());
-   assert(topic->containerId == rootModel->id);
+   assert(topic->containerId.empty());
    assert(topic->abstract);
+   assert((topic->stereotypes == std::vector<std::string>{"Abstract"}));
    const auto topicClass = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "class" && node.label == "TopicClass"; });
    const auto topicStruct = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "structure" && node.label == "TopicStruct"; });
    assert(topicClass != diagram.diagram.nodes.end() && topicClass->abstract);
    assert(topicStruct != diagram.diagram.nodes.end() && topicStruct->abstract);
+   assert((topicClass->stereotypes == std::vector<std::string>{"Abstract"}));
+   assert((topicStruct->stereotypes ==
+      std::vector<std::string>{"Abstract","Structure"}));
    assert(topicClass->containerId == topic->id);
    assert(topicStruct->containerId == topic->id);
+   assert(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [&topic](const auto &node) {
+         return node.kind == "view" && node.label == "TopicView" &&
+            node.containerId == topic->id &&
+            node.stereotypes == std::vector<std::string>{"Abstract","View"};
+      }));
+   assert(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+      [&topic](const auto &node) {
+         return node.kind == "function" && node.label == "TopicFunction" &&
+            node.containerId == topic->id;
+      }));
    assert(std::none_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),[](const auto &node) {
-      return node.id.find("DiagramLibrary") != std::string::npos;
+      return node.id.find("DiagramLibrary.ImportedData") != std::string::npos ||
+         node.id.find("DiagramLibrary.ImportedColors") != std::string::npos;
    }));
    assert(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
       return symbol.qualifiedName == "DiagramLibrary.ImportedColors";

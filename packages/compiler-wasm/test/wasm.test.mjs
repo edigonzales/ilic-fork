@@ -61,6 +61,19 @@ END WasmModel.
   assert.equal(combined.semantic.success, true);
   assert.deepEqual(combined.semantic.diagnostics, combined.compilation.diagnostics);
   assert.deepEqual(combined.syntax.map(snapshot => snapshot.uri), [uri]);
+  const itemNode = combined.semantic.diagram.nodes.find(node =>
+    node.id === "class:WasmModel.Topic.Item");
+  assert.ok(itemNode);
+  assert.deepEqual(itemNode.stereotypes, []);
+  assert.deepEqual(itemNode.operations, []);
+  assert.deepEqual(itemNode.members[0], {
+    name: "value",
+    type: "TEXT",
+    cardinality: "0..1",
+    declaringType: "",
+    inherited: false,
+    inlineEnumValues: [],
+  });
 
   const formatted = session.format(uri);
   assert.equal(formatted.success, true);
@@ -147,6 +160,55 @@ END LiveEdit.
     true,
     JSON.stringify(compilation.diagnostics),
   );
+  session.dispose();
+});
+
+test("exports functions and views as stereotyped diagram nodes", {
+  skip: existsSync(modulePath) ? false : "WASM package artifacts have not been built"
+}, async () => {
+  const compiler = await createCompiler();
+  const session = compiler.createSession();
+  const uri = "memory:///WasmDiagram.ili";
+  session.putSource(uri, `INTERLIS 2.4;
+MODEL WasmDiagram (en) AT "https://example.invalid" VERSION "1" =
+  FUNCTION RootFunction(value : TEXT) : TEXT;
+  TOPIC Data =
+    CLASS Source =
+      Name : TEXT;
+    END Source;
+    FUNCTION TopicFunction(value : TEXT) : TEXT;
+    VIEW Overview
+      PROJECTION OF source ~ Source;
+    =
+      ATTRIBUTE ALL OF source;
+    END Overview;
+  END Data;
+END WasmDiagram.
+`);
+
+  const semantic = session.analyze({ roots: [uri] });
+  assert.equal(semantic.success, true, JSON.stringify(semantic.diagnostics));
+  const modelScope = semantic.diagram.nodes.find(node =>
+    node.kind === "modelScope");
+  const topic = semantic.diagram.nodes.find(node =>
+    node.kind === "topic" && node.label === "Data (WasmDiagram)");
+  assert.ok(modelScope);
+  assert.ok(topic);
+  assert.ok(semantic.diagram.nodes.some(node =>
+    node.kind === "function" &&
+    node.label === "RootFunction" &&
+    node.containerId === modelScope.id &&
+    node.stereotypes.includes("Function")));
+  assert.ok(semantic.diagram.nodes.some(node =>
+    node.kind === "function" &&
+    node.label === "TopicFunction" &&
+    node.containerId === topic.id &&
+    node.stereotypes.includes("Function")));
+  assert.ok(semantic.diagram.nodes.some(node =>
+    node.kind === "view" &&
+    node.label === "Overview" &&
+    node.containerId === topic.id &&
+    node.stereotypes.includes("View")));
   session.dispose();
 });
 

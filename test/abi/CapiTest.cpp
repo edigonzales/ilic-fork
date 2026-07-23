@@ -36,6 +36,9 @@ int main()
    const char *source = R"ili(INTERLIS 2.3;
 !!@ displayName = "ABI model"
 MODEL AbiModel AT "https://example.invalid/ilic/tests" VERSION "1" =
+  CLASS Item (ABSTRACT) =
+    Name : TEXT;
+  END Item;
 END AbiModel.
 )ili";
    assert(put(session,uri,source) == 0);
@@ -66,6 +69,11 @@ END AbiModel.
    assert(combined.find("\"kind\":\"compilation-analysis\"") != std::string::npos);
    assert(combined.find("\"compilation\":{\"abiVersion\":1") != std::string::npos);
    assert(combined.find("\"semantic\":{\"abiVersion\":1") != std::string::npos);
+   assert(combined.find("\"cardinality\":\"0..1\"") != std::string::npos);
+   assert(combined.find("\"declaringType\":\"\"") != std::string::npos);
+   assert(combined.find("\"inlineEnumValues\":[]") != std::string::npos);
+   assert(combined.find("\"operations\":[]") != std::string::npos);
+   assert(combined.find("\"stereotypes\":") != std::string::npos);
    assert(combined.find("\"syntax\":[{") != std::string::npos);
    assert(combined.find("\"transcript\":[") != std::string::npos);
 

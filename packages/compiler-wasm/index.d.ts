@@ -80,14 +80,19 @@ export interface SemanticReference {
 export interface SemanticDependency {
   sourceUri: string; targetUri: string; model: string; range?: SourceRange | null;
 }
-export interface DiagramMember { name: string; type: string; inherited: boolean; }
+export interface DiagramMember {
+  name: string; type: string; cardinality?: string; declaringType?: string;
+  inherited: boolean; inlineEnumValues?: string[];
+}
 export interface DiagramNode {
   id: string; containerId: string; label: string; kind: string; abstract: boolean;
-  range: SourceRange | null; members: DiagramMember[]; enumValues: string[];
+  range: SourceRange | null; stereotypes?: string[];
+  members: DiagramMember[]; enumValues: string[]; operations?: string[];
 }
 export interface DiagramEdge {
   id: string; sourceId: string; targetId: string; kind: string;
   label: string; cardinality: string;
+  sourceCardinality?: string; targetCardinality?: string;
 }
 export interface DocumentationSection {
   id: string; title: string; kind: string; text: string; level: number;

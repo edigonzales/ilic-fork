@@ -1664,6 +1664,16 @@ private:
 
 }
 
+Multiplicity effectiveRoleCardinality(Role *role)
+{
+   return effective_role_cardinality(role);
+}
+
+Multiplicity attributeCardinality(Type *type)
+{
+   return attribute_cardinality(type);
+}
+
 void check_model_semantics()
 {
    Log.setCategory("semantic");
