@@ -323,6 +323,60 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
       sections.push_back(Value::Object{{"id",section.id},{"title",section.title},
          {"kind",section.kind},{"text",section.text},{"level",section.level}});
    }
+   Value::Array models;
+   for (const auto &model : result.documentation.models) {
+      Value::Array viewables;
+      for (const auto &viewable : model.viewables) {
+         Value::Array rows;
+         for (const auto &row : viewable.rows) {
+            rows.push_back(Value::Object{{"name",row.name},
+               {"cardinality",row.cardinality},{"type",row.type},
+               {"description",row.description}});
+         }
+         viewables.push_back(Value::Object{{"name",viewable.name},
+            {"kind",viewable.kind},{"isAbstract",viewable.isAbstract},
+            {"documentation",viewable.documentation},{"rows",std::move(rows)}});
+      }
+      Value::Array enumerations;
+      for (const auto &enumeration : model.enumerations) {
+         Value::Array entries;
+         for (const auto &entry : enumeration.entries)
+            entries.push_back(Value::Object{{"value",entry.value},
+               {"documentation",entry.documentation}});
+         enumerations.push_back(Value::Object{{"name",enumeration.name},
+            {"documentation",enumeration.documentation},{"entries",std::move(entries)}});
+      }
+      Value::Array topics;
+      for (const auto &topic : model.topics) {
+         Value::Array topicViewables;
+         for (const auto &viewable : topic.viewables) {
+            Value::Array rows;
+            for (const auto &row : viewable.rows)
+               rows.push_back(Value::Object{{"name",row.name},
+                  {"cardinality",row.cardinality},{"type",row.type},
+                  {"description",row.description}});
+            topicViewables.push_back(Value::Object{{"name",viewable.name},
+               {"kind",viewable.kind},{"isAbstract",viewable.isAbstract},
+               {"documentation",viewable.documentation},{"rows",std::move(rows)}});
+         }
+         Value::Array topicEnumerations;
+         for (const auto &enumeration : topic.enumerations) {
+            Value::Array entries;
+            for (const auto &entry : enumeration.entries)
+               entries.push_back(Value::Object{{"value",entry.value},
+                  {"documentation",entry.documentation}});
+            topicEnumerations.push_back(Value::Object{{"name",enumeration.name},
+               {"documentation",enumeration.documentation},{"entries",std::move(entries)}});
+         }
+         topics.push_back(Value::Object{{"name",topic.name},{"documentation",topic.documentation},
+            {"viewables",std::move(topicViewables)},
+            {"enumerations",std::move(topicEnumerations)}});
+      }
+      models.push_back(Value::Object{{"name",model.name},{"uri",model.uri},
+         {"title",model.title},{"shortDescription",model.shortDescription},
+         {"topics",std::move(topics)},{"viewables",std::move(viewables)},
+         {"enumerations",std::move(enumerations)}});
+   }
    Value::Array missingModels;
    for (const auto &model : result.missingModels) missingModels.emplace_back(model);
    return Value::Object{{"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
@@ -333,7 +387,7 @@ Value semanticResult(const ilic::SemanticSnapshot &result)
       {"dependencies",std::move(dependencies)},
       {"diagram",Value::Object{{"nodes",std::move(diagramNodes)},{"edges",std::move(diagramEdges)}}},
       {"documentation",Value::Object{{"title",result.documentation.title},
-         {"sections",std::move(sections)}}},
+         {"sections",std::move(sections)},{"models",std::move(models)}}},
       {"diagnostics",diagnostics(result.diagnostics)},{"logs",logs(result.logs)}};
 }
 

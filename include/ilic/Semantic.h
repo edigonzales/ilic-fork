@@ -81,9 +81,53 @@ struct DocumentationSection {
    int level = 1;
 };
 
+struct DocumentationRow {
+   std::string name;
+   std::string cardinality;
+   std::string type;
+   std::string description;
+};
+
+struct DocumentationViewable {
+   std::string name;
+   std::string kind;
+   bool isAbstract = false;
+   std::string documentation;
+   std::vector<DocumentationRow> rows;
+};
+
+struct DocumentationEnumerationEntry {
+   std::string value;
+   std::string documentation;
+};
+
+struct DocumentationEnumeration {
+   std::string name;
+   std::string documentation;
+   std::vector<DocumentationEnumerationEntry> entries;
+};
+
+struct DocumentationTopic {
+   std::string name;
+   std::string documentation;
+   std::vector<DocumentationViewable> viewables;
+   std::vector<DocumentationEnumeration> enumerations;
+};
+
+struct DocumentationModel {
+   std::string name;
+   std::string uri;
+   std::string title;
+   std::string shortDescription;
+   std::vector<DocumentationTopic> topics;
+   std::vector<DocumentationViewable> viewables;
+   std::vector<DocumentationEnumeration> enumerations;
+};
+
 struct DocumentationProjection {
    std::string title;
    std::vector<DocumentationSection> sections;
+   std::vector<DocumentationModel> models;
 };
 
 struct SemanticSnapshot {

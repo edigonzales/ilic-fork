@@ -54,6 +54,21 @@ END WasmModel.
   assert.equal(item.endRange?.start.line, 6);
   assert.equal(item.endRange?.start.character, 8);
   assert.equal(semantic.documentVersions[uri], 7);
+  assert.equal(semantic.documentation.models?.length, 1);
+  assert.equal(semantic.documentation.models[0].name, "WasmModel");
+  assert.deepEqual(
+    semantic.documentation.models[0].topics.map(topic => topic.name),
+    ["Topic"],
+  );
+  assert.deepEqual(
+    semantic.documentation.models[0].topics[0].viewables[0].rows[0],
+    {
+      name: "value",
+      cardinality: "0..1",
+      type: "Text",
+      description: "",
+    },
+  );
 
   const combined = session.compileAndAnalyze({ roots: [uri] });
   assert.equal(combined.kind, "compilation-analysis");

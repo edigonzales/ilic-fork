@@ -68,6 +68,18 @@ void enumValues(metamodel::EnumType *type,std::vector<std::string> &values)
    visit(type->TopNode,"");
 }
 
+void documentationInlineEnumValues(metamodel::EnumNode *node,
+   const std::string &prefix,std::vector<std::string> &values)
+{
+   if (node == nullptr) return;
+   for (auto *child : node->Node) {
+      if (child == nullptr) continue;
+      const std::string value = join(prefix,child->Name);
+      if (child->Node.empty() && !value.empty()) values.push_back(value);
+      documentationInlineEnumValues(child,value,values);
+   }
+}
+
 std::string documentation(metamodel::MetaElement *element)
 {
    std::ostringstream text;
@@ -165,11 +177,233 @@ void inlineEnumerationValues(metamodel::Type *type,
    if (!type->Name.empty() && type->Name != "Type" &&
        type->Name != "TYPE") return;
    if (auto *enumeration = dynamic_cast<metamodel::EnumType *>(type)) {
-      enumValues(enumeration,values);
+      documentationInlineEnumValues(enumeration->TopNode,"",values);
       return;
    }
-   if (auto *tree = dynamic_cast<metamodel::EnumTreeValueType *>(type))
-      enumValues(tree->ET,values);
+   if (auto *tree = dynamic_cast<metamodel::EnumTreeValueType *>(type)) {
+      documentationInlineEnumValues(tree->ET == nullptr ? nullptr : tree->ET->TopNode,
+         "",values);
+   }
+}
+
+std::string documentationTypeName(metamodel::Type *type)
+{
+   if (type == nullptr) return "<Unknown>";
+   if (auto *multi = dynamic_cast<metamodel::MultiValue *>(type))
+      return documentationTypeName(multi->BaseType);
+   if (!type->Name.empty() && type->Name != "Type" && type->Name != "TYPE")
+      return type->Name;
+   if (auto *object = dynamic_cast<metamodel::ObjectType *>(type)) {
+      (void)object;
+      return "ObjectType";
+   }
+   if (auto *related = dynamic_cast<metamodel::ClassRelatedType *>(type)) {
+      if (related->_baseclass != nullptr && !related->_baseclass->Name.empty())
+         return related->_baseclass->Name;
+      return dynamic_cast<metamodel::ReferenceType *>(type) != nullptr ?
+         "Reference" : "Composition";
+   }
+   if (dynamic_cast<metamodel::EnumType *>(type) != nullptr ||
+       dynamic_cast<metamodel::EnumTreeValueType *>(type) != nullptr)
+      return "Enumeration";
+   if (dynamic_cast<metamodel::BooleanType *>(type) != nullptr)
+      return "BOOLEAN";
+   if (auto *text = dynamic_cast<metamodel::TextType *>(type)) {
+      switch (text->Kind) {
+         case metamodel::TextType::MText: return "MTEXT";
+         case metamodel::TextType::NameVal: return "NAME";
+         case metamodel::TextType::Uri: return "URI";
+         case metamodel::TextType::Text: return "Text";
+      }
+   }
+   if (dynamic_cast<metamodel::NumType *>(type) != nullptr)
+      return "Numeric";
+   if (auto *coord = dynamic_cast<metamodel::CoordType *>(type))
+      return std::string(coord->Multi ? "MultiCoord" : "Coord") +
+         std::to_string(coord->Axis.size());
+   if (auto *line = dynamic_cast<metamodel::LineType *>(type)) {
+      switch (line->Kind) {
+         case metamodel::LineType::Polyline: return "Polyline";
+         case metamodel::LineType::DirectedPolyline: return "DirectedPolyline";
+         case metamodel::LineType::Surface: return "Surface";
+         case metamodel::LineType::Area: return "Area";
+         case metamodel::LineType::MultiPolyline: return "MultiPolyline";
+         case metamodel::LineType::DirectedMultiPolyline: return "DirectedMultiPolyline";
+         case metamodel::LineType::MultiSurface: return "MultiSurface";
+         case metamodel::LineType::MultiArea: return "MultiArea";
+      }
+   }
+   if (dynamic_cast<metamodel::AnyOIDType *>(type) != nullptr)
+      return "ANY OID";
+   if (dynamic_cast<metamodel::AttributeRefType *>(type) != nullptr)
+      return "ATTRIBUTE";
+   if (dynamic_cast<metamodel::BlackboxType *>(type) != nullptr)
+      return "BLACKBOX";
+   return type->getClass();
+}
+
+bool isObjectType(metamodel::Type *type)
+{
+   if (auto *multi = dynamic_cast<metamodel::MultiValue *>(type))
+      return isObjectType(multi->BaseType);
+   return dynamic_cast<metamodel::ObjectType *>(type) != nullptr;
+}
+
+void appendDocumentationEnumEntries(
+   std::vector<DocumentationEnumerationEntry> &entries,
+   metamodel::EnumNode *node,const std::string &prefix,bool includeIntermediate)
+{
+   if (node == nullptr) return;
+   for (auto *child : node->Node) {
+      if (child == nullptr) continue;
+      const std::string value = join(prefix,child->Name);
+      const bool hasChildren = !child->Node.empty();
+      if (!hasChildren || includeIntermediate)
+         entries.push_back({value,documentation(child)});
+      appendDocumentationEnumEntries(entries,child,value,includeIntermediate);
+   }
+}
+
+metamodel::EnumType *documentationEnumerationType(metamodel::MetaElement *element)
+{
+   if (auto *enumeration = dynamic_cast<metamodel::EnumType *>(element))
+      return enumeration;
+   if (auto *tree = dynamic_cast<metamodel::EnumTreeValueType *>(element))
+      return tree->ET;
+   return nullptr;
+}
+
+DocumentationEnumeration documentationEnumeration(metamodel::MetaElement *element)
+{
+   DocumentationEnumeration result;
+   if (element == nullptr) return result;
+   result.name = element->Name;
+   result.documentation = documentation(element);
+   auto *enumeration = documentationEnumerationType(element);
+   if (enumeration != nullptr) {
+      const bool includeIntermediate =
+         dynamic_cast<metamodel::EnumTreeValueType *>(element) != nullptr;
+      appendDocumentationEnumEntries(result.entries,enumeration->TopNode,"",
+         includeIntermediate);
+   }
+   return result;
+}
+
+DocumentationViewable documentationViewable(metamodel::Class *viewable,
+   metamodel::Package *scope)
+{
+   DocumentationViewable result;
+   if (viewable == nullptr) return result;
+   result.name = viewable->Name;
+   result.kind = classKind(*viewable);
+   result.isAbstract = isAbstract(viewable);
+   result.documentation = documentation(viewable);
+
+   for (auto *attribute : viewable->ClassAttribute) {
+      if (attribute == nullptr || isObjectType(attribute->Type)) continue;
+      DocumentationRow row;
+      row.name = attribute->Name;
+      row.cardinality = cardinality(metamodel::attributeCardinality(attribute->Type));
+      row.type = documentationTypeName(attribute->Type);
+      row.description = documentation(attribute);
+      std::vector<std::string> inlineValues;
+      inlineEnumerationValues(attribute->Type,inlineValues);
+      if (!inlineValues.empty()) {
+         row.description.clear();
+         for (std::size_t index = 0; index < inlineValues.size(); ++index) {
+            if (index != 0) row.description += ", ";
+            row.description += inlineValues[index];
+         }
+      }
+      result.rows.push_back(std::move(row));
+   }
+
+   std::sort(result.rows.begin(), result.rows.end(), [](const auto &left, const auto &right) {
+      return left.name < right.name;
+   });
+
+   if (viewable->Kind == metamodel::Class::ClassVal && scope != nullptr) {
+      for (auto *element : scope->Element) {
+         auto *association = dynamic_cast<metamodel::Class *>(element);
+         if (association == nullptr ||
+             association->Kind != metamodel::Class::Association ||
+             association->Role.size() != 2) continue;
+         auto role = association->Role.begin();
+         auto *left = *role++;
+         auto *right = *role;
+         if (left == nullptr || right == nullptr) continue;
+         auto addRole = [&](metamodel::Role *me,metamodel::Role *other) {
+            if (me == nullptr || other == nullptr || me->_baseclass != viewable ||
+                other->_baseclass == nullptr) return;
+            result.rows.push_back({me->Name.empty() ? "role" : me->Name,
+               cardinality(metamodel::effectiveRoleCardinality(me)),
+               other->_baseclass->Name,""});
+         };
+         addRole(left,right);
+         addRole(right,left);
+      }
+   }
+   return result;
+}
+
+std::vector<DocumentationViewable> documentationViewables(metamodel::Package *scope)
+{
+   std::vector<DocumentationViewable> result;
+   if (scope == nullptr) return result;
+   for (auto *element : scope->Element) {
+      auto *viewable = dynamic_cast<metamodel::Class *>(element);
+      if (viewable == nullptr || viewable->Kind == metamodel::Class::Association)
+         continue;
+      result.push_back(documentationViewable(viewable,scope));
+   }
+   std::sort(result.begin(),result.end(),[](const auto &left,const auto &right) {
+      return left.name < right.name;
+   });
+   return result;
+}
+
+std::vector<DocumentationEnumeration> documentationEnumerations(metamodel::Package *scope)
+{
+   std::vector<DocumentationEnumeration> result;
+   if (scope == nullptr) return result;
+   for (auto *element : scope->Element) {
+      if (documentationEnumerationType(element) != nullptr)
+         result.push_back(documentationEnumeration(element));
+   }
+   std::sort(result.begin(),result.end(),[](const auto &left,const auto &right) {
+      return left.name < right.name;
+   });
+   return result;
+}
+
+DocumentationModel documentationModel(metamodel::Model *model)
+{
+   DocumentationModel result;
+   if (model == nullptr) return result;
+   result.name = model->Name;
+   result.uri = model->_ilifile;
+   for (auto *attribute : model->MetaAttribute) {
+      if (attribute == nullptr) continue;
+      if (attribute->Name == "title") result.title = attribute->Value;
+      else if (attribute->Name == "shortDescription")
+         result.shortDescription = attribute->Value;
+   }
+   result.viewables = documentationViewables(model);
+   result.enumerations = documentationEnumerations(model);
+   for (auto *element : model->Element) {
+      auto *topic = dynamic_cast<metamodel::SubModel *>(element);
+      if (topic == nullptr) continue;
+      DocumentationTopic topicResult;
+      topicResult.name = topic->Name;
+      topicResult.documentation = documentation(topic);
+      topicResult.viewables = documentationViewables(topic);
+      topicResult.enumerations = documentationEnumerations(topic);
+      result.topics.push_back(std::move(topicResult));
+   }
+   std::sort(result.topics.begin(),result.topics.end(),[](const auto &left,const auto &right) {
+      return left.name < right.name;
+   });
+   return result;
 }
 
 class SnapshotBuilder {
@@ -181,8 +415,11 @@ public:
    void addModel(metamodel::Model *model)
    {
       if (model == nullptr) return;
-      if (snapshot_.documentation.title.empty() && model->_ilifile != "internal")
+      const bool documentationRoot = diagramRootFiles_.count(model->_ilifile) != 0;
+      if (snapshot_.documentation.title.empty() && documentationRoot)
          snapshot_.documentation.title = model->Name;
+      if (documentationRoot)
+         snapshot_.documentation.models.push_back(documentationModel(model));
       addElement(model,"","",1,diagramRootFiles_.count(model->_ilifile) != 0,"");
    }
 
@@ -205,6 +442,10 @@ public:
          }
       }
       addDiagramEdges();
+      std::sort(snapshot_.documentation.models.begin(),
+         snapshot_.documentation.models.end(),[](const auto &left,const auto &right) {
+            return left.name < right.name;
+         });
    }
 
 private:

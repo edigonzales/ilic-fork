@@ -37,6 +37,7 @@ namespace metamodel {
       int Column = 0;
    };
    static map<int,list<PendingMetaAttribute>> PendingMetaAttributes;
+   static map<int,string> PendingDocumentation;
 
    static string trim_copy(const string &value)
    {
@@ -72,6 +73,7 @@ namespace metamodel {
       AllLineForms.clear();
       AllGraphics.clear();
       PendingMetaAttributes.clear();
+      PendingDocumentation.clear();
       CurrentSourceText.clear();
       UniversalClassesInitialized = false;
       ili23 = true;
@@ -83,6 +85,61 @@ namespace metamodel {
    {
       CurrentSourceText = source;
       PendingMetaAttributes.clear();
+      PendingDocumentation.clear();
+
+      auto normalize_documentation = [](string value) {
+         istringstream lines(value);
+         vector<string> normalized;
+         string line;
+         while (getline(lines,line)) {
+            line = trim_copy(line);
+            if (!line.empty() && line.front() == '*') {
+               line = trim_copy(line.substr(1));
+            }
+            normalized.push_back(line);
+         }
+         while (!normalized.empty() && normalized.front().empty())
+            normalized.erase(normalized.begin());
+         while (!normalized.empty() && normalized.back().empty())
+            normalized.pop_back();
+         string result;
+         for (const auto &line : normalized) {
+            if (!result.empty()) result += '\n';
+            result += line;
+         }
+         return result;
+      };
+
+      size_t search = 0;
+      while ((search = source.find("/**",search)) != string::npos) {
+         const size_t contentStart = search + 3;
+         const size_t end = source.find("*/",contentStart);
+         if (end == string::npos) break;
+         const string text = normalize_documentation(
+            source.substr(contentStart,end - contentStart));
+         size_t next = end + 2;
+         int lineNumber = 1;
+         for (size_t index = 0; index < next && index < source.size(); ++index)
+            if (source[index] == '\n') ++lineNumber;
+         while (next < source.size()) {
+            const size_t lineEnd = source.find('\n',next);
+            const size_t length = lineEnd == string::npos ? source.size() - next :
+               lineEnd - next;
+            const string line = source.substr(next,length);
+            const size_t first = line.find_first_not_of(" \t\r");
+            const string trimmed = first == string::npos ? "" : line.substr(first);
+            if (trimmed.empty() || trimmed.rfind("!!",0) == 0) {
+               if (lineEnd == string::npos) break;
+               next = lineEnd + 1;
+               ++lineNumber;
+               continue;
+            }
+            break;
+         }
+         if (!text.empty() && next < source.size())
+            PendingDocumentation[lineNumber] = text;
+         search = end + 2;
+      }
       list<PendingMetaAttribute> pending;
       istringstream lines(source);
       string line;
@@ -244,6 +301,14 @@ namespace metamodel {
             attribute->MetaElement = e;
             e->MetaAttribute.push_back(attribute);
          }
+      }
+      auto documentation = PendingDocumentation.find(line);
+      if (documentation != PendingDocumentation.end() &&
+          !documentation->second.empty()) {
+         auto *doc = new DocText();
+         init_mmobject(doc,line);
+         doc->Text = documentation->second;
+         e->Documentation.push_back(doc);
       }
       MMObject *ctx = get_context();
       if (ctx == nullptr) {

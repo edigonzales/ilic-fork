@@ -30,7 +30,7 @@ MODEL Semantic (en) AT "https://example.invalid" VERSION "1" =
   IMPORTS BaseLibrary;
   TOPIC Data =
     CLASS Base (ABSTRACT) =
-      /* 😀 */ Name : BaseLibrary.Remote;
+      /** Base name documentation */ Name : BaseLibrary.Remote;
     END Base;
     CLASS Item EXTENDS Base =
       Code : MANDATORY TEXT * 20;
@@ -115,6 +115,37 @@ END Semantic.
          edge.cardinality == "left 1 / right 0..*";
    }));
    assert(!snapshot.documentation.title.empty());
+   assert(snapshot.documentation.models.size() == 1);
+   const auto &documentationModel = snapshot.documentation.models.front();
+   assert(documentationModel.name == "Semantic");
+   assert(documentationModel.uri == uri);
+   assert(documentationModel.topics.size() == 1);
+   assert(documentationModel.topics.front().name == "Data");
+   const auto itemDocumentation = std::find_if(
+      documentationModel.topics.front().viewables.begin(),
+      documentationModel.topics.front().viewables.end(),
+      [](const auto &viewable) { return viewable.name == "Item"; });
+   assert(itemDocumentation != documentationModel.topics.front().viewables.end());
+   assert(std::any_of(itemDocumentation->rows.begin(),itemDocumentation->rows.end(),
+      [](const auto &row) {
+         return row.name == "left" && row.cardinality == "1" && row.type == "Base";
+      }));
+   assert(std::any_of(itemDocumentation->rows.begin(),itemDocumentation->rows.end(),
+      [](const auto &row) {
+         return row.name == "Code" && row.description == "";
+      }));
+   assert(std::none_of(documentationModel.topics.front().viewables.begin(),
+      documentationModel.topics.front().viewables.end(),
+      [](const auto &viewable) { return viewable.name == "Link"; }));
+   const auto baseDocumentation = std::find_if(
+      documentationModel.topics.front().viewables.begin(),
+      documentationModel.topics.front().viewables.end(),
+      [](const auto &viewable) { return viewable.name == "Base"; });
+   assert(baseDocumentation != documentationModel.topics.front().viewables.end());
+   assert(std::any_of(baseDocumentation->rows.begin(),baseDocumentation->rows.end(),
+      [](const auto &row) {
+         return row.name == "Name" && row.description == "Base name documentation";
+      }));
 
    ilic::CompilerSession extendedSession;
    const std::string extendedUri = "memory:///Extended.ili";
@@ -241,6 +272,30 @@ END DiagramRoot.
    diagramRequest.roots = {diagramRootUri};
    const ilic::SemanticSnapshot diagram = diagramSession.analyze(diagramRequest);
    assert(diagram.success);
+   assert(diagram.documentation.models.size() == 1);
+   const auto &diagramDocumentation = diagram.documentation.models.front();
+   assert(diagramDocumentation.name == "DiagramRoot");
+   assert(diagramDocumentation.topics.size() == 1);
+   assert(diagramDocumentation.enumerations.size() == 1);
+   assert(diagramDocumentation.enumerations.front().name == "RootColors");
+   assert(diagramDocumentation.enumerations.front().entries.size() == 2);
+   assert(diagramDocumentation.enumerations.front().entries.front().value == "red");
+   const auto documentationRootClass = std::find_if(
+      diagramDocumentation.viewables.begin(),diagramDocumentation.viewables.end(),
+      [](const auto &viewable) { return viewable.name == "RootClass"; });
+   assert(documentationRootClass != diagramDocumentation.viewables.end());
+   assert(documentationRootClass->isAbstract);
+   const auto documentationState = std::find_if(
+      documentationRootClass->rows.begin(),documentationRootClass->rows.end(),
+      [](const auto &row) { return row.name == "State"; });
+   assert(documentationState != documentationRootClass->rows.end());
+   assert(documentationState->type == "Enumeration");
+   assert(documentationState->description == "open, closed, archived");
+   assert(diagramDocumentation.topics.front().enumerations.size() == 2);
+   assert(std::any_of(diagramDocumentation.topics.front().enumerations.begin(),
+      diagramDocumentation.topics.front().enumerations.end(),[](const auto &enumeration) {
+         return enumeration.name == "TopicTree" && enumeration.entries.size() == 2;
+      }));
    assert(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
       return symbol.qualifiedName == "DiagramLibrary.ImportedData.ImportedClass";
    }));

@@ -97,6 +97,30 @@ export interface DiagramEdge {
 export interface DocumentationSection {
   id: string; title: string; kind: string; text: string; level: number;
 }
+export interface DocumentationRow {
+  name: string; cardinality: string; type: string; description?: string;
+}
+export interface DocumentationViewable {
+  name: string; kind: "class" | "structure" | "view";
+  isAbstract: boolean; documentation?: string; rows: DocumentationRow[];
+}
+export interface DocumentationEnumerationEntry {
+  value: string; documentation?: string;
+}
+export interface DocumentationEnumeration {
+  name: string; documentation?: string; entries: DocumentationEnumerationEntry[];
+}
+export interface DocumentationTopic {
+  name: string; documentation?: string;
+  viewables: DocumentationViewable[];
+  enumerations: DocumentationEnumeration[];
+}
+export interface DocumentationModel {
+  name: string; uri: string; title?: string; shortDescription?: string;
+  topics: DocumentationTopic[];
+  viewables: DocumentationViewable[];
+  enumerations: DocumentationEnumeration[];
+}
 export interface SemanticSnapshot {
   schemaVersion: 1;
   abiVersion: 1;
@@ -111,7 +135,11 @@ export interface SemanticSnapshot {
   references: SemanticReference[];
   dependencies: SemanticDependency[];
   diagram: { nodes: DiagramNode[]; edges: DiagramEdge[] };
-  documentation: { title: string; sections: DocumentationSection[] };
+  documentation: {
+    title: string;
+    sections: DocumentationSection[];
+    models?: DocumentationModel[];
+  };
   diagnostics: Diagnostic[];
   logs: LogEvent[];
 }
