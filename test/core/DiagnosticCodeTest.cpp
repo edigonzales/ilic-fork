@@ -20,5 +20,11 @@ int main()
       == "ILIC-INPUT-UNSUPPORTED-VERSION");
    assert(diagnosticCodeForMessage("an association requires at least two roles")
       == "ILIC-ASSOCIATION-ROLE-COUNT");
+   assert(diagnosticCodeForMessage("topicname TopicB must match TopicA")
+      == "ILIC-NAME-END-MISMATCH");
+   assert(diagnosticCodeForMessage("PARENT is only valid in a normal inspection view")
+      == "ILIC-REFERENCE-RULE");
+   assert(diagnosticCodeForMessage("NotAnAssociation is no association")
+      == "ILIC-TYPE-MISMATCH");
    return 0;
 }

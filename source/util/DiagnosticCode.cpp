@@ -57,7 +57,7 @@ std::string diagnosticCodeForMessage(std::string_view message)
       return "ILIC-NAME-NOT-FOUND";
    }
 
-   if (contains(value,{"does not match","should end with","must end with"," expected"}))
+   if (contains(value,{"does not match","must match","should end with","must end with"," expected"}))
       return "ILIC-NAME-END-MISMATCH";
    if (contains(value,{"duplicate","multiple declaration","multiple declarations",
       "already exists","there is already","same name","name conflict","several attributes"}))
@@ -77,6 +77,9 @@ std::string diagnosticCodeForMessage(std::string_view message)
    if (contains(value,{"constraint","unique","basket and local","set constraint",
       "required in"}))
       return "ILIC-CONSTRAINT-RULE";
+   if (contains(value,{"parent is only valid","thisarea is only valid",
+      "thatarea is only valid","aggregates has no aggregation base"}))
+      return "ILIC-REFERENCE-RULE";
    if (contains(value,{"generic","deferred","context definition","context default"}))
       return "ILIC-GENERIC-CONTEXT";
    if (contains(value,{"enumeration","enum ","#"}))
@@ -87,7 +90,7 @@ std::string diagnosticCodeForMessage(std::string_view message)
       return "ILIC-REFERENCE-RULE";
    if (contains(value,{"datatype","type","numeric","boolean","logical","text length",
       "formatted value","coordinate","coord ","structure","class ","association ",
-      "view ","domain "}))
+      "association","view ","domain "}))
       return "ILIC-TYPE-MISMATCH";
    if (contains(value,{"minimum","maximum","range","precision","overlap","outside"}))
       return "ILIC-VALUE-RANGE";
