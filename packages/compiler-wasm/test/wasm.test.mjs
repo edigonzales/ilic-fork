@@ -37,6 +37,23 @@ END WasmModel.
   assert.ok(syntax.tokens.length > 0);
   assert.ok(syntax.nodes.some(node => node.kind === "modelDef"));
 
+  const editor = session.editorSnapshot(uri);
+  assert.equal(editor.kind, "editor");
+  assert.equal(editor.documentVersion, 7);
+  assert.deepEqual(
+    editor.declarations.map(declaration => declaration.qualifiedName),
+    [
+      "WasmModel",
+      "WasmModel.Topic",
+      "WasmModel.Topic.Item",
+      "WasmModel.Topic.Item.value",
+    ],
+  );
+  assert.equal(
+    JSON.stringify(editor).length < JSON.stringify(syntax).length,
+    true,
+  );
+
   const semantic = session.analyze({ roots: [uri] });
   assert.equal(semantic.kind, "semantic");
   assert.equal(semantic.success, true, JSON.stringify(semantic.diagnostics));
@@ -259,4 +276,112 @@ END Extended.
     reference.targetId === base.id &&
     reference.range?.uri === uri));
   session.dispose();
+});
+
+test("projects imports, references, END names, and Unicode positions for editors", async () => {
+  const compiler = await createCompiler();
+  const session = compiler.createSession();
+  const uri = "file:///editor.ili";
+  session.putSource(
+    uri,
+    `INTERLIS 2.4;
+!! Zürich 😀
+MODEL Editor (de) AT "https://example.com" VERSION "1" =
+  IMPORTS UNQUALIFIED Base, Units;
+  TOPIC T =
+    CLASS C EXTENDS Base.Root =
+      values: LIST {0..*} OF S;
+      parent: REFERENCE TO Base.Root;
+    END C;
+    STRUCTURE S =
+    END S;
+  END T;
+END Editor.
+`,
+    11,
+  );
+
+  const snapshot = session.editorSnapshot(uri);
+  assert.equal(snapshot.schemaVersion, 1);
+  assert.equal(snapshot.documentVersion, 11);
+  assert.deepEqual(
+    snapshot.imports.map(entry => [entry.model, entry.unqualified]),
+    [["Base", true], ["Units", true]],
+  );
+  assert.deepEqual(
+    snapshot.references.map(reference => [reference.kind, reference.text]),
+    [
+      ["extends", "Base.Root"],
+      ["collection", "S"],
+      ["reference", "Base.Root"],
+    ],
+  );
+  const model = snapshot.declarations.find(value => value.name === "Editor");
+  assert.equal(model?.endRange?.start.line, 12);
+  assert.equal(
+    model?.selectionRange.start.byteOffset,
+    new TextEncoder().encode("INTERLIS 2.4;\n!! Zürich 😀\nMODEL ").length,
+  );
+  assert.deepEqual(
+    snapshot.contexts.map(context => context.kind),
+    ["modelDef", "topicDef", "classDef", "structureDef"],
+  );
+  session.dispose();
+});
+
+test("keeps editor diagnostics limited to structurally safe findings", async () => {
+  const compiler = await createCompiler();
+  const session = compiler.createSession();
+  const uri = "file:///editor-diagnostics.ili";
+  session.putSource(uri, `INTERLIS 2.4;
+MODEL Diagnostics =
+  CLASS Item =
+  END Wrong;
+  CLASS Duplicate =
+  END Duplicate;
+  CLASS Duplicate =
+  END Duplicate;
+END Diagnostics.
+`, 2);
+  const snapshot = session.editorSnapshot(uri);
+  assert.deepEqual(
+    snapshot.diagnostics.map(diagnostic => diagnostic.code),
+    ["ILIC-LIVE-END-NAME", "ILIC-LIVE-DUPLICATE"],
+  );
+  assert.equal(
+    snapshot.diagnostics.every(value => value.source === "live"),
+    true,
+  );
+  session.dispose();
+});
+
+test("keeps editor snapshots within the interactive latency budget", async () => {
+  const compiler = await createCompiler();
+  for (const [count, budget] of [[550, 150], [3_500, 750]]) {
+    const session = compiler.createSession();
+    const uri = `file:///performance-${count}.ili`;
+    const attributes = Array.from(
+      { length: count },
+      (_, index) => `    attribute${index}: TEXT*20;`,
+    ).join("\n");
+    const source = `INTERLIS 2.4;
+MODEL Performance (en) AT "https://example.com" VERSION "1" =
+  TOPIC T =
+    CLASS C =
+${attributes}
+    END C;
+  END T;
+END Performance.
+`;
+    session.putSource(uri, source, 1);
+    const started = performance.now();
+    const snapshot = session.editorSnapshot(uri);
+    const elapsed = performance.now() - started;
+    assert.equal(snapshot.declarations.length, count + 3);
+    assert.ok(
+      elapsed < budget,
+      `${new TextEncoder().encode(source).length} bytes took ${elapsed.toFixed(1)} ms (budget ${budget} ms)`,
+    );
+    session.dispose();
+  }
 });

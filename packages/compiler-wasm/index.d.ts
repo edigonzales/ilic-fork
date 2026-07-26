@@ -9,6 +9,8 @@ export interface Diagnostic {
   relatedInformation: Array<{ range: SourceRange | null; message: string }>;
   notes: string[];
   treatedAsError: boolean;
+  source?: "compiler" | "live" | "lint";
+  tags?: Array<"unnecessary" | "deprecated">;
 }
 export interface LogEvent {
   level: "trace" | "debug" | "information" | "warning" | "error";
@@ -66,6 +68,40 @@ export interface SyntaxSnapshot {
   contexts: SyntaxContext[];
   imports: string[];
   importReferences?: SyntaxImportReference[];
+  diagnostics: Diagnostic[];
+}
+export type EditorSymbolKind =
+  | "model" | "topic" | "class" | "structure" | "association"
+  | "view" | "graphic" | "domain" | "unit" | "attribute";
+export interface EditorDeclaration {
+  id: string;
+  name: string;
+  qualifiedName: string;
+  kind: EditorSymbolKind;
+  containerId: string | null;
+  range: SourceRange;
+  selectionRange: SourceRange;
+  endRange: SourceRange | null;
+}
+export interface EditorReference {
+  text: string;
+  kind: "extends" | "type" | "collection" | "reference" | "unit";
+  sourceId: string | null;
+  range: SourceRange;
+}
+export interface EditorSnapshot {
+  schemaVersion: 1;
+  abiVersion: 1;
+  compilerVersion: string;
+  kind: "editor";
+  success: boolean;
+  uri: string;
+  documentVersion: number;
+  iliVersion: "1.0" | "2.3" | "2.4";
+  declarations: EditorDeclaration[];
+  references: EditorReference[];
+  imports: SyntaxImportReference[];
+  contexts: SyntaxContext[];
   diagnostics: Diagnostic[];
 }
 export interface SemanticSymbol {
@@ -192,6 +228,7 @@ export class CompilerSession {
   removeSource(uri: string): boolean;
   compile(request: CompilationRequest): CompilationResult;
   parse(uri: string): SyntaxSnapshot;
+  editorSnapshot(uri: string): EditorSnapshot;
   analyze(request: CompilationRequest): SemanticSnapshot;
   compileAndAnalyze(request: CompilationRequest): CompilationAnalysisResult;
   format(uri: string, options?: { indentSize?: number; requireValidSyntax?: boolean }): FormatResult;

@@ -46,6 +46,27 @@ Eine Session kann mehrere virtuelle Dateien und Imports enthalten.
 enthalten stabile Codes sowie, soweit verfügbar, nullbasierte Zeilen und
 UTF-16-Spalten.
 
+## Kompakter Editor-Snapshot
+
+`session.editorSnapshot(uri)` erzeugt additiv zur bestehenden
+`SyntaxSnapshot`-API einen versionierten, fehlertoleranten `EditorSnapshot`.
+Er enthält nur die für interaktive Editorfunktionen benötigten
+Deklarationen, Scopes, Referenzen, Imports und Cursor-Kontexte. Strings und
+Kommentare werden beim linearen Editor-Scan unterdrückt; Quellbereiche
+enthalten weiterhin UTF-16-Positionen und UTF-8-Byteoffsets.
+
+```js
+const snapshot = session.editorSnapshot(uri);
+console.log(snapshot.documentVersion);
+console.log(snapshot.declarations);
+console.log(snapshot.references);
+```
+
+Der kompakte Scan ist kein Ersatz für `compile`, `analyze` oder
+`compileAndAnalyze`. Ein Host sollte ihn in einem eigenen Worker ausführen,
+veraltete Dokumentversionen verwerfen und vollständige Compilerdiagnosen
+weiterhin bei Save oder einem expliziten Compile erzeugen.
+
 ## Repository-Modelle
 
 Netzwerk, Dateisystem und Cache liegen bewusst außerhalb des WASM-Moduls.
@@ -93,7 +114,8 @@ worker.onmessage = ({ data }) => console.log(data);
 ```
 
 Unterstützt werden `createSession`, `disposeSession`, `putSource`,
-`removeSource`, `parse`, `analyze`, `compile` und `format`. Für produktiven Einsatz sollte der Host
+`removeSource`, `parse`, `editorSnapshot`, `analyze`, `compile`,
+`compileAndAnalyze` und `format`. Für produktiven Einsatz sollte der Host
 Requests über `id` Promise-basiert korrelieren.
 
 ## Browser und Bundler
