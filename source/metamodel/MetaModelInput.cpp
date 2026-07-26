@@ -887,6 +887,7 @@ namespace metamodel {
       Class *c = static_cast<Class *>(t);
       if (c->Kind != Class::Association) {
          Log.error(name + " is no association",line);
+         return nullptr;
       }
       return c;
    }

@@ -126,14 +126,14 @@ END ModelB.
    diagnosticRequest.roots.push_back(diagnosticUri);
    const ilic::CompilationResult diagnosticResult = diagnosticSession.compile(diagnosticRequest);
    assert(!diagnosticResult.success);
-   assert(std::any_of(diagnosticResult.diagnostics.begin(),diagnosticResult.diagnostics.end(),
+   assert(std::count_if(diagnosticResult.diagnostics.begin(),diagnosticResult.diagnostics.end(),
       [](const auto &diagnostic) {
          return diagnostic.code == "ILIC-TRANSLATION-MISMATCH" &&
             diagnostic.message.find("nullptr") == std::string::npos &&
             diagnostic.message.find("left") != std::string::npos &&
             diagnostic.range.valid && !diagnostic.relatedInformation.empty() &&
             diagnostic.relatedInformation.front().range.valid;
-      }));
+      }) == 1);
 
    ilic::CompilerSession anonymousAssociationSession;
    const char *anonymousUri = "memory:///AnonymousAssociation.ili";
@@ -159,5 +159,34 @@ END AnonymousAssociation.
             diagnostic.message.find("anonymous association") != std::string::npos &&
             diagnostic.message.find("???") == std::string::npos;
       }));
+
+   ilic::CompilerSession invalidAssociationSession;
+   const char *invalidAssociationUri = "memory:///InvalidAssociationBase.ili";
+   invalidAssociationSession.putSource(invalidAssociationUri,R"ili(INTERLIS 2.3;
+MODEL InvalidAssociationBase AT "https://example.invalid" VERSION "1" =
+  TOPIC Topic =
+    CLASS A = END A;
+    CLASS B = END B;
+    CLASS NotAnAssociation = END NotAnAssociation;
+    ASSOCIATION Link EXTENDS NotAnAssociation =
+      left -- A;
+      right -- B;
+    END Link;
+  END Topic;
+END InvalidAssociationBase.
+)ili");
+   ilic::CompilationRequest invalidAssociationRequest;
+   invalidAssociationRequest.roots.push_back(invalidAssociationUri);
+   const auto invalidAssociationResult =
+      invalidAssociationSession.compile(invalidAssociationRequest);
+   assert(!invalidAssociationResult.success);
+   assert(std::count_if(
+      invalidAssociationResult.diagnostics.begin(),
+      invalidAssociationResult.diagnostics.end(),
+      [](const auto &diagnostic) {
+         return diagnostic.severity == ilic::DiagnosticSeverity::Error;
+      }) == 1);
+   assert(invalidAssociationResult.diagnostics.front().message
+      == "NotAnAssociation is no association");
    return 0;
 }

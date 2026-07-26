@@ -46,6 +46,7 @@ public:
 
 private:
    set<Model *> cyclic_models;
+   set<MetaElement *> compared_elements;
    map<string,string> translated_names;
 
    Model *find_model(const string &name)
@@ -208,6 +209,7 @@ private:
       vector<T *> base_values = as_vector(base);
       if (translated_values.size() != base_values.size()) {
          mismatch(owner,owner->_translationOf,property + " count");
+         return;
       }
       size_t count = min(translated_values.size(),base_values.size());
       for (size_t i = 0; i < count; ++i) {
@@ -534,6 +536,9 @@ private:
    void compare_element(MetaElement *translated,MetaElement *base)
    {
       if (translated == nullptr || base == nullptr || translated->getClass() != base->getClass()) {
+         return;
+      }
+      if (!compared_elements.insert(translated).second) {
          return;
       }
       if (auto extendable = dynamic_cast<ExtendableME *>(translated)) {
