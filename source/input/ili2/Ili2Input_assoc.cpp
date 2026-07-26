@@ -67,21 +67,40 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
       list<Constraint *> Constraint;
    */
    
-   string name1 = "???";
+   string name1;
    if (ctx->associationname1 != nullptr) {
       name1 = ctx->associationname1->getText();
    }
    
-   string name2 = "???";
+   string name2;
    if (ctx->associationname2 != nullptr) {
       name2 = ctx->associationname2->getText();
    }
    
-   debug(ctx,">>> visitAssociationDef(" + name1 + ")");
+   const string diagnosticName = name1.empty() ? "anonymous association" : name1;
+   debug(ctx,">>> visitAssociationDef(" + diagnosticName + ")");
    Log.incNestLevel();
    
-   if (name1 != name2) {
-      Log.error(name2 + " does not match " + name1,ctx->END()->getSymbol()->getLine());
+   if (name1.empty() != name2.empty()) {
+      if (name1.empty()) {
+         Log.error(
+            "anonymous association must not have the closing name \"" + name2 + "\"",
+            ctx->END()->getSymbol()->getLine(),0,
+            "ILIC-ASSOCIATION-UNEXPECTED-END-NAME");
+      }
+      else {
+         Log.error(
+            "association \"" + name1 + "\" must end with \"END " + name1 + "\"",
+            ctx->END()->getSymbol()->getLine(),0,
+            "ILIC-ASSOCIATION-MISSING-END-NAME");
+      }
+   }
+   else if (!name1.empty() && name1 != name2) {
+      Log.error(
+         "association \"" + name1 + "\" must end with \"END " + name1
+            + "\"; found \"END " + name2 + "\"",
+         ctx->END()->getSymbol()->getLine(),0,
+         "ILIC-ASSOCIATION-END-NAME-MISMATCH");
    }
 
    // init Class
@@ -92,7 +111,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    set_end_selection_source(c,ctx->associationname2);
 
    // MetaElement Attributes
-   c->Name = name1;
+   c->Name = name1.empty() ? "???" : name1;
 
    // ExtendableME Attributes
    map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,EXTENDED,FINAL,OID}));
@@ -229,7 +248,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    pop_context();
 
    Log.decNestLevel();
-   debug(ctx,"<<< visitAssociationDef(" + name1 + ")");
+   debug(ctx,"<<< visitAssociationDef(" + diagnosticName + ")");
    
    return c;
 

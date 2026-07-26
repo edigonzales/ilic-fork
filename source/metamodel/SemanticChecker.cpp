@@ -1613,7 +1613,11 @@ private:
             continue;
          }
          if (!roleNames.insert(role->Name).second) {
-            Log.error("duplicate role " + role->Name + " in association " + association->Name,role->_line);
+            const string associationName = association->Name.empty() || association->Name == "???"
+               ? "anonymous association" : "association \"" + association->Name + "\"";
+            Log.error(
+               "duplicate role \"" + role->Name + "\" in " + associationName,
+               role->_line,0,"ILIC-ASSOCIATION-DUPLICATE-ROLE");
          }
          if (role->Strongness != Role::Assoc) {
             ++aggregateRoles;
