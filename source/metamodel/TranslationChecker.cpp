@@ -101,13 +101,56 @@ private:
 
    string label(MetaElement *element) const
    {
-      return element == nullptr ? "<missing>" : get_path(element);
+      if (element == nullptr) {
+         return "missing translated declaration";
+      }
+      if (auto role = dynamic_cast<Role *>(element)) {
+         string owner = "association";
+         if (role->Association != nullptr) {
+            owner = role->Association->Name.empty() || role->Association->Name == "???"
+               ? "anonymous association" : "association " + role->Association->Name;
+         }
+         return owner + " role " + role->Name;
+      }
+      if (auto attribute = dynamic_cast<AttrOrParam *>(element)) {
+         MetaElement *parent = attribute->AttrParent != nullptr
+            ? static_cast<MetaElement *>(attribute->AttrParent)
+            : static_cast<MetaElement *>(attribute->ParamParent);
+         return parent == nullptr ? "parameter " + attribute->Name
+            : label(parent) + "." + attribute->Name;
+      }
+      if (auto type = dynamic_cast<Type *>(element); type != nullptr && type->_attr != nullptr) {
+         return label(type->_attr) + ".TYPE";
+      }
+      string path = get_path(element);
+      if (path.empty() || path == "nullptr" || path == "unknown") {
+         return element->Name.empty() || element->Name == "???"
+            ? "unnamed " + element->getClass()
+            : element->getClass() + " \"" + element->Name + "\"";
+      }
+      return path;
    }
 
    void mismatch(MetaElement *translated,MetaElement *base,const string &property)
    {
-      Log.error("translation mismatch for " + label(translated) + " against "
-         + label(base) + ": " + property,translated == nullptr ? -1 : translated->_line);
+      const int line = translated != nullptr && translated->_line > 0 ? translated->_line
+         : base != nullptr && base->_line > 0 ? base->_line : 1;
+      vector<ilic::RelatedInformation> relatedInformation;
+      if (base != nullptr && base->_line > 0 && !Log.getCurrentSource().empty()) {
+         ilic::RelatedInformation related;
+         related.message = "Corresponding base declaration: " + label(base);
+         related.range.valid = true;
+         related.range.uri = Log.getCurrentSource();
+         related.range.start.line = static_cast<size_t>(base->_line - 1);
+         related.range.start.character = 0;
+         related.range.end = related.range.start;
+         related.range.end.character = 1;
+         relatedInformation.push_back(std::move(related));
+      }
+      Log.error(
+         "translated declaration \"" + label(translated) + "\" does not match \""
+            + label(base) + "\" for " + property,
+         line,0,"ILIC-TRANSLATION-MISMATCH",std::move(relatedInformation));
    }
 
    string canonical_text(const string &text) const

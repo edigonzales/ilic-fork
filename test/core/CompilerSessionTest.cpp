@@ -96,5 +96,68 @@ END Translation.
       {"Translation","ili2c.translationOf","Base"});
    ilic::CompilationResult translation = translationSession.compile(translationRequest);
    assert(translation.success);
+
+   ilic::CompilerSession diagnosticSession;
+   const char *diagnosticUri = "memory:///DiagnosticQuality.ili";
+   diagnosticSession.putSource(diagnosticUri,R"ili(INTERLIS 2.3;
+MODEL ModelA (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC TopicA =
+    CLASS A = END A;
+    CLASS B = END B;
+    ASSOCIATION Link (ABSTRACT) =
+      left (ABSTRACT) -- A;
+      right -- B;
+    END Link;
+  END TopicA;
+END ModelA.
+MODEL ModelB (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF ModelA [ "1" ] =
+  TOPIC TopicB =
+    CLASS A = END A;
+    CLASS B = END B;
+    ASSOCIATION Link (ABSTRACT) =
+      left -- A;
+      right -- B;
+    END Link;
+  END TopicB;
+END ModelB.
+)ili");
+   ilic::CompilationRequest diagnosticRequest;
+   diagnosticRequest.roots.push_back(diagnosticUri);
+   const ilic::CompilationResult diagnosticResult = diagnosticSession.compile(diagnosticRequest);
+   assert(!diagnosticResult.success);
+   assert(std::any_of(diagnosticResult.diagnostics.begin(),diagnosticResult.diagnostics.end(),
+      [](const auto &diagnostic) {
+         return diagnostic.code == "ILIC-TRANSLATION-MISMATCH" &&
+            diagnostic.message.find("nullptr") == std::string::npos &&
+            diagnostic.message.find("left") != std::string::npos &&
+            diagnostic.range.valid && !diagnostic.relatedInformation.empty() &&
+            diagnostic.relatedInformation.front().range.valid;
+      }));
+
+   ilic::CompilerSession anonymousAssociationSession;
+   const char *anonymousUri = "memory:///AnonymousAssociation.ili";
+   anonymousAssociationSession.putSource(anonymousUri,R"ili(INTERLIS 2.3;
+MODEL AnonymousAssociation AT "https://example.invalid" VERSION "1" =
+  TOPIC Topic =
+    CLASS A = END A;
+    CLASS B = END B;
+    ASSOCIATION =
+      duplicate -- A;
+      duplicate -- B;
+    END;
+  END Topic;
+END AnonymousAssociation.
+)ili");
+   ilic::CompilationRequest anonymousRequest;
+   anonymousRequest.roots.push_back(anonymousUri);
+   const auto anonymousResult = anonymousAssociationSession.compile(anonymousRequest);
+   assert(!anonymousResult.success);
+   assert(std::any_of(anonymousResult.diagnostics.begin(),anonymousResult.diagnostics.end(),
+      [](const auto &diagnostic) {
+         return diagnostic.code == "ILIC-ASSOCIATION-DUPLICATE-ROLE" &&
+            diagnostic.message.find("anonymous association") != std::string::npos &&
+            diagnostic.message.find("???") == std::string::npos;
+      }));
    return 0;
 }

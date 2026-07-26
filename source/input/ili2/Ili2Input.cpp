@@ -241,7 +241,13 @@ antlrcpp::Any Ili2Input::visitRunTimeParameterDef(parser::Ili2Parser::RunTimePar
       AttrOrParam *a = new AttrOrParam;
       a->_line = get_line(p->runtimeparametername);
       a->Name = p->runtimeparametername->getText();
+      a->ElementInPackage = get_model_context();
+      push_context(a);
       a->Type = visitAttrTypeDef(p->attrTypeDef());
+      pop_context();
+      if (a->Type != nullptr) {
+         a->Type->_attr = a;
+      }
       get_model_context()->_runtimeparameter.push_back(a);
    }
 
