@@ -52,10 +52,13 @@ END UnknownDomain.
    assert(std::none_of(invalid.transcript.begin(),invalid.transcript.end(),
       [](const auto &line) { return line.find("compiler run failed") != std::string::npos; }));
    bool located = false;
+   bool specificallyCoded = false;
    for (const auto &diagnostic : invalid.diagnostics) {
       if (diagnostic.range.valid && diagnostic.range.uri == invalidUri) located = true;
+      if (diagnostic.code == "ILIC-NAME-TYPE-NOT-FOUND") specificallyCoded = true;
    }
    assert(located);
+   assert(specificallyCoded);
 
    ilic::CompilerSession metaSession;
    const char *metaUri = "memory:///MetaAttributes.ili";

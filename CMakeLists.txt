@@ -71,6 +71,7 @@ set(ILIC_CORE_SOURCES
     source/output/XsdOutput.cpp
 
     source/util/Converter.cpp
+    source/util/DiagnosticCode.cpp
     source/util/IliFile.cpp
     source/util/Logger.cpp
     source/util/os.cpp
@@ -210,6 +211,11 @@ if(BUILD_TESTING)
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core)
     add_test(NAME ilic_core_session COMMAND ilic_core_session_test)
+    add_executable(ilic_diagnostic_code_test test/core/DiagnosticCodeTest.cpp)
+    target_include_directories(ilic_diagnostic_code_test PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/util")
+    target_link_libraries(ilic_diagnostic_code_test PRIVATE ilic-core)
+    add_test(NAME ilic_diagnostic_code COMMAND ilic_diagnostic_code_test)
     add_executable(ilic_syntax_snapshot_test test/core/SyntaxSnapshotTest.cpp)
     target_link_libraries(ilic_syntax_snapshot_test PRIVATE ilic-core)
     add_test(NAME ilic_syntax_snapshot COMMAND ilic_syntax_snapshot_test)

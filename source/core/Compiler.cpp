@@ -176,7 +176,11 @@ bool compileFile(
    if (file == nullptr) return false;
    if (file->getIliVersion() != "1.0" && file->getIliVersion() != "2.3"
        && file->getIliVersion() != "2.4") {
-      Log.error(file->getFilePath() + ": unsupported iliversion " + file->getIliVersion());
+      Log.setCurrentSource(file->getFilePath());
+      Log.error(
+         "unsupported INTERLIS version " + file->getIliVersion()
+            + "; supported versions are 1.0, 2.3, and 2.4",
+         1,0,"ILIC-INPUT-UNSUPPORTED-VERSION");
       appendNewEvents(transcript,diagnosticIndex,logIndex);
       return true;
    }

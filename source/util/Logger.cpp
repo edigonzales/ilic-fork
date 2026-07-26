@@ -8,6 +8,7 @@ to do !!!
 #include <iostream>
 #include <fstream>
 
+#include "DiagnosticCode.h"
 #include "Logger.h"
 
 using namespace util;
@@ -266,7 +267,7 @@ void Logger::displayErrors(bool state)
 void Logger::error(string message)
 {
    ilic::Diagnostic diagnostic;
-   diagnostic.code = "ILIC-COMPILER";
+   diagnostic.code = diagnosticCodeForMessage(message);
    diagnostic.message = message;
    recordDiagnostic(diagnostic);
    errorcount++;
@@ -276,7 +277,7 @@ void Logger::error(string message)
 void Logger::errorNoIdent(string message)
 {
    ilic::Diagnostic diagnostic;
-   diagnostic.code = "ILIC-COMPILER";
+   diagnostic.code = diagnosticCodeForMessage(message);
    diagnostic.message = message;
    recordDiagnostic(diagnostic);
    errorcount++;
@@ -285,14 +286,18 @@ void Logger::errorNoIdent(string message)
 
 void Logger::error(string message,int line)
 {
-   error(std::move(message),line,0,"ILIC-SEMANTIC");
+   error(std::move(message),line,0);
 }
 
-void Logger::error(string message,int line,int column,string code)
+void Logger::error(string message,int line,int column,string code,
+   vector<ilic::RelatedInformation> relatedInformation,vector<string> notes)
 {
    ilic::Diagnostic diagnostic;
-   diagnostic.code = std::move(code);
+   diagnostic.code = code.empty() || code == "ILIC-SEMANTIC" || code == "ILIC-COMPILER"
+      ? diagnosticCodeForMessage(message) : std::move(code);
    diagnostic.message = message;
+   diagnostic.relatedInformation = std::move(relatedInformation);
+   diagnostic.notes = std::move(notes);
    if (line > 0 && !current_source.empty()) {
       diagnostic.range.valid = true;
       diagnostic.range.uri = current_source;

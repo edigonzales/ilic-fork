@@ -75,7 +75,9 @@ namespace util {
          void error(string message);
          void errorNoIdent(string message);
          void error(string message,int line);
-         void error(string message,int line,int column,string code = "ILIC-SEMANTIC");
+         void error(string message,int line,int column,string code = "",
+            vector<ilic::RelatedInformation> relatedInformation = {},
+            vector<string> notes = {});
          int getErrorCount();
          
          // internal_error
