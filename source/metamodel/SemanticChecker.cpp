@@ -1442,7 +1442,7 @@ private:
                dynamic_cast<ObjectType *>(attribute->Type);
             if (object != nullptr) {
                require_topic_dependency(containing_topic(view),
-                                        containing_topic(object->_baseclass),view,
+                                        containing_topic(object->_baseclass),attribute,
                                         "view base");
             }
          }
@@ -1637,12 +1637,22 @@ private:
 
    void check_attribute_namespace(Class *viewable)
    {
-      unordered_set<string> names;
+      unordered_map<string,AttrOrParam *> names;
       for (AttrOrParam *attribute : viewable->ClassAttribute) {
-         if (attribute != nullptr && !names.insert(attribute->Name).second) {
+         if (attribute == nullptr) {
+            continue;
+         }
+         auto first = names.find(attribute->Name);
+         if (first != names.end()) {
             Log.error(DiagnosticId::NamespaceMemberDuplicate,
                "duplicate attribute or view-base name " + attribute->Name +
-                  " in " + viewable->Name,diagnostic_range(attribute));
+                  " in " + viewable->Name,diagnostic_range(attribute),
+               related_information(first->second,
+                  "First attribute or view-base declaration: " +
+                     first->second->Name));
+         }
+         else {
+            names[attribute->Name] = attribute;
          }
       }
    }
@@ -1814,7 +1824,8 @@ private:
       if (!topic_has_dependency(source,target)) {
          Log.error(DiagnosticId::TopicDependencyRequired,
             kind + " requires topic " + source->Name + " to depend on " + target->Name,
-            diagnostic_range(owner));
+            diagnostic_reference_range(owner,"dependency"),
+            related_information(target,"Required topic is declared here"));
       }
    }
 

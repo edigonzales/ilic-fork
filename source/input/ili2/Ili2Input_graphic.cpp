@@ -100,6 +100,7 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
    }
    
    if (ctx->BASED() != nullptr) {
+      set_reference_source(g,"dependency",ctx->bpath);
       if (g->Base != nullptr) {
          Log.error(DiagnosticId::GraphicBaseAlreadyDefined,
             "graphic definition is already based on " + get_path(g->Base),

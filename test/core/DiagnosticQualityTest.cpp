@@ -333,6 +333,66 @@ END ModelB.
       == derivedViewAttributeUri);
    assert(derivedViewAttributeDiagnostic.relatedInformation.front().range.start.line == 8);
 
+   const char *viewDependencyUri = "memory:///ViewDependencyLocation.ili";
+   const auto viewDependency = compile(viewDependencyUri,R"ili(INTERLIS 2.3;
+MODEL ViewDependencyLocation AT "https://example.invalid" VERSION "1" =
+  TOPIC Base =
+    CLASS Item =
+    END Item;
+  END Base;
+  TOPIC Usage =
+    VIEW Items
+      PROJECTION OF ViewDependencyLocation.Base.Item;
+      =
+    END Items;
+  END Usage;
+END ViewDependencyLocation.
+)ili");
+   const auto &viewDependencyDiagnostic = assert_single_diagnostic(
+      viewDependency,
+      "ILIC-TOPIC-DEPENDENCY-REQUIRED",
+      8,
+      {"view base","Usage","Base"}
+   );
+   assert(viewDependencyDiagnostic.range.uri == viewDependencyUri);
+   assert(viewDependencyDiagnostic.range.start.character == 48);
+   assert(viewDependencyDiagnostic.range.end.character == 52);
+   assert(viewDependencyDiagnostic.relatedInformation.front().range.uri
+      == viewDependencyUri);
+   assert(viewDependencyDiagnostic.relatedInformation.front().range.start.line == 2);
+
+   const char *viewNamespaceUri = "memory:///ViewNamespaceLocation.ili";
+   const auto viewNamespace = compile(viewNamespaceUri,R"ili(INTERLIS 2.3;
+MODEL ViewNamespaceLocation AT "https://example.invalid" VERSION "1" =
+  TOPIC Base =
+    CLASS Item =
+      base : TEXT * 20;
+    END Item;
+  END Base;
+  TOPIC Usage =
+    DEPENDS ON Base;
+    VIEW Items
+      PROJECTION OF base ~ ViewNamespaceLocation.Base.Item;
+      =
+      ATTRIBUTE
+        ALL OF base;
+    END Items;
+  END Usage;
+END ViewNamespaceLocation.
+)ili");
+   const auto &viewNamespaceDiagnostic = assert_single_diagnostic(
+      viewNamespace,
+      "ILIC-NAMESPACE-MEMBER-DUPLICATE",
+      13,
+      {"base","Items"}
+   );
+   assert(viewNamespaceDiagnostic.range.uri == viewNamespaceUri);
+   assert(viewNamespaceDiagnostic.range.start.character == 15);
+   assert(viewNamespaceDiagnostic.range.end.character == 19);
+   assert(viewNamespaceDiagnostic.relatedInformation.front().range.uri
+      == viewNamespaceUri);
+   assert(viewNamespaceDiagnostic.relatedInformation.front().range.start.line == 10);
+
    const std::string translationBaseUri = "memory:///translation/Base.ili";
    const std::string translationUri = "memory:///translation/Translated.ili";
    const std::map<std::string,std::string> translationSources{

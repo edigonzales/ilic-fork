@@ -363,6 +363,7 @@ antlrcpp::Any Ili2Input::visitRenamedViewableRef(parser::Ili2Parser::RenamedView
    init_extendableme(a,get_line(aliasToken));
    set_selection_source(a,aliasToken);
    set_reference_source(a,"type",ctx->path());
+   set_reference_source(a,"dependency",ctx->path());
    a->_visible = false;
    a->AttrParent = get_class_context();
    a->Name = name;
@@ -485,6 +486,7 @@ antlrcpp::Any Ili2Input::visitViewAttribute(parser::Ili2Parser::ViewAttributeCon
          if (basetype != nullptr) {
             for (auto aa : basetype->_baseclass->ClassAttribute) {
                AttrOrParam *aac = static_cast<AttrOrParam *>(aa->clone());
+               set_selection_source(aac,ctx->basename);
                aac->_visible = true; // to do !!!
                PathEl *pe = new PathEl;
                pe->Kind = PathEl::Attribute;
