@@ -189,5 +189,31 @@ END ModelB.
       {"attrB3","INTERLIS.HALIGNMENT","attrA3","INTERLIS.VALIGNMENT"},
       3
    );
+
+   const char *genericRangeUri = "memory:///GenericCoordinateRangeMismatch.ili";
+   const auto genericRange = compile(genericRangeUri,R"ili(INTERLIS 2.4;
+MODEL GenericCoordinateRangeMismatch AT "https://example.invalid" VERSION "1" =
+  DOMAIN
+    GenericCoord (GENERIC) = COORD 0 .. 100, NUMERIC;
+    ConcreteCoord = COORD 0 .. 200, 0 .. 200;
+  CONTEXT default =
+    GenericCoord = ConcreteCoord;
+  TOPIC Topic =
+    CLASS Item = Position : GenericCoord; END Item;
+  END Topic;
+END GenericCoordinateRangeMismatch.
+)ili");
+   const auto &genericRangeDiagnostic = assert_single_diagnostic(
+      genericRange,
+      "ILIC-GENERIC-COORD-RANGE-MISMATCH",
+      6,
+      {"ConcreteCoord","GenericCoord","axis 1","maximum 200",
+       "allowed maximum 100"},
+      2
+   );
+   assert(genericRangeDiagnostic.relatedInformation.front().range.uri
+      == genericRangeUri);
+   assert(genericRangeDiagnostic.relatedInformation[1].range.uri
+      == genericRangeUri);
    return 0;
 }

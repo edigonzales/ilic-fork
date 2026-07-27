@@ -613,7 +613,7 @@ if(BUILD_TESTING)
     )
     add_ilic_regression_test(ilic_regression_generic_context_range_invalid FALSE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_context_range_invalid.ili"
-        OUTPUT_REGEX "not a compatible specialization"
+        OUTPUT_REGEX "axis 1: maximum 10.5001 exceeds the allowed maximum 10.50"
     )
     add_ilic_regression_test(ilic_regression_generic_context_refinement_invalid FALSE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili24/generic_context_refinement_invalid.ili"

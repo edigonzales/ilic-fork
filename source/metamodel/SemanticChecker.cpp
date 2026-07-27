@@ -677,29 +677,70 @@ GenericDef *visible_generic_definition(Model *model,DomainType *generic)
    return generic_definition_in_imports(model,generic,visited);
 }
 
-bool coordinate_type_fits(CoordType *concrete,CoordType *generic)
+enum class CoordinateFitError {
+   None,
+   MissingCoordinate,
+   DimensionMismatch,
+   MissingAxis,
+   MinimumBelowRange,
+   MaximumAboveRange
+};
+
+struct CoordinateFitResult {
+   CoordinateFitError Error = CoordinateFitError::None;
+   size_t Axis = 0;
+   string Actual;
+   string Expected;
+
+   bool fits() const
+   {
+      return Error == CoordinateFitError::None;
+   }
+};
+
+CoordinateFitResult coordinate_type_fit(CoordType *concrete,CoordType *generic)
 {
-   if (concrete == nullptr || generic == nullptr || concrete->Axis.size() != generic->Axis.size()) {
-      return false;
+   if (concrete == nullptr || generic == nullptr) {
+      return {CoordinateFitError::MissingCoordinate};
+   }
+   if (concrete->Axis.size() != generic->Axis.size()) {
+      return {
+         CoordinateFitError::DimensionMismatch,
+         0,
+         to_string(concrete->Axis.size()),
+         to_string(generic->Axis.size())
+      };
    }
    auto concreteAxis = concrete->Axis.begin();
    auto genericAxis = generic->Axis.begin();
+   size_t axis = 1;
    for (; concreteAxis != concrete->Axis.end(); ++concreteAxis,++genericAxis) {
       NumType *candidate = *concreteAxis;
       NumType *base = *genericAxis;
       if (candidate == nullptr || base == nullptr) {
-         return false;
+         return {CoordinateFitError::MissingAxis,axis};
       }
       if (!base->Min.empty() &&
           (candidate->Min.empty() || compare_exact_decimal(candidate->Min,base->Min) < 0)) {
-         return false;
+         return {
+            CoordinateFitError::MinimumBelowRange,
+            axis,
+            candidate->Min.empty() ? "unbounded" : candidate->Min,
+            base->Min
+         };
       }
       if (!base->Max.empty() &&
           (candidate->Max.empty() || compare_exact_decimal(candidate->Max,base->Max) > 0)) {
-         return false;
+         return {
+            CoordinateFitError::MaximumAboveRange,
+            axis,
+            candidate->Max.empty() ? "unbounded" : candidate->Max,
+            base->Max
+         };
       }
+      ++axis;
    }
-   return true;
+   return {};
 }
 
 class Checker {
@@ -933,8 +974,33 @@ private:
          GenericDef *imported = generic_definition_in_imports(model,generic,visited);
          for (DomainType *concrete : definition->ConcreteDomain) {
             auto concreteCoordinate = dynamic_cast<CoordType *>(concrete);
-            if (concreteCoordinate == nullptr ||
-                !coordinate_type_fits(concreteCoordinate,genericCoordinate)) {
+            CoordinateFitResult fit =
+               coordinate_type_fit(concreteCoordinate,genericCoordinate);
+            if (fit.Error == CoordinateFitError::MinimumBelowRange ||
+                fit.Error == CoordinateFitError::MaximumAboveRange) {
+               const string bound = fit.Error ==
+                  CoordinateFitError::MinimumBelowRange ? "minimum" : "maximum";
+               const string relation = fit.Error ==
+                  CoordinateFitError::MinimumBelowRange ?
+                     "is below the allowed minimum" :
+                     "exceeds the allowed maximum";
+               vector<ilic::RelatedInformation> related;
+               append_related(related,concrete,
+                  "Concrete coordinate domain: " + get_path(concrete));
+               append_related(related,generic,
+                  "Generic coordinate domain: " + get_path(generic));
+               Log.error(
+                  "context mapping " + get_path(concrete) + " to " +
+                     get_path(generic) + " is outside the generic coordinate " +
+                     "range on axis " + to_string(fit.Axis) + ": " + bound +
+                     " " + fit.Actual + " " + relation + " " + fit.Expected,
+                  diagnostic_range(definition),
+                  "ILIC-GENERIC-COORD-RANGE-MISMATCH",
+                  std::move(related)
+               );
+               continue;
+            }
+            if (!fit.fits()) {
                Log.error("concrete domain " + (concrete == nullptr ? string("???") : concrete->Name) +
                          " is not a compatible specialization of generic domain " + generic->Name,
                          definition->_line);
