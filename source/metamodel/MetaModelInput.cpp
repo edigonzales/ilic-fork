@@ -98,6 +98,11 @@ namespace metamodel {
    void prepare_meta_attributes(const string &source)
    {
       CurrentSourceText = source;
+      if (ilic::SourceManager *sources = ilic::activeSourceManager();
+          sources != nullptr && !Log.getCurrentSource().empty() &&
+          !sources->contains(Log.getCurrentSource())) {
+         sources->put(Log.getCurrentSource(),source,0);
+      }
       PendingMetaAttributes.clear();
       PendingDocumentation.clear();
 

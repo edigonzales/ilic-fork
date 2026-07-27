@@ -1,6 +1,8 @@
 #include "ilic/Compiler.h"
 
 #include <cassert>
+#include <filesystem>
+#include <fstream>
 #include <initializer_list>
 #include <iostream>
 #include <map>
@@ -360,6 +362,42 @@ END ViewDependencyLocation.
    assert(viewDependencyDiagnostic.relatedInformation.front().range.uri
       == viewDependencyUri);
    assert(viewDependencyDiagnostic.relatedInformation.front().range.start.line == 2);
+
+   const auto fileBackedViewDependencyUri =
+      std::filesystem::temp_directory_path() /
+      "ilic_file_backed_diagnostic_quality.ili";
+   {
+      std::ofstream source(fileBackedViewDependencyUri);
+      source << R"ili(INTERLIS 2.3;
+MODEL FileBackedLocation AT "https://example.invalid" VERSION "1" =
+  TOPIC Base =
+    CLASS Item =
+    END Item;
+  END Base;
+  TOPIC Usage =
+    VIEW Items
+      PROJECTION OF FileBackedLocation.Base.Item;
+      =
+    END Items;
+  END Usage;
+END FileBackedLocation.
+)ili";
+   }
+   ilic::CompilerSession fileBackedSession;
+   ilic::CompilationRequest fileBackedRequest;
+   fileBackedRequest.roots.push_back(fileBackedViewDependencyUri.string());
+   const auto fileBackedViewDependency = fileBackedSession.compile(fileBackedRequest);
+   std::filesystem::remove(fileBackedViewDependencyUri);
+   const auto &fileBackedViewDependencyDiagnostic = assert_single_diagnostic(
+      fileBackedViewDependency,
+      "ILIC-TOPIC-DEPENDENCY-REQUIRED",
+      8,
+      {"view base","Usage","Base"}
+   );
+   assert(fileBackedViewDependencyDiagnostic.range.uri
+      == fileBackedViewDependencyUri.string());
+   assert(fileBackedViewDependencyDiagnostic.range.start.character == 46);
+   assert(fileBackedViewDependencyDiagnostic.range.end.character == 50);
 
    const char *viewNamespaceUri = "memory:///ViewNamespaceLocation.ili";
    const auto viewNamespace = compile(viewNamespaceUri,R"ili(INTERLIS 2.3;
