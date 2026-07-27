@@ -98,12 +98,6 @@ namespace metamodel {
    void prepare_meta_attributes(const string &source)
    {
       CurrentSourceText = source;
-      if (ilic::SourceManager *sources = ilic::activeSourceManager();
-          sources != nullptr && !Log.getCurrentSource().empty() &&
-          Log.getCurrentSource() != "internal" &&
-          !sources->contains(Log.getCurrentSource())) {
-         sources->put(Log.getCurrentSource(),source,0);
-      }
       PendingMetaAttributes.clear();
       PendingDocumentation.clear();
 
@@ -266,7 +260,11 @@ namespace metamodel {
       const size_t start = utf8_byte_offset(token->getStartIndex());
       const size_t end = utf8_byte_offset(token->getStopIndex() + 1);
       ilic::SourceManager *sources = ilic::activeSourceManager();
-      if (sources == nullptr || sources->get(Log.getCurrentSource()) == nullptr) return result;
+      ilic::SourceManager fallbackSources;
+      if (sources == nullptr || sources->get(Log.getCurrentSource()) == nullptr) {
+         fallbackSources.put(Log.getCurrentSource(),CurrentSourceText,0);
+         sources = &fallbackSources;
+      }
       const ilic::SourcePosition startPosition = sources->position(Log.getCurrentSource(),start);
       const ilic::SourcePosition endPosition = sources->position(Log.getCurrentSource(),end);
       result.valid = true;
