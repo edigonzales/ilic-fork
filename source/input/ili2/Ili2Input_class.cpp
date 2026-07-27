@@ -501,10 +501,9 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    pop_context();
 
    if (aa != nullptr && aa->AttrParent != get_class_context()) {
-      if (properties[EXTENDED]) {
-         check_type_extendability(aa->Type,a->Type,get_line(ctx));
-      }
-      else {
+      // Type compatibility belongs to the semantic checker, which can report
+      // the named declarations and their exact source ranges.
+      if (!properties[EXTENDED]) {
          Log.error("attribute " + a->Name + " must be declared EXTENDED",get_line(ctx));
       }
    }

@@ -26,6 +26,5 @@ namespace input {
    map<string,bool> get_properties(parser::Ili2Parser::PropertiesContext *ctx,vector<string> allowed_properties);
    void check_references(metamodel::Class *c,string name,int line);
    bool check_type_compatibility(string base,string extension);
-   bool check_type_extendability(metamodel::Type *base,metamodel::Type *extension,int line);
 
 }

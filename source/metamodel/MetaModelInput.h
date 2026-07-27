@@ -64,7 +64,8 @@ namespace metamodel {
    Class* find_structure(string name,int line );
    Class* find_structure(Package *p,string name,int line);
    View* find_view(string name, int line);
-   Class* find_association(string name,int line);
+   Class* find_association(string name,int line,
+      const ilic::SourceRange &referenceRange = {});
    Class* find_association(Package *p,string name,int line);
    AttrOrParam* find_attribute(Class *c,string name);
    Role* find_role(Class *c,string name);

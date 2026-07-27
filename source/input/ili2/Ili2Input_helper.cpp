@@ -41,27 +41,6 @@ bool input::check_type_compatibility(string t1,string t2)
 
 }
 
-bool input::check_type_extendability(metamodel::Type *base,metamodel::Type *extension,int line)
-{
-
-   if (base == nullptr || extension == nullptr) {
-      return true;
-   }
-   if (base->getClass() != extension->getClass()) {
-      Log.error("incompatible type",line);
-      return false;
-   }
-   else if (base->getClass() == "TextType") {
-      TextType *b = static_cast<TextType *>(base);
-      TextType *e = static_cast<TextType *>(extension);
-      if (e->MaxLength > b->MaxLength && b->MaxLength != -1) {
-         Log.error("extended type may not exeed length of base type",line);
-         return false;
-      }
-   }
-   return true;
-}
-
 map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ctx,vector<string> allowed_properties)
 {
 

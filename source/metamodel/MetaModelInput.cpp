@@ -1,4 +1,5 @@
 #include "MetaModelInput.h"
+#include "DiagnosticUtil.h"
 #include "../../include/ilic/SourceManager.h"
 #include "../util/StringUtil.h"
 #include "../util/Logger.h"
@@ -46,6 +47,19 @@ namespace metamodel {
       size_t last = value.size();
       while (last > first && isspace(static_cast<unsigned char>(value[last - 1]))) --last;
       return value.substr(first,last - first);
+   }
+
+   static string diagnostic_type_kind(Type *type)
+   {
+      if (auto viewable = dynamic_cast<Class *>(type)) {
+         switch (viewable->Kind) {
+            case Class::Structure: return "STRUCTURE";
+            case Class::ClassVal: return "CLASS";
+            case Class::ViewVal: return "VIEW";
+            case Class::Association: return "ASSOCIATION";
+         }
+      }
+      return type == nullptr ? "UNKNOWN" : "DOMAIN";
    }
 
    static string decode_meta_value(string value)
@@ -423,7 +437,10 @@ namespace metamodel {
       }
       for (auto pp : AllPackages) {
          if (get_path(pp) == get_path(p)) {
-            Log.error("multiple declarations of " + get_path(p),p->_line);
+            if (pp->ElementInPackage == nullptr ||
+                pp->ElementInPackage != p->ElementInPackage) {
+               Log.error("multiple declarations of " + get_path(p),p->_line);
+            }
             return;
          }
       }
@@ -554,7 +571,10 @@ namespace metamodel {
       Log.debug(">>> add_type " + get_path(t));
       for (Type* tt : AllTypes) {
          if (get_path(tt) == get_path(t) && t->Name != "???") {
-            Log.error("multiple declarations of " + get_path(t),t->_line);
+            if (tt->ElementInPackage == nullptr ||
+                tt->ElementInPackage != t->ElementInPackage) {
+               Log.error("multiple declarations of " + get_path(t),t->_line);
+            }
             return;
          }
       }
@@ -872,7 +892,7 @@ namespace metamodel {
       return nullptr;
    }
 
-   Class* find_association(string name, int line)
+   Class* find_association(string name,int line,const ilic::SourceRange &referenceRange)
    {
       Log.debug("find_association " + name);
       Type* t = find_type(name, line, false);
@@ -880,13 +900,35 @@ namespace metamodel {
          Log.error("association " + name + " not found",line);
          return nullptr;
       }
+      ilic::SourceRange primaryRange = referenceRange;
+      if (!primaryRange.valid && line > 0 && !Log.getCurrentSource().empty()) {
+         primaryRange.valid = true;
+         primaryRange.uri = Log.getCurrentSource();
+         primaryRange.start.line = static_cast<size_t>(line - 1);
+         primaryRange.end = primaryRange.start;
+         primaryRange.end.character++;
+      }
       if (t->getClass() != "Class") {
-         Log.error(name + " is no association",line);
+         const string declaration = get_path(t);
+         Log.error(
+            declaration + " is a " + diagnostic_type_kind(t) +
+               ", but an ASSOCIATION is required as an association base",
+            primaryRange,
+            "ILIC-ASSOCIATION-INVALID-BASE-KIND",
+            related_information(t,"Base declaration: " + declaration)
+         );
          return nullptr;
       }
       Class *c = static_cast<Class *>(t);
       if (c->Kind != Class::Association) {
-         Log.error(name + " is no association",line);
+         const string declaration = get_path(c);
+         Log.error(
+            declaration + " is a " + diagnostic_type_kind(c) +
+               ", but an ASSOCIATION is required as an association base",
+            primaryRange,
+            "ILIC-ASSOCIATION-INVALID-BASE-KIND",
+            related_information(c,"Base declaration: " + declaration)
+         );
          return nullptr;
       }
       return c;
@@ -1006,7 +1048,10 @@ namespace metamodel {
       Log.debug(">>> add_graphic " + get_path(g));
       for (Graphic* gg : AllGraphics) {
          if (get_path(gg) == get_path(g)) {
-            Log.error("multiple declarations of " + get_path(g),g->_line);
+            if (gg->ElementInPackage == nullptr ||
+                gg->ElementInPackage != g->ElementInPackage) {
+               Log.error("multiple declarations of " + get_path(g),g->_line);
+            }
             return;
          }
       }

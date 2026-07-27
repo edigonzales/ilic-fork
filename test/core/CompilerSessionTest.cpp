@@ -186,7 +186,151 @@ END InvalidAssociationBase.
       [](const auto &diagnostic) {
          return diagnostic.severity == ilic::DiagnosticSeverity::Error;
       }) == 1);
-   assert(invalidAssociationResult.diagnostics.front().message
-      == "NotAnAssociation is no association");
+   const auto &invalidAssociationDiagnostic =
+      invalidAssociationResult.diagnostics.front();
+   assert(invalidAssociationDiagnostic.code
+      == "ILIC-ASSOCIATION-INVALID-BASE-KIND");
+   assert(invalidAssociationDiagnostic.message.find("NotAnAssociation")
+      != std::string::npos);
+   assert(invalidAssociationDiagnostic.message.find("CLASS")
+      != std::string::npos);
+   assert(invalidAssociationDiagnostic.message.find("ASSOCIATION")
+      != std::string::npos);
+   assert(invalidAssociationDiagnostic.range.valid);
+   assert(invalidAssociationDiagnostic.range.start.line == 6);
+   assert(invalidAssociationDiagnostic.relatedInformation.size() == 1);
+   assert(invalidAssociationDiagnostic.relatedInformation.front().range.valid);
+   assert(invalidAssociationDiagnostic.relatedInformation.front().range.start.line == 5);
+
+   ilic::CompilerSession attributeExtensionSession;
+   const char *attributeExtensionUri =
+      "memory:///IncompatibleAttributeExtension.ili";
+   attributeExtensionSession.putSource(attributeExtensionUri,R"ili(INTERLIS 2.3;
+MODEL IncompatibleAttributeExtension AT "https://example.invalid" VERSION "1" =
+  DOMAIN Height = 0.0 .. 100.0;
+  DOMAIN Position = COORD 0.0 .. 100.0, 0.0 .. 100.0;
+  TOPIC Topic =
+    CLASS Base = Value : Height; END Base;
+    CLASS Derived EXTENDS Base =
+      Value (EXTENDED) : Position;
+    END Derived;
+  END Topic;
+END IncompatibleAttributeExtension.
+)ili");
+   ilic::CompilationRequest attributeExtensionRequest;
+   attributeExtensionRequest.roots.push_back(attributeExtensionUri);
+   const auto attributeExtensionResult =
+      attributeExtensionSession.compile(attributeExtensionRequest);
+   assert(!attributeExtensionResult.success);
+   assert(attributeExtensionResult.errorCount == 1);
+   const auto &attributeExtensionDiagnostic =
+      attributeExtensionResult.diagnostics.front();
+   assert(attributeExtensionDiagnostic.code
+      == "ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION");
+   assert(attributeExtensionDiagnostic.message.find("Position")
+      != std::string::npos);
+   assert(attributeExtensionDiagnostic.message.find("Height")
+      != std::string::npos);
+   assert(attributeExtensionDiagnostic.range.valid);
+   assert(attributeExtensionDiagnostic.range.start.line == 7);
+   assert(attributeExtensionDiagnostic.relatedInformation.size() == 2);
+
+   ilic::CompilerSession classExtensionSession;
+   const char *classExtensionUri = "memory:///ClassExtendedRequired.ili";
+   classExtensionSession.putSource(classExtensionUri,R"ili(INTERLIS 2.3;
+MODEL ClassExtendedRequired AT "https://example.invalid" VERSION "1" =
+  TOPIC BaseTopic =
+    CLASS Item = END Item;
+  END BaseTopic;
+  TOPIC DerivedTopic EXTENDS BaseTopic =
+    CLASS Item EXTENDS ClassExtendedRequired.BaseTopic.Item =
+    END Item;
+  END DerivedTopic;
+END ClassExtendedRequired.
+)ili");
+   ilic::CompilationRequest classExtensionRequest;
+   classExtensionRequest.roots.push_back(classExtensionUri);
+   const auto classExtensionResult =
+      classExtensionSession.compile(classExtensionRequest);
+   assert(!classExtensionResult.success);
+   assert(classExtensionResult.errorCount == 1);
+   const auto &classExtensionDiagnostic =
+      classExtensionResult.diagnostics.front();
+   assert(classExtensionDiagnostic.code == "ILIC-CLASS-EXTENDED-REQUIRED");
+   assert(classExtensionDiagnostic.message.find("DerivedTopic")
+      != std::string::npos);
+   assert(classExtensionDiagnostic.message.find("BaseTopic")
+      != std::string::npos);
+   assert(classExtensionDiagnostic.message.find("EXTENDED")
+      != std::string::npos);
+   assert(classExtensionDiagnostic.range.valid);
+   assert(classExtensionDiagnostic.range.start.line == 6);
+   assert(classExtensionDiagnostic.relatedInformation.size() == 1);
+
+   struct NamespaceCase {
+      const char *uri;
+      const char *source;
+      size_t duplicateLine;
+      std::string firstKind;
+      std::string secondKind;
+   };
+   const NamespaceCase namespaceCases[] = {
+      {
+         "memory:///DuplicateTopic.ili",
+         R"ili(INTERLIS 2.3;
+MODEL DuplicateTopic AT "https://example.invalid" VERSION "1" =
+  TOPIC Topic = END Topic;
+  TOPIC Topic = END Topic;
+END DuplicateTopic.
+)ili",
+         3,"TOPIC","TOPIC"
+      },
+      {
+         "memory:///ClassDomainCollision.ili",
+         R"ili(INTERLIS 2.3;
+MODEL ClassDomainCollision AT "https://example.invalid" VERSION "1" =
+  TOPIC Topic =
+    DOMAIN Item = TEXT*3;
+    CLASS Item = END Item;
+  END Topic;
+END ClassDomainCollision.
+)ili",
+         4,"DOMAIN","CLASS"
+      },
+      {
+         "memory:///DuplicateClass.ili",
+         R"ili(INTERLIS 2.3;
+MODEL DuplicateClass AT "https://example.invalid" VERSION "1" =
+  TOPIC Topic =
+    CLASS Item = END Item;
+    CLASS Item = END Item;
+  END Topic;
+END DuplicateClass.
+)ili",
+         4,"CLASS","CLASS"
+      }
+   };
+   for (const auto &namespaceCase : namespaceCases) {
+      ilic::CompilerSession namespaceSession;
+      namespaceSession.putSource(namespaceCase.uri,namespaceCase.source);
+      ilic::CompilationRequest namespaceRequest;
+      namespaceRequest.roots.push_back(namespaceCase.uri);
+      const auto namespaceResult = namespaceSession.compile(namespaceRequest);
+      assert(!namespaceResult.success);
+      assert(namespaceResult.errorCount == 1);
+      const auto &namespaceDiagnostic = namespaceResult.diagnostics.front();
+      assert(namespaceDiagnostic.code
+         == "ILIC-NAMESPACE-DUPLICATE-DECLARATION");
+      assert(namespaceDiagnostic.message.find(namespaceCase.firstKind)
+         != std::string::npos);
+      assert(namespaceDiagnostic.message.find(namespaceCase.secondKind)
+         != std::string::npos);
+      assert(namespaceDiagnostic.range.valid);
+      assert(namespaceDiagnostic.range.start.line == namespaceCase.duplicateLine);
+      assert(namespaceDiagnostic.relatedInformation.size() == 1);
+      assert(namespaceDiagnostic.relatedInformation.front().range.valid);
+      assert(namespaceDiagnostic.relatedInformation.front().range.start.line
+         < namespaceDiagnostic.range.start.line);
+   }
    return 0;
 }

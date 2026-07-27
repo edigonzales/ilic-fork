@@ -8,6 +8,7 @@
 
 #include "MetaModel.h"
 #include "MetaModelInput.h"
+#include "DiagnosticUtil.h"
 #include "../util/Logger.h"
 
 using namespace std;
@@ -31,6 +32,42 @@ Type *canonical_declared_type(Type *type)
       current = base;
    }
    return current;
+}
+
+string declaration_kind(MetaElement *element)
+{
+   if (auto viewable = dynamic_cast<Class *>(element)) {
+      switch (viewable->Kind) {
+         case Class::Structure: return "STRUCTURE";
+         case Class::ClassVal: return "CLASS";
+         case Class::ViewVal: return "VIEW";
+         case Class::Association: return "ASSOCIATION";
+      }
+   }
+   if (dynamic_cast<SubModel *>(element) != nullptr) return "TOPIC";
+   if (dynamic_cast<Model *>(element) != nullptr) return "MODEL";
+   if (dynamic_cast<Type *>(element) != nullptr) return "DOMAIN";
+   if (dynamic_cast<Graphic *>(element) != nullptr) return "GRAPHIC";
+   return element == nullptr ? "DECLARATION" : element->getClass();
+}
+
+string diagnostic_type_name(Type *type)
+{
+   Type *declared = canonical_declared_type(type);
+   if (declared != nullptr && declared->ElementInPackage != nullptr) {
+      return get_path(declared);
+   }
+   return type == nullptr ? "unknown type" : type->getClass();
+}
+
+void append_related(
+   vector<ilic::RelatedInformation> &target,
+   MetaElement *element,
+   const string &message
+)
+{
+   auto information = related_information(element,message);
+   target.insert(target.end(),information.begin(),information.end());
 }
 
 Descriptor descriptor_from_type(Type *type)
@@ -1317,8 +1354,17 @@ private:
       // EXTENDED form; EXTENDS must introduce a distinct class name.
       if (!viewable->Extended && viewable->Name == base->Name &&
           topic != baseTopic && package_is_same_or_extension(topic,baseTopic)) {
-         Log.error("class or structure " + viewable->Name +
-                   " must use EXTENDED when retaining the base name",viewable->_line);
+         const string viewablePath = get_path(viewable);
+         const string basePath = get_path(base);
+         Log.error(
+            declaration_kind(viewable) + " " + viewablePath + " in TOPIC " +
+               get_path(topic) + " extends same-named " + declaration_kind(base) +
+               " " + basePath + " from extended TOPIC " + get_path(baseTopic) +
+               "; declare " + viewable->Name + " using the EXTENDED form",
+            diagnostic_range(viewable),
+            "ILIC-CLASS-EXTENDED-REQUIRED",
+            related_information(base,"Base declaration: " + basePath)
+         );
          return;
       }
       if (!viewable->Extended) {
@@ -1406,8 +1452,18 @@ private:
          }
          auto existing = localNames.find(element->Name);
          if (existing != localNames.end()) {
-            Log.error("duplicate declaration " + element->Name + " in " + package->Name,
-                      element->_line);
+            MetaElement *first = existing->second;
+            const string container = get_path(package);
+            Log.error(
+               declaration_kind(element) + " " + element->Name +
+                  " duplicates " + declaration_kind(first) + " " + first->Name +
+                  " in " + declaration_kind(package) + " " + container,
+               diagnostic_range(element),
+               "ILIC-NAMESPACE-DUPLICATE-DECLARATION",
+               related_information(first,
+                  "First declaration: " + declaration_kind(first) + " " +
+                     get_path(first))
+            );
          }
          else {
             localNames[element->Name] = element;
@@ -1452,7 +1508,10 @@ private:
          auto extendable = dynamic_cast<ExtendableME *>(element);
          bool explicitOverride = extendable != nullptr && extendable->Extended &&
                                  extendable->Super == inherited->second;
-         if (!explicitOverride) {
+         auto viewable = dynamic_cast<Class *>(element);
+         bool sameNameSpecialization = viewable != nullptr &&
+            viewable->Super == inherited->second && !viewable->Extended;
+         if (!explicitOverride && !sameNameSpecialization) {
             Log.error("declaration " + element->Name + " in topic " + topic->Name +
                       " conflicts with an inherited declaration",element->_line);
          }
@@ -1545,13 +1604,34 @@ private:
       if (baseDeclared != nullptr && declared != nullptr &&
           baseDeclared->ElementInPackage != nullptr && declared->ElementInPackage != nullptr &&
           !declared_type_is_same_or_extension(attribute->Type,base->Type)) {
-         Log.error("domain of extended attribute " + attribute->Name +
-                   " does not extend its base domain",attribute->_line);
+         const string actualType = diagnostic_type_name(attribute->Type);
+         const string expectedType = diagnostic_type_name(base->Type);
+         vector<ilic::RelatedInformation> related;
+         append_related(related,base,
+            "Base attribute: " + get_path(base) + " uses " + expectedType);
+         append_related(related,baseDeclared,
+            "Expected base domain: " + expectedType);
+         Log.error(
+            "extended attribute " + get_path(attribute) + " uses " + actualType +
+               ", but its type must extend " + expectedType,
+            diagnostic_range(attribute),
+            "ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION",
+            std::move(related)
+         );
+         return;
       }
 
       if (base->Type->getClass() != attribute->Type->getClass()) {
-         Log.error("type of extended attribute " + attribute->Name +
-                   " is incompatible with its base",attribute->_line);
+         const string actualType = diagnostic_type_name(attribute->Type);
+         const string expectedType = diagnostic_type_name(base->Type);
+         Log.error(
+            "extended attribute " + get_path(attribute) + " uses " + actualType +
+               ", but its type must be compatible with " + expectedType,
+            diagnostic_range(attribute),
+            "ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION",
+            related_information(base,
+               "Base attribute: " + get_path(base) + " uses " + expectedType)
+         );
          return;
       }
       if (auto text = dynamic_cast<TextType *>(attribute->Type)) {

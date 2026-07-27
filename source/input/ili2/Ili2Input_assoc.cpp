@@ -127,7 +127,8 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
          Log.error(string("EXTENDED can only by used in extended topics"),c->_line);
       }
       else {
-         Class *s = find_association(name1,c->_line);
+         Class *s = find_association(
+            name1,c->_line,c->_selectionSource);
          c->Super = s;
          if (s != nullptr) {
             s->Sub.push_back(c);
@@ -141,7 +142,9 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    // EXTENDS
    if (ctx->associationRef() != nullptr) {
       set_reference_source(c,"inheritance",ctx->associationRef());
-      Class *s = find_association(ctx->associationRef()->getText(),c->_line);
+      Class *s = find_association(
+         ctx->associationRef()->getText(),c->_line,
+         c->_selectionSource);
       c->Super = s;
       if (s != nullptr) {
          s->Sub.push_back(c);
