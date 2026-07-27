@@ -14,6 +14,23 @@ macOS ARM64, Linux x86_64 (fully static musl), and Windows x86_64. Runtime
 dependency checks are part of each release job. macOS x86_64 is not a release
 target.
 
+Public downloads are available from [GitHub Releases](https://github.com/edigonzales/ilic-fork/releases):
+
+- stable binaries: [latest release](https://github.com/edigonzales/ilic-fork/releases/latest)
+- current development snapshot: [`snapshot`](https://github.com/edigonzales/ilic-fork/releases/tag/snapshot)
+
+The stable download URLs keep working across releases:
+
+```text
+https://github.com/edigonzales/ilic-fork/releases/latest/download/ilic-macos-arm64.tar.gz
+https://github.com/edigonzales/ilic-fork/releases/latest/download/ilic-linux-x86_64.tar.gz
+https://github.com/edigonzales/ilic-fork/releases/latest/download/ilic-windows-x86_64.zip
+```
+
+Snapshot consumers can replace `latest` with `snapshot`. Snapshot assets are
+updated by manually running the native release workflow and are not intended
+for reproducible production deployments.
+
 ## Installation
 In order to install ilic, extract the [.zip](https://www.infogrips.ch/products/ilic.zip) file into a directory.
 

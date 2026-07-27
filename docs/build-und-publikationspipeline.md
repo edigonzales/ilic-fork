@@ -29,11 +29,14 @@ Pakete.
 | Workflow                                                                                      | Trigger                                                                                                      | Ergebnis                                                                             |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)                                     | Push auf `main` (ausser reine Markdown-Änderungen), Pull Request (ausser reine Markdown-Änderungen), manuell | Native Matrix, CTest, WASM- und npm-Prüfungen                                        |
-| [`.github/workflows/build-native-release.yml`](../.github/workflows/build-native-release.yml) | manuell oder `v*`-Tag                                                                                        | geprüfte Einzelbinary-Archive für macOS ARM64, Linux x86_64 und Windows x86_64       |
+| [`.github/workflows/build-native-release.yml`](../.github/workflows/build-native-release.yml) | manuell oder `v*`-Tag                                                                                        | geprüfte Archive plus stabiler GitHub Release oder beweglicher `snapshot`-Pre-Release |
 | [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | erfolgreiche `CI` auf `main`, manuell                                                                        | Compiler-only-Snapshot der beiden npm-Pakete und Dispatch des exakten Release-Inputs |
 
 Beide Workflows checken ohne persistierte GitHub-Credentials aus. Normale
-Build-Jobs besitzen nur Leserechte auf den Repository-Inhalt.
+Build-Jobs besitzen nur Leserechte auf den Repository-Inhalt. Ausschliesslich
+der abschliessende `publish-release`-Job erhält für GitHub-Release-Assets die
+Berechtigung `contents: write` und verwendet den automatisch bereitgestellten
+`GITHUB_TOKEN`.
 
 Die CI-Trigger verwenden `paths-ignore: "**/*.md"`: Änderungen, die
 ausschliesslich Markdown-Dateien betreffen, benötigen keinen Compiler- oder
@@ -75,6 +78,28 @@ lokale Smoke-Tests und die Archive `ilic-macos-arm64.tar.gz`,
 `ilic-linux-x86_64.tar.gz` und `ilic-windows-x86_64.zip`.
 Die technischen Einzelheiten des Windows-Pfads stehen unter
 [Windows-Build-Stack](build-und-installation.md#windows-build-stack).
+
+Nach erfolgreichem Abschluss aller drei Plattformjobs lädt ein eigener
+Release-Job die Archive zusammen mit `SHA256SUMS` als öffentliche GitHub-
+Release-Assets hoch. Ein Push eines `v*`-Tags erzeugt einen stabilen Release
+mit automatisch generierten Release Notes. Ein manueller Lauf verwendet den
+ausgewählten Branch oder Tag und aktualisiert stattdessen den beweglichen
+`snapshot`-Pre-Release.
+
+Damit stehen dauerhafte, öffentliche Download-URLs zur Verfügung:
+
+```text
+https://github.com/edigonzales/ilic-fork/releases/latest/download/ilic-linux-x86_64.tar.gz
+https://github.com/edigonzales/ilic-fork/releases/download/snapshot/ilic-linux-x86_64.tar.gz
+```
+
+Die Actions-Artefakte der einzelnen Buildjobs bleiben zusätzliche
+Debug-Artefakte. Sie sind zeitlich begrenzt und nicht der öffentliche
+Distributionskanal.
+
+Der Snapshot wird seriell veröffentlicht. Sein Tag zeigt immer auf den
+zuletzt geprüften Commit; die drei Assets mit festen Dateinamen und die
+Prüfsummendatei werden ersetzt. Stabile Releases werden nicht überschrieben.
 
 ### 3. Reproduzierbarer WASM-Build
 
@@ -180,10 +205,12 @@ die Run-ID dieses Publish-Workflows:
 0.9.9-SNAPSHOT.YYYYMMDDHHmmss.<run-id>
 ```
 
-Staging-Verzeichnisse und Tarballs liegen unter `build/npm/` und werden nicht
-eingecheckt. Publiziert werden nur die beiden öffentlichen npm-Pakete. Nicht
-publiziert werden der native Compiler, statische Bibliotheken, CTest-Binaries,
-WASM-Zwischenverzeichnisse oder ein GitHub Release.
+Staging-Verzeichnisse und Tarballs dieses npm-Publish-Schritts liegen unter
+`build/npm/` und werden nicht eingecheckt. Publiziert werden dort nur die beiden
+öffentlichen npm-Pakete. Der native Compiler wird separat durch
+`build-native-release.yml` als GitHub-Release-Asset veröffentlicht; statische
+Bibliotheken, CTest-Binaries und WASM-Zwischenverzeichnisse werden nicht
+publiziert.
 
 ## Pinning und lokale Abweichungen
 
@@ -225,6 +252,11 @@ beschrieben.
 ## Fehlerbehandlung
 
 - Schlägt ein Build oder Test fehl, erfolgt weder Dispatch noch Publikation.
+- Schlägt der stabile Release-Job fehl, wird ein vorhandener Release für den
+  Tag nicht überschrieben; der Lauf kann nach manueller Fehlerbehebung erneut
+  geprüft werden.
+- Beim Snapshot werden nur die festen Release-Assets ersetzt; der Release
+  bleibt ein Pre-Release und wird nicht als `latest` markiert.
 - Schlägt der Dispatch fehl, zuerst Berechtigung und Gültigkeit von
   `RELEASE_DISPATCH_TOKEN` prüfen und danach die CI erneut starten.
 - Schlägt der nachgelagerte Release-Train fehl, wird er im
