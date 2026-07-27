@@ -242,8 +242,13 @@ function editorTokens(uri, text) {
 
 function editorTextProjection(uri, text, documentVersion) {
   const tokens = editorTokens(uri, text);
+  const tokenIndexByStartOffset = new Map(tokens.map((token, index) => [
+    token.range.start.byteOffset,
+    index,
+  ]));
   const declarations = [];
   const references = [];
+  const referenceKeys = new Set();
   const imports = [];
   const diagnostics = [];
   const stack = [];
@@ -324,9 +329,8 @@ function editorTextProjection(uri, text, documentVersion) {
       entry.range.start.byteOffset === path.range.start.byteOffset))
       return;
     const key = `${kind}:${path.range.start.byteOffset}:${path.range.end.byteOffset}`;
-    if (references.some(reference =>
-      `${reference.kind}:${reference.range.start.byteOffset}:${reference.range.end.byteOffset}` === key))
-      return;
+    if (referenceKeys.has(key)) return;
+    referenceKeys.add(key);
     references.push({ text: path.text, kind, sourceId: sourceId ?? null, range: path.range });
   };
 
@@ -478,8 +482,9 @@ function editorTextProjection(uri, text, documentVersion) {
       && declaration.kind !== "domain"
       && declaration.kind !== "unit")
       continue;
-    const startIndex = tokens.findIndex(token =>
-      token.range.start.byteOffset === declaration.selectionRange.start.byteOffset);
+    const startIndex = tokenIndexByStartOffset.get(
+      declaration.selectionRange.start.byteOffset,
+    ) ?? -1;
     if (startIndex < 0) continue;
     const separator = declaration.kind === "attribute" ? ":" : "=";
     let cursor = startIndex + 1;
