@@ -1,0 +1,193 @@
+#include "ilic/Compiler.h"
+
+#include <cassert>
+#include <initializer_list>
+#include <string>
+
+namespace {
+
+ilic::CompilationResult compile(const char *uri,const char *source)
+{
+   ilic::CompilerSession session;
+   session.putSource(uri,source);
+   ilic::CompilationRequest request;
+   request.roots.push_back(uri);
+   return session.compile(request);
+}
+
+const ilic::Diagnostic &assert_single_diagnostic(
+   const ilic::CompilationResult &result,
+   const std::string &code,
+   size_t line,
+   std::initializer_list<std::string> messageParts,
+   size_t minimumRelatedInformation = 1
+)
+{
+   assert(!result.success);
+   assert(result.errorCount == 1);
+   assert(result.diagnostics.size() == 1);
+   const auto &diagnostic = result.diagnostics.front();
+   assert(diagnostic.code == code);
+   assert(diagnostic.range.valid);
+   assert(diagnostic.range.start.line == line);
+   assert(diagnostic.relatedInformation.size() >= minimumRelatedInformation);
+   for (const auto &part : messageParts) {
+      assert(diagnostic.message.find(part) != std::string::npos);
+   }
+   assert(diagnostic.message.find("TOP") == std::string::npos);
+   assert(diagnostic.message.find("nullptr") == std::string::npos);
+   return diagnostic;
+}
+
+} // namespace
+
+int main()
+{
+   const char *associationUri = "memory:///DerivedAssociationMismatch.ili";
+   const auto association = compile(associationUri,R"ili(INTERLIS 2.3;
+MODEL ModelA (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC TopicA =
+    CLASS ClassA0 = END ClassA0;
+    CLASS ClassA1 = END ClassA1;
+    CLASS ClassA2 = END ClassA2;
+    VIEW IntersectionA1
+      JOIN OF A0~ClassA0,A1~ClassA1;
+    = END IntersectionA1;
+    VIEW IntersectionA2
+      JOIN OF A0~ClassA0,A1~ClassA2;
+    = END IntersectionA2;
+    ASSOCIATION assocA4 DERIVED FROM IntersectionA1 =
+      a4_0 -- ClassA0 := IntersectionA1 -> A0;
+      a4_1 -- ClassA1 := IntersectionA1 -> A1;
+    END assocA4;
+  END TopicA;
+END ModelA.
+MODEL ModelB (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF ModelA [ "1" ] =
+  TOPIC TopicB =
+    CLASS ClassB0 = END ClassB0;
+    CLASS ClassB1 = END ClassB1;
+    CLASS ClassB2 = END ClassB2;
+    VIEW IntersectionB1
+      JOIN OF B0~ClassB0,B1~ClassB1;
+    = END IntersectionB1;
+    VIEW IntersectionB2
+      JOIN OF B0~ClassB0,B1~ClassB2;
+    = END IntersectionB2;
+    ASSOCIATION assocB4 DERIVED FROM IntersectionB2 =
+      b4_0 -- ClassB0 := IntersectionB2 -> B0;
+      b4_1 -- ClassB1 := IntersectionB2 -> B1;
+    END assocB4;
+  END TopicB;
+END ModelB.
+)ili");
+   const auto &associationDiagnostic = assert_single_diagnostic(
+      association,
+      "ILIC-TRANSLATION-DERIVED-ASSOCIATION-MISMATCH",
+      31,
+      {"assocB4","IntersectionB2","assocA4","IntersectionA1"},
+      3
+   );
+   assert(associationDiagnostic.relatedInformation.front().range.uri
+      == associationUri);
+
+   const char *coordinateUri = "memory:///CoordinateDimensionMismatch.ili";
+   const auto coordinate = compile(coordinateUri,R"ili(INTERLIS 2.3;
+MODEL ModelA (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC TopicA =
+    DOMAIN CoordA2 = COORD
+      460000.000 .. 870000.000,
+      45000.000 .. 310000.000,
+      -200.000 .. 5000.000;
+  END TopicA;
+END ModelA.
+MODEL ModelB (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF ModelA [ "1" ] =
+  TOPIC TopicB =
+    DOMAIN CoordB2 = COORD
+      460000.000 .. 870000.000,
+      45000.000 .. 310000.000;
+  END TopicB;
+END ModelB.
+)ili");
+   assert_single_diagnostic(
+      coordinate,
+      "ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH",
+      12,
+      {"CoordB2","2 dimensions","CoordA2","3 dimensions"}
+   );
+
+   const char *enumerationUri = "memory:///FinalEnumerationMismatch.ili";
+   const auto enumeration = compile(enumerationUri,R"ili(INTERLIS 2.3;
+MODEL ModelA (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC TopicA =
+    CLASS ClassA1 = attrA1 : (a1,a2(a21,a22)); END ClassA1;
+    CLASS ClassA2 EXTENDS ClassA1 =
+      attrA1 (EXTENDED): (FINAL);
+    END ClassA2;
+  END TopicA;
+END ModelA.
+MODEL ModelB (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF ModelA [ "1" ] =
+  TOPIC TopicB =
+    CLASS ClassB1 = attrB1 : (b1,b2(b21,b22)); END ClassB1;
+    CLASS ClassB2 EXTENDS ClassB1 =
+      attrB1 (EXTENDED): (b1(b11));
+    END ClassB2;
+  END TopicB;
+END ModelB.
+)ili");
+   assert_single_diagnostic(
+      enumeration,
+      "ILIC-TRANSLATION-ENUM-FINAL-MISMATCH",
+      14,
+      {"attrB1","b1","attrA1","final enumeration"}
+   );
+
+   const char *horizontalUri = "memory:///HorizontalAlignmentMismatch.ili";
+   const auto horizontal = compile(horizontalUri,R"ili(INTERLIS 2.3;
+MODEL ModelA (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC TopicA =
+    CLASS ClassA1 = attrA3 : HALIGNMENT; END ClassA1;
+  END TopicA;
+END ModelA.
+MODEL ModelB (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF ModelA [ "1" ] =
+  TOPIC TopicB =
+    CLASS ClassB1 = attrB3 : VALIGNMENT; END ClassB1;
+  END TopicB;
+END ModelB.
+)ili");
+   const auto &horizontalDiagnostic = assert_single_diagnostic(
+      horizontal,
+      "ILIC-TRANSLATION-DOMAIN-REFERENCE-MISMATCH",
+      9,
+      {"attrB3","INTERLIS.VALIGNMENT","attrA3","INTERLIS.HALIGNMENT"},
+      3
+   );
+   assert(horizontalDiagnostic.relatedInformation.front().range.uri
+      == horizontalUri);
+
+   const char *verticalUri = "memory:///VerticalAlignmentMismatch.ili";
+   const auto vertical = compile(verticalUri,R"ili(INTERLIS 2.3;
+MODEL ModelA (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC TopicA =
+    CLASS ClassA1 = attrA3 : VALIGNMENT; END ClassA1;
+  END TopicA;
+END ModelA.
+MODEL ModelB (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF ModelA [ "1" ] =
+  TOPIC TopicB =
+    CLASS ClassB1 = attrB3 : HALIGNMENT; END ClassB1;
+  END TopicB;
+END ModelB.
+)ili");
+   assert_single_diagnostic(
+      vertical,
+      "ILIC-TRANSLATION-DOMAIN-REFERENCE-MISMATCH",
+      9,
+      {"attrB3","INTERLIS.HALIGNMENT","attrA3","INTERLIS.VALIGNMENT"},
+      3
+   );
+   return 0;
+}

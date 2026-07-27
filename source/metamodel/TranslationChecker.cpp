@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "DiagnosticUtil.h"
 #include "MetaModel.h"
 #include "../util/Logger.h"
 
@@ -47,6 +48,7 @@ public:
 private:
    set<Model *> cyclic_models;
    set<MetaElement *> compared_elements;
+   set<MetaElement *> specialized_mismatches;
    map<string,string> translated_names;
 
    Model *find_model(const string &name)
@@ -154,6 +156,170 @@ private:
          line,0,"ILIC-TRANSLATION-MISMATCH",std::move(relatedInformation));
    }
 
+   void append_related(
+      vector<ilic::RelatedInformation> &target,
+      MetaElement *element,
+      const string &message
+   )
+   {
+      auto information = related_information(element,message);
+      target.insert(target.end(),information.begin(),information.end());
+   }
+
+   Type *named_domain(Type *type) const
+   {
+      set<Type *> seen;
+      for (Type *current = type; current != nullptr && seen.insert(current).second;
+           current = dynamic_cast<Type *>(current->Super)) {
+         if (current->ElementInPackage != nullptr) {
+            return current;
+         }
+      }
+      return nullptr;
+   }
+
+   bool report_alignment_domain_mismatch(Type *translated,Type *base)
+   {
+      auto translatedAttribute =
+         dynamic_cast<AttrOrParam *>(diagnostic_owner(translated));
+      auto baseAttribute = dynamic_cast<AttrOrParam *>(diagnostic_owner(base));
+      Type *actualDomain = named_domain(translated);
+      Type *expectedDomain = named_domain(base);
+      if (translatedAttribute == nullptr || baseAttribute == nullptr ||
+          actualDomain == nullptr || expectedDomain == nullptr ||
+          same_ref(actualDomain,expectedDomain)) {
+         return false;
+      }
+      const string actualName = get_path(actualDomain);
+      const string expectedName = get_path(expectedDomain);
+      const bool alignmentDomains =
+         (actualName == "INTERLIS.HALIGNMENT" ||
+          actualName == "INTERLIS.VALIGNMENT") &&
+         (expectedName == "INTERLIS.HALIGNMENT" ||
+          expectedName == "INTERLIS.VALIGNMENT");
+      if (!alignmentDomains) {
+         return false;
+      }
+
+      vector<ilic::RelatedInformation> related;
+      append_related(related,baseAttribute,
+         "Corresponding base attribute: " + label(baseAttribute) +
+            " uses " + expectedName);
+      append_related(related,actualDomain,
+         "Actual domain declaration: " + actualName);
+      append_related(related,expectedDomain,
+         "Expected domain declaration: " + expectedName);
+      Log.error(
+         "translated attribute " + label(translatedAttribute) + " uses " +
+            actualName + ", but " + label(baseAttribute) + " uses " +
+            expectedName,
+         diagnostic_range(translatedAttribute),
+         "ILIC-TRANSLATION-DOMAIN-REFERENCE-MISMATCH",
+         std::move(related)
+      );
+      return true;
+   }
+
+   bool report_coordinate_dimension_mismatch(
+      Package *translatedPackage,
+      Package *basePackage
+   )
+   {
+      vector<CoordType *> actualCoordinates;
+      vector<CoordType *> expectedCoordinates;
+      for (MetaElement *element : translatedPackage->Element) {
+         auto coordinate = dynamic_cast<CoordType *>(element);
+         if (coordinate != nullptr &&
+             diagnostic_range(diagnostic_owner(coordinate)).valid) {
+            actualCoordinates.push_back(coordinate);
+         }
+      }
+      for (MetaElement *element : basePackage->Element) {
+         auto coordinate = dynamic_cast<CoordType *>(element);
+         if (coordinate != nullptr &&
+             diagnostic_range(diagnostic_owner(coordinate)).valid) {
+            expectedCoordinates.push_back(coordinate);
+         }
+      }
+      if (actualCoordinates.size() != expectedCoordinates.size()) {
+         return false;
+      }
+      for (size_t index = 0; index < actualCoordinates.size(); ++index) {
+         CoordType *actual = actualCoordinates[index];
+         CoordType *expected = expectedCoordinates[index];
+         if (actual->Axis.size() == expected->Axis.size()) {
+            continue;
+         }
+         vector<ilic::RelatedInformation> related;
+         append_related(related,expected,
+            "Corresponding base coordinate domain: " + label(expected));
+         Log.error(
+            "translated coordinate domain " + label(actual) + " has " +
+               to_string(actual->Axis.size()) + " dimensions, but " +
+               label(expected) + " has " +
+               to_string(expected->Axis.size()) + " dimensions",
+            diagnostic_range(actual),
+            "ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH",
+            std::move(related)
+         );
+         return true;
+      }
+      return false;
+   }
+
+   bool report_enum_final_mismatch(EnumNode *translated,EnumNode *base)
+   {
+      auto translatedAttribute =
+         dynamic_cast<AttrOrParam *>(diagnostic_owner(translated));
+      auto baseAttribute =
+         dynamic_cast<AttrOrParam *>(diagnostic_owner(base));
+      if (translatedAttribute == nullptr || baseAttribute == nullptr ||
+          translated->Final == base->Final || !base->Final) {
+         return false;
+      }
+      string additions;
+      for (EnumNode *node : translated->Node) {
+         if (node == nullptr) continue;
+         if (!additions.empty()) additions += ", ";
+         additions += node->Name;
+      }
+      if (additions.empty()) additions = "additional enumeration values";
+      vector<ilic::RelatedInformation> related;
+      append_related(related,baseAttribute,
+         "Corresponding base attribute: " + label(baseAttribute) +
+            " declares a final enumeration");
+      Log.error(
+         "translated attribute " + label(translatedAttribute) +
+            " extends the enumeration with " + additions + ", but " +
+            label(baseAttribute) + " requires a final enumeration",
+         diagnostic_range(translatedAttribute),
+         "ILIC-TRANSLATION-ENUM-FINAL-MISMATCH",
+         std::move(related)
+      );
+      specialized_mismatches.insert(translated);
+      return true;
+   }
+
+   void report_derived_association_mismatch(Class *translated,Class *base)
+   {
+      vector<ilic::RelatedInformation> related;
+      append_related(related,base,
+         "Corresponding base association: " + label(base));
+      append_related(related,translated->View,
+         "Actual derivation view: " + label(translated->View));
+      append_related(related,base->View,
+         "Expected derivation view: " + label(base->View));
+      Log.error(
+         "translated association " + label(translated) + " is derived from " +
+            label(translated->View) + ", but the translation of " +
+            label(base) + " must be derived from " + label(base->View) +
+            "; the role derivations must refer to that corresponding view",
+         diagnostic_range(translated),
+         "ILIC-TRANSLATION-DERIVED-ASSOCIATION-MISMATCH",
+         std::move(related)
+      );
+   }
+
    string canonical_text(const string &text) const
    {
       string result;
@@ -208,6 +374,21 @@ private:
       vector<T *> translated_values = as_vector(translated);
       vector<T *> base_values = as_vector(base);
       if (translated_values.size() != base_values.size()) {
+         if (auto translatedPackage = dynamic_cast<Package *>(owner)) {
+            auto basePackage = dynamic_cast<Package *>(owner->_translationOf);
+            if (basePackage != nullptr &&
+                report_coordinate_dimension_mismatch(
+                   translatedPackage,basePackage)) {
+               return;
+            }
+         }
+         if (auto translatedNode = dynamic_cast<EnumNode *>(owner)) {
+            auto baseNode = dynamic_cast<EnumNode *>(owner->_translationOf);
+            if (baseNode != nullptr &&
+                report_enum_final_mismatch(translatedNode,baseNode)) {
+               return;
+            }
+         }
          mismatch(owner,owner->_translationOf,property + " count");
          return;
       }
@@ -220,6 +401,9 @@ private:
    void link_type(Type *translated,Type *base)
    {
       if (translated == nullptr || base == nullptr) {
+         return;
+      }
+      if (report_alignment_domain_mismatch(translated,base)) {
          return;
       }
       link_element(translated,base);
@@ -538,6 +722,9 @@ private:
       if (translated == nullptr || base == nullptr || translated->getClass() != base->getClass()) {
          return;
       }
+      if (specialized_mismatches.find(translated) != specialized_mismatches.end()) {
+         return;
+      }
       if (!compared_elements.insert(translated).second) {
          return;
       }
@@ -573,7 +760,9 @@ private:
          ref(translated,base,"object OID",cls->Oid,base_class->Oid);
          value(translated,base,"OID property",cls->OidProperty,base_class->OidProperty);
          value(translated,base,"NO OID",cls->NoOid,base_class->NoOid);
-         ref(translated,base,"derived association",cls->View,base_class->View);
+         if (!same_ref(cls->View,base_class->View)) {
+            report_derived_association_mismatch(cls,base_class);
+         }
       }
       if (auto attribute = dynamic_cast<AttrOrParam *>(translated)) {
          AttrOrParam *base_attribute = static_cast<AttrOrParam *>(base);
