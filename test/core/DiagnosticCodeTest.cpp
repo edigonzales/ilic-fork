@@ -2,10 +2,21 @@
 #include "Logger.h"
 
 #include <cassert>
+#include <regex>
+#include <set>
 
 int main()
 {
    using util::diagnosticCodeForMessage;
+
+   std::set<std::string_view> codes;
+   const std::regex publicCode("^ILIC-[A-Z0-9]+(?:-[A-Z0-9]+)*$");
+   for (const auto &definition : util::diagnosticDefinitions()) {
+      assert(std::regex_match(definition.code.begin(),definition.code.end(),publicCode));
+      assert(codes.insert(definition.code).second);
+      assert(util::diagnosticCode(definition.id) == definition.code);
+   }
+   assert(!codes.empty());
 
    assert(diagnosticCodeForMessage("type MissingDomain not found.")
       == "ILIC-NAME-TYPE-NOT-FOUND");
@@ -40,13 +51,13 @@ int main()
    ilic::SourceRange relatedRange = range;
    relatedRange.uri = "memory:///base.ili";
    Log.error(
+      util::DiagnosticId::TranslationCoordDimensionMismatch,
       "precisely ranged diagnostic",
       range,
-      "ILIC-TEST-PRECISE-RANGE",
       {{relatedRange,"Base declaration"}}
    );
    const auto &diagnostic = Log.getDiagnostics().front();
-   assert(diagnostic.code == "ILIC-TEST-PRECISE-RANGE");
+   assert(diagnostic.code == "ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH");
    assert(diagnostic.range.uri == "memory:///range.ili");
    assert(diagnostic.range.start.line == 4);
    assert(diagnostic.range.end.character == 12);

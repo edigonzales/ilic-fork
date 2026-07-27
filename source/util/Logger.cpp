@@ -325,6 +325,20 @@ void Logger::error(string message,const ilic::SourceRange &range,string code,
    }
 }
 
+void Logger::error(DiagnosticId id,string message,int line,int column,
+   vector<ilic::RelatedInformation> relatedInformation,vector<string> notes)
+{
+   error(std::move(message),line,column,std::string(diagnosticCode(id)),
+      std::move(relatedInformation),std::move(notes));
+}
+
+void Logger::error(DiagnosticId id,string message,const ilic::SourceRange &range,
+   vector<ilic::RelatedInformation> relatedInformation,vector<string> notes)
+{
+   error(std::move(message),range,std::string(diagnosticCode(id)),
+      std::move(relatedInformation),std::move(notes));
+}
+
 int Logger::getErrorCount()
 {
    return errorcount;

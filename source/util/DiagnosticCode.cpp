@@ -3,10 +3,76 @@
 #include <algorithm>
 #include <cctype>
 #include <initializer_list>
+#include <stdexcept>
 
 namespace util {
 
 namespace {
+
+const std::vector<DiagnosticDefinition> definitions{
+   DiagnosticDefinition{DiagnosticId::AbiRequest,"ILIC-ABI-REQUEST"},
+   DiagnosticDefinition{DiagnosticId::AssociationDuplicateRole,"ILIC-ASSOCIATION-DUPLICATE-ROLE"},
+   DiagnosticDefinition{DiagnosticId::AssociationEndNameMismatch,"ILIC-ASSOCIATION-END-NAME-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::AssociationInvalidBaseKind,"ILIC-ASSOCIATION-INVALID-BASE-KIND"},
+   DiagnosticDefinition{DiagnosticId::AssociationMissingEndName,"ILIC-ASSOCIATION-MISSING-END-NAME"},
+   DiagnosticDefinition{DiagnosticId::AssociationRoleCount,"ILIC-ASSOCIATION-ROLE-COUNT"},
+   DiagnosticDefinition{DiagnosticId::AssociationUnexpectedEndName,"ILIC-ASSOCIATION-UNEXPECTED-END-NAME"},
+   DiagnosticDefinition{DiagnosticId::AttributeIncompatibleExtension,"ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION"},
+   DiagnosticDefinition{DiagnosticId::CardinalityRule,"ILIC-CARDINALITY-RULE"},
+   DiagnosticDefinition{DiagnosticId::ClassExtendedRequired,"ILIC-CLASS-EXTENDED-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::CompilerInternal,"ILIC-COMPILER-INTERNAL"},
+   DiagnosticDefinition{DiagnosticId::ConstraintRule,"ILIC-CONSTRAINT-RULE"},
+   DiagnosticDefinition{DiagnosticId::DependencyRule,"ILIC-DEPENDENCY-RULE"},
+   DiagnosticDefinition{DiagnosticId::EnumerationRule,"ILIC-ENUMERATION-RULE"},
+   DiagnosticDefinition{DiagnosticId::FormatEncoding,"ILIC-FORMAT-ENCODING"},
+   DiagnosticDefinition{DiagnosticId::FormatVersion,"ILIC-FORMAT-VERSION"},
+   DiagnosticDefinition{DiagnosticId::FunctionSignature,"ILIC-FUNCTION-SIGNATURE"},
+   DiagnosticDefinition{DiagnosticId::GenericContext,"ILIC-GENERIC-CONTEXT"},
+   DiagnosticDefinition{DiagnosticId::GenericCoordRangeMismatch,"ILIC-GENERIC-COORD-RANGE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::InheritanceRule,"ILIC-INHERITANCE-RULE"},
+   DiagnosticDefinition{DiagnosticId::InputLoad,"ILIC-INPUT-LOAD"},
+   DiagnosticDefinition{DiagnosticId::InputUnsupportedVersion,"ILIC-INPUT-UNSUPPORTED-VERSION"},
+   DiagnosticDefinition{DiagnosticId::MetaDangling,"ILIC-META-DANGLING"},
+   DiagnosticDefinition{DiagnosticId::MetaSyntax,"ILIC-META-SYNTAX"},
+   DiagnosticDefinition{DiagnosticId::MetaTarget,"ILIC-META-TARGET"},
+   DiagnosticDefinition{DiagnosticId::ModelDependency,"ILIC-MODEL-DEPENDENCY"},
+   DiagnosticDefinition{DiagnosticId::ModelInvalidDeclaration,"ILIC-MODEL-INVALID-DECLARATION"},
+   DiagnosticDefinition{DiagnosticId::NameAttributeNotFound,"ILIC-NAME-ATTRIBUTE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameDuplicate,"ILIC-NAME-DUPLICATE"},
+   DiagnosticDefinition{DiagnosticId::NameElementNotFound,"ILIC-NAME-ELEMENT-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameEndMismatch,"ILIC-NAME-END-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::NameModelNotFound,"ILIC-NAME-MODEL-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameNotFound,"ILIC-NAME-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameRoleNotFound,"ILIC-NAME-ROLE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameTopicNotFound,"ILIC-NAME-TOPIC-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameTypeNotFound,"ILIC-NAME-TYPE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NamespaceDuplicateDeclaration,"ILIC-NAMESPACE-DUPLICATE-DECLARATION"},
+   DiagnosticDefinition{DiagnosticId::ParseEncoding,"ILIC-PARSE-ENCODING"},
+   DiagnosticDefinition{DiagnosticId::ParseSyntax,"ILIC-PARSE-SYNTAX"},
+   DiagnosticDefinition{DiagnosticId::PropertyRule,"ILIC-PROPERTY-RULE"},
+   DiagnosticDefinition{DiagnosticId::ReferenceRule,"ILIC-REFERENCE-RULE"},
+   DiagnosticDefinition{DiagnosticId::RepositoryCache,"ILIC-REPO-CACHE"},
+   DiagnosticDefinition{DiagnosticId::RepositoryChecksum,"ILIC-REPO-CHECKSUM"},
+   DiagnosticDefinition{DiagnosticId::RepositoryCycle,"ILIC-REPO-CYCLE"},
+   DiagnosticDefinition{DiagnosticId::RepositoryDownload,"ILIC-REPO-DOWNLOAD"},
+   DiagnosticDefinition{DiagnosticId::RepositoryIndex,"ILIC-REPO-INDEX"},
+   DiagnosticDefinition{DiagnosticId::RepositoryNotFound,"ILIC-REPO-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::RepositoryPath,"ILIC-REPO-PATH"},
+   DiagnosticDefinition{DiagnosticId::RepositorySite,"ILIC-REPO-SITE"},
+   DiagnosticDefinition{DiagnosticId::RepositoryUri,"ILIC-REPO-URI"},
+   DiagnosticDefinition{DiagnosticId::RepositoryVersion,"ILIC-REPO-VERSION"},
+   DiagnosticDefinition{DiagnosticId::SourceNotFound,"ILIC-SOURCE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::Syntax,"ILIC-SYNTAX"},
+   DiagnosticDefinition{DiagnosticId::TranslationCoordDimensionMismatch,"ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationDerivedAssociationMismatch,"ILIC-TRANSLATION-DERIVED-ASSOCIATION-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationDomainReferenceMismatch,"ILIC-TRANSLATION-DOMAIN-REFERENCE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationEnumFinalMismatch,"ILIC-TRANSLATION-ENUM-FINAL-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationMismatch,"ILIC-TRANSLATION-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationRule,"ILIC-TRANSLATION-RULE"},
+   DiagnosticDefinition{DiagnosticId::TypeMismatch,"ILIC-TYPE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::ValueRange,"ILIC-VALUE-RANGE"},
+   DiagnosticDefinition{DiagnosticId::Warning,"ILIC-WARNING"}
+};
 
 std::string lower(std::string_view value)
 {
@@ -24,6 +90,21 @@ bool contains(const std::string &value,std::initializer_list<std::string_view> n
    });
 }
 
+}
+
+std::string_view diagnosticCode(DiagnosticId id)
+{
+   auto found = std::find_if(definitions.begin(),definitions.end(),
+      [id](const DiagnosticDefinition &definition) { return definition.id == id; });
+   if (found == definitions.end()) {
+      throw std::invalid_argument("unknown DiagnosticId");
+   }
+   return found->code;
+}
+
+const std::vector<DiagnosticDefinition> &diagnosticDefinitions()
+{
+   return definitions;
 }
 
 std::string diagnosticCodeForMessage(std::string_view message)

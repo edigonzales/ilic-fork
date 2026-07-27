@@ -14,6 +14,7 @@ to do !!!
 #include <stdexcept>
 
 #include "../../include/ilic/Diagnostic.h"
+#include "DiagnosticCode.h"
 
 using namespace std;
 
@@ -79,6 +80,12 @@ namespace util {
             vector<ilic::RelatedInformation> relatedInformation = {},
             vector<string> notes = {});
          void error(string message,const ilic::SourceRange &range,string code = "",
+            vector<ilic::RelatedInformation> relatedInformation = {},
+            vector<string> notes = {});
+         void error(DiagnosticId id,string message,int line,int column = 0,
+            vector<ilic::RelatedInformation> relatedInformation = {},
+            vector<string> notes = {});
+         void error(DiagnosticId id,string message,const ilic::SourceRange &range,
             vector<ilic::RelatedInformation> relatedInformation = {},
             vector<string> notes = {});
          int getErrorCount();
