@@ -292,26 +292,34 @@ void Logger::error(string message,int line)
 void Logger::error(string message,int line,int column,string code,
    vector<ilic::RelatedInformation> relatedInformation,vector<string> notes)
 {
+   ilic::SourceRange range;
+   if (line > 0 && !current_source.empty()) {
+      range.valid = true;
+      range.uri = current_source;
+      range.start.line = static_cast<size_t>(line - 1);
+      range.start.character = static_cast<size_t>(column);
+      range.end = range.start;
+      range.end.character++;
+   }
+   error(std::move(message),range,std::move(code),std::move(relatedInformation),std::move(notes));
+}
+
+void Logger::error(string message,const ilic::SourceRange &range,string code,
+   vector<ilic::RelatedInformation> relatedInformation,vector<string> notes)
+{
    ilic::Diagnostic diagnostic;
    diagnostic.code = code.empty() || code == "ILIC-SEMANTIC" || code == "ILIC-COMPILER"
       ? diagnosticCodeForMessage(message) : std::move(code);
    diagnostic.message = message;
+   diagnostic.range = range;
    diagnostic.relatedInformation = std::move(relatedInformation);
    diagnostic.notes = std::move(notes);
-   if (line > 0 && !current_source.empty()) {
-      diagnostic.range.valid = true;
-      diagnostic.range.uri = current_source;
-      diagnostic.range.start.line = static_cast<size_t>(line - 1);
-      diagnostic.range.start.character = static_cast<size_t>(column);
-      diagnostic.range.end = diagnostic.range.start;
-      diagnostic.range.end.character++;
-   }
    recordDiagnostic(diagnostic);
    errorcount++;
    if (display_error) {
-      if (!current_source.empty() && line > 0) {
-         this->messageNoIdent("err:    " + current_source + ":" + to_string(line) + ":" +
-            to_string(column + 1) + ": " + message);
+      if (range.valid && !range.uri.empty()) {
+         this->messageNoIdent("err:    " + range.uri + ":" + to_string(range.start.line + 1) +
+            ":" + to_string(range.start.character + 1) + ": " + message);
       }
       else this->messageNoIdent("err:    " + message);
    }

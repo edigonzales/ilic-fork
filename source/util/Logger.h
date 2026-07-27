@@ -78,6 +78,9 @@ namespace util {
          void error(string message,int line,int column,string code = "",
             vector<ilic::RelatedInformation> relatedInformation = {},
             vector<string> notes = {});
+         void error(string message,const ilic::SourceRange &range,string code = "",
+            vector<ilic::RelatedInformation> relatedInformation = {},
+            vector<string> notes = {});
          int getErrorCount();
          
          // internal_error
