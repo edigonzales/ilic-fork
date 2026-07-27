@@ -128,7 +128,7 @@ END ModelB.
    assert(!diagnosticResult.success);
    assert(std::count_if(diagnosticResult.diagnostics.begin(),diagnosticResult.diagnostics.end(),
       [](const auto &diagnostic) {
-         return diagnostic.code == "ILIC-TRANSLATION-MISMATCH" &&
+         return diagnostic.code == "ILIC-TRANSLATION-ABSTRACT-MISMATCH" &&
             diagnostic.message.find("nullptr") == std::string::npos &&
             diagnostic.message.find("left") != std::string::npos &&
             diagnostic.range.valid && !diagnostic.relatedInformation.empty() &&

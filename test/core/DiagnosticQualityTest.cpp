@@ -396,8 +396,8 @@ END FileBackedLocation.
    );
    assert(fileBackedViewDependencyDiagnostic.range.uri
       == fileBackedViewDependencyUri.string());
-   assert(fileBackedViewDependencyDiagnostic.range.start.character == 46);
-   assert(fileBackedViewDependencyDiagnostic.range.end.character == 50);
+   assert(fileBackedViewDependencyDiagnostic.range.start.character == 44);
+   assert(fileBackedViewDependencyDiagnostic.range.end.character == 48);
 
    const char *viewNamespaceUri = "memory:///ViewNamespaceLocation.ili";
    const auto viewNamespace = compile(viewNamespaceUri,R"ili(INTERLIS 2.3;
