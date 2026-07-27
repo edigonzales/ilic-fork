@@ -52,6 +52,10 @@ const ilic::Diagnostic &assert_single_diagnostic(
    const auto &diagnostic = result.diagnostics.front();
    assert(diagnostic.code == code);
    assert(diagnostic.range.valid);
+   if (diagnostic.range.start.line != line) {
+      std::cerr << code << " expected zero-based line " << line
+                << ", got " << diagnostic.range.start.line << "\n";
+   }
    assert(diagnostic.range.start.line == line);
    assert(diagnostic.relatedInformation.size() >= minimumRelatedInformation);
    for (const auto &part : messageParts) {
@@ -242,6 +246,92 @@ END GenericCoordinateRangeMismatch.
       == genericRangeUri);
    assert(genericRangeDiagnostic.relatedInformation[1].range.uri
       == genericRangeUri);
+
+   const char *runtimeParameterUri = "memory:///RuntimeParameterMismatch.ili";
+   const auto runtimeParameter = compile(runtimeParameterUri,R"ili(INTERLIS 2.3;
+MODEL ModelA (de) AT "https://example.invalid" VERSION "1" =
+  PARAMETER paramA : MANDATORY TEXT * 20;
+END ModelA.
+MODEL ModelB (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF ModelA [ "1" ] =
+  PARAMETER paramB : TEXT * 20;
+END ModelB.
+)ili");
+   const auto &runtimeParameterDiagnostic = assert_single_diagnostic(
+      runtimeParameter,
+      "ILIC-TRANSLATION-TYPE-PROPERTY-MISMATCH",
+      6,
+      {"paramB","paramA","mandatory"}
+   );
+   assert(runtimeParameterDiagnostic.range.uri == runtimeParameterUri);
+   assert(runtimeParameterDiagnostic.range.start.character == 12);
+   assert(runtimeParameterDiagnostic.range.end.character == 18);
+   assert(runtimeParameterDiagnostic.relatedInformation.front().range.uri
+      == runtimeParameterUri);
+   assert(runtimeParameterDiagnostic.relatedInformation.front().range.start.line == 2);
+   assert(runtimeParameterDiagnostic.relatedInformation.front().range.start.character == 12);
+   assert(runtimeParameterDiagnostic.relatedInformation.front().range.end.character == 18);
+
+   const char *duplicateRuntimeParameterUri =
+      "memory:///DuplicateRuntimeParameter.ili";
+   const auto duplicateRuntimeParameter = compile(
+      duplicateRuntimeParameterUri,R"ili(INTERLIS 2.3;
+MODEL DuplicateRuntimeParameter AT "https://example.invalid" VERSION "1" =
+  PARAMETER
+    repeated : BOOLEAN;
+    repeated : TEXT * 20;
+END DuplicateRuntimeParameter.
+)ili");
+   const auto &duplicateRuntimeParameterDiagnostic = assert_single_diagnostic(
+      duplicateRuntimeParameter,
+      "ILIC-MODEL-RUNTIME-PARAMETER-DUPLICATE",
+      4,
+      {"repeated","DuplicateRuntimeParameter"},
+      0
+   );
+   assert(duplicateRuntimeParameterDiagnostic.range.uri
+      == duplicateRuntimeParameterUri);
+   assert(duplicateRuntimeParameterDiagnostic.range.start.character == 4);
+   assert(duplicateRuntimeParameterDiagnostic.range.end.character == 12);
+
+   const char *derivedViewAttributeUri =
+      "memory:///DerivedViewAttributeMismatch.ili";
+   const auto derivedViewAttribute = compile(
+      derivedViewAttributeUri,R"ili(INTERLIS 2.3;
+MODEL ModelA (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC TopicA =
+    CLASS ClassA0 = valueA : 1 .. 10; END ClassA0;
+    VIEW ViewA0 PROJECTION OF A0~ClassA0; = END ViewA0;
+    CLASS ClassA1 EXTENDS ClassA0 = END ClassA1;
+    CLASS ClassA2 EXTENDS ClassA0 = END ClassA2;
+    VIEW ViewA1 EXTENDS ViewA0
+      BASE A0 EXTENDED BY A0p~ClassA1 =
+    END ViewA1;
+  END TopicA;
+END ModelA.
+MODEL ModelB (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF ModelA [ "1" ] =
+  TOPIC TopicB =
+    CLASS ClassB0 = valueB : 1 .. 10; END ClassB0;
+    VIEW ViewB0 PROJECTION OF B0~ClassB0; = END ViewB0;
+    CLASS ClassB1 EXTENDS ClassB0 = END ClassB1;
+    CLASS ClassB2 EXTENDS ClassB0 = END ClassB2;
+    VIEW ViewB1 EXTENDS ViewB0
+      BASE B0 EXTENDED BY B0p~ClassB2 =
+    END ViewB1;
+  END TopicB;
+END ModelB.
+)ili");
+   const auto &derivedViewAttributeDiagnostic = assert_single_diagnostic(
+      derivedViewAttribute,
+      "ILIC-TRANSLATION-REFERENCE-MISMATCH",
+      20,
+      {"B0p","A0p","class reference"}
+   );
+   assert(derivedViewAttributeDiagnostic.range.uri == derivedViewAttributeUri);
+   assert(derivedViewAttributeDiagnostic.relatedInformation.front().range.uri
+      == derivedViewAttributeUri);
+   assert(derivedViewAttributeDiagnostic.relatedInformation.front().range.start.line == 8);
 
    const std::string translationBaseUri = "memory:///translation/Base.ili";
    const std::string translationUri = "memory:///translation/Translated.ili";

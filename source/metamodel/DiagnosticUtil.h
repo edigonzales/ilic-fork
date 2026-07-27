@@ -45,8 +45,25 @@ inline MetaElement *diagnostic_owner(MetaElement *element)
          element = root->EnumType;
       }
    }
-   if (auto type = dynamic_cast<Type *>(element); type != nullptr && type->_attr != nullptr) {
-      return type->_attr;
+   if (auto type = dynamic_cast<Type *>(element)) {
+      if (type->_attr != nullptr) {
+         element = type->_attr;
+      }
+      else if (type->LTParent != nullptr) {
+         element = type->LTParent;
+      }
+   }
+   if (auto attribute = dynamic_cast<AttrOrParam *>(element);
+       attribute != nullptr && !diagnostic_range(attribute).valid) {
+      if (attribute->AttrParent != nullptr) {
+         return attribute->AttrParent;
+      }
+      if (attribute->ParamParent != nullptr) {
+         return attribute->ParamParent;
+      }
+      if (attribute->ElementInPackage != nullptr) {
+         return attribute->ElementInPackage;
+      }
    }
    return element;
 }
