@@ -650,7 +650,7 @@ if(BUILD_TESTING)
     )
     add_ilic_regression_test(ilic_regression_translation_mismatch FALSE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_mismatch.ili"
-        OUTPUT_REGEX "translation mismatch"
+        OUTPUT_REGEX "does not match.*for text length"
     )
     add_ilic_regression_test(ilic_regression_translation_dependency_loading TRUE
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/test/regression/ili23/translation_loading/TranslatedModel.ili"

@@ -84,14 +84,14 @@ END Semantic.
    assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),
       [&semanticSource](const auto &reference) {
       return reference.kind == "type" && reference.range.valid &&
-         reference.range.start.line == 5 && reference.range.start.character == 34 &&
-         reference.range.end.character == 40 &&
+         reference.range.start.line == 5 && reference.range.start.character == 56 &&
+         reference.range.end.character == 62 &&
          reference.range.start.byteOffset == semanticSource.find("Remote;");
    }));
    assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
       return reference.kind == "qualifier" && reference.range.valid &&
-         reference.range.start.line == 5 && reference.range.start.character == 22 &&
-         reference.range.end.character == 33;
+         reference.range.start.line == 5 && reference.range.start.character == 44 &&
+         reference.range.end.character == 55;
    }));
    assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
       return reference.kind == "role" && reference.range.valid &&
