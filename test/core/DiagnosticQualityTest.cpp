@@ -84,7 +84,7 @@ END ModelB.
    const auto &associationDiagnostic = assert_single_diagnostic(
       association,
       "ILIC-TRANSLATION-DERIVED-ASSOCIATION-MISMATCH",
-      31,
+      30,
       {"assocB4","IntersectionB2","assocA4","IntersectionA1"},
       3
    );
