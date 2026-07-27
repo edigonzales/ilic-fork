@@ -10,8 +10,6 @@ permissions:
 
 jobs:
   build-macos-arm64:
-    # Temporarily disabled while the native release publication is stabilized.
-    if: ${{ false }}
     runs-on: macos-14
     timeout-minutes: 50
     steps:
@@ -71,8 +69,6 @@ jobs:
           if-no-files-found: error
 
   build-windows-x86_64:
-    # Temporarily disabled while the native release publication is stabilized.
-    if: ${{ false }}
     runs-on: windows-latest
     timeout-minutes: 55
     steps:
@@ -110,7 +106,9 @@ jobs:
   publish-release:
     name: Publish GitHub release
     needs:
+      - build-macos-arm64
       - build-linux-x86_64
+      - build-windows-x86_64
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -119,10 +117,20 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Download macOS archive
+        uses: actions/download-artifact@v7
+        with:
+          name: ilic-macos-arm64
+          path: dist
       - name: Download Linux archive
         uses: actions/download-artifact@v7
         with:
           name: ilic-linux-x86_64
+          path: dist
+      - name: Download Windows archive
+        uses: actions/download-artifact@v7
+        with:
+          name: ilic-windows-x86_64
           path: dist
       - name: Create checksums
         shell: bash
