@@ -164,7 +164,6 @@ jobs:
                 --latest=false
             else
               gh release create "$release_tag" \
-                --verify-tag \
                 --title "$release_title" \
                 --notes "$release_notes" \
                 --prerelease \
@@ -175,12 +174,16 @@ jobs:
           fi
 
           release_tag="$GITHUB_REF_NAME"
+          # Keep this job checkout-free: local tag verification requires git metadata.
+          if ! gh api --silent "repos/$GITHUB_REPOSITORY/git/ref/tags/$release_tag" >/dev/null 2>&1; then
+            echo "The pushed tag $release_tag does not exist on GitHub; refusing to create a release." >&2
+            exit 1
+          fi
           if gh release view "$release_tag" >/dev/null 2>&1; then
             echo "A release already exists for $release_tag; stable releases are immutable." >&2
             exit 1
           fi
           gh release create "$release_tag" dist/* \
-            --verify-tag \
             --generate-notes \
             --title "ilic $release_tag" \
             --latest=true
