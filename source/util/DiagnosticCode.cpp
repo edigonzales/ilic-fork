@@ -1,8 +1,6 @@
 #include "DiagnosticCode.h"
 
 #include <algorithm>
-#include <cctype>
-#include <initializer_list>
 #include <stdexcept>
 
 namespace util {
@@ -14,43 +12,123 @@ const std::vector<DiagnosticDefinition> definitions{
    DiagnosticDefinition{DiagnosticId::AssociationDuplicateRole,"ILIC-ASSOCIATION-DUPLICATE-ROLE"},
    DiagnosticDefinition{DiagnosticId::AssociationEndNameMismatch,"ILIC-ASSOCIATION-END-NAME-MISMATCH"},
    DiagnosticDefinition{DiagnosticId::AssociationInvalidBaseKind,"ILIC-ASSOCIATION-INVALID-BASE-KIND"},
+   DiagnosticDefinition{DiagnosticId::AssociationAbstractRoleInConcrete,"ILIC-ASSOCIATION-ABSTRACT-ROLE-IN-CONCRETE"},
+   DiagnosticDefinition{DiagnosticId::AssociationAdditionalRoleInExtension,"ILIC-ASSOCIATION-ADDITIONAL-ROLE-IN-EXTENSION"},
+   DiagnosticDefinition{DiagnosticId::AssociationAggregationBinary,"ILIC-ASSOCIATION-AGGREGATION-BINARY"},
+   DiagnosticDefinition{DiagnosticId::AssociationAttributeNameConflict,"ILIC-ASSOCIATION-ATTRIBUTE-NAME-CONFLICT"},
+   DiagnosticDefinition{DiagnosticId::AssociationRoleAccessNameConflict,"ILIC-ASSOCIATION-ROLE-ACCESS-NAME-CONFLICT"},
+   DiagnosticDefinition{DiagnosticId::AssociationMultipleAggregationRoles,"ILIC-ASSOCIATION-MULTIPLE-AGGREGATION-ROLES"},
    DiagnosticDefinition{DiagnosticId::AssociationMissingEndName,"ILIC-ASSOCIATION-MISSING-END-NAME"},
    DiagnosticDefinition{DiagnosticId::AssociationRoleCount,"ILIC-ASSOCIATION-ROLE-COUNT"},
    DiagnosticDefinition{DiagnosticId::AssociationUnexpectedEndName,"ILIC-ASSOCIATION-UNEXPECTED-END-NAME"},
+   DiagnosticDefinition{DiagnosticId::AttributeCardinalityExtension,"ILIC-ATTRIBUTE-CARDINALITY-EXTENSION"},
+   DiagnosticDefinition{DiagnosticId::AttributeBaseFinal,"ILIC-ATTRIBUTE-BASE-FINAL"},
+   DiagnosticDefinition{DiagnosticId::AttributeBaseNotFound,"ILIC-ATTRIBUTE-BASE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::AttributeExtendedRequired,"ILIC-ATTRIBUTE-EXTENDED-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::AttributeDuplicate,"ILIC-ATTRIBUTE-DUPLICATE"},
+   DiagnosticDefinition{DiagnosticId::AttributeExtensionListOrdering,"ILIC-ATTRIBUTE-EXTENSION-LIST-ORDERING"},
+   DiagnosticDefinition{DiagnosticId::AttributeExtensionNumericRange,"ILIC-ATTRIBUTE-EXTENSION-NUMERIC-RANGE"},
+   DiagnosticDefinition{DiagnosticId::AttributeExtensionStructureTarget,"ILIC-ATTRIBUTE-EXTENSION-STRUCTURE-TARGET"},
+   DiagnosticDefinition{DiagnosticId::AttributeExtensionTextKind,"ILIC-ATTRIBUTE-EXTENSION-TEXT-KIND"},
+   DiagnosticDefinition{DiagnosticId::AttributeExtensionTextLength,"ILIC-ATTRIBUTE-EXTENSION-TEXT-LENGTH"},
+   DiagnosticDefinition{DiagnosticId::AttributeExtensionTransient,"ILIC-ATTRIBUTE-EXTENSION-TRANSIENT"},
    DiagnosticDefinition{DiagnosticId::AttributeIncompatibleExtension,"ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION"},
-   DiagnosticDefinition{DiagnosticId::CardinalityRule,"ILIC-CARDINALITY-RULE"},
+   DiagnosticDefinition{DiagnosticId::AttributeMandatoryExtensionRequired,"ILIC-ATTRIBUTE-MANDATORY-EXTENSION-REQUIRED"},
    DiagnosticDefinition{DiagnosticId::ClassExtendedRequired,"ILIC-CLASS-EXTENDED-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ClassAbstractInConcreteTopic,"ILIC-CLASS-ABSTRACT-IN-CONCRETE-TOPIC"},
+   DiagnosticDefinition{DiagnosticId::ClassAbstractModelContextRequired,"ILIC-CLASS-ABSTRACT-MODEL-CONTEXT-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ClassSpecializationConflict,"ILIC-CLASS-SPECIALIZATION-CONFLICT"},
    DiagnosticDefinition{DiagnosticId::CompilerInternal,"ILIC-COMPILER-INTERNAL"},
-   DiagnosticDefinition{DiagnosticId::ConstraintRule,"ILIC-CONSTRAINT-RULE"},
-   DiagnosticDefinition{DiagnosticId::DependencyRule,"ILIC-DEPENDENCY-RULE"},
-   DiagnosticDefinition{DiagnosticId::EnumerationRule,"ILIC-ENUMERATION-RULE"},
+   DiagnosticDefinition{DiagnosticId::CompilerUnsupportedType,"ILIC-COMPILER-UNSUPPORTED-TYPE"},
+   DiagnosticDefinition{DiagnosticId::ConstraintDomainTargetUnsupported,"ILIC-CONSTRAINT-DOMAIN-TARGET-UNSUPPORTED"},
+   DiagnosticDefinition{DiagnosticId::ConstraintExistenceTypeMismatch,"ILIC-CONSTRAINT-EXISTENCE-TYPE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::ConstraintGlobalUniqueMultivalueAttribute,"ILIC-CONSTRAINT-GLOBAL-UNIQUE-MULTIVALUE-ATTRIBUTE"},
+   DiagnosticDefinition{DiagnosticId::ConstraintGlobalUniqueMultivalueRole,"ILIC-CONSTRAINT-GLOBAL-UNIQUE-MULTIVALUE-ROLE"},
+   DiagnosticDefinition{DiagnosticId::ConstraintSetOnStructure,"ILIC-CONSTRAINT-SET-ON-STRUCTURE"},
+   DiagnosticDefinition{DiagnosticId::ConstraintUniqueBasketLocal,"ILIC-CONSTRAINT-UNIQUE-BASKET-LOCAL"},
+   DiagnosticDefinition{DiagnosticId::EnumerationDuplicateElement,"ILIC-ENUMERATION-DUPLICATE-ELEMENT"},
+   DiagnosticDefinition{DiagnosticId::EnumerationExtensionDuplicate,"ILIC-ENUMERATION-EXTENSION-DUPLICATE"},
+   DiagnosticDefinition{DiagnosticId::EnumerationValueInvalid,"ILIC-ENUMERATION-VALUE-INVALID"},
+   DiagnosticDefinition{DiagnosticId::ExpressionBooleanRequired,"ILIC-EXPRESSION-BOOLEAN-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ExpressionComparisonTypeMismatch,"ILIC-EXPRESSION-COMPARISON-TYPE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::ExpressionLogicalRequired,"ILIC-EXPRESSION-LOGICAL-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ExpressionNumericRequired,"ILIC-EXPRESSION-NUMERIC-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ExpressionOrderingTypeMismatch,"ILIC-EXPRESSION-ORDERING-TYPE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::FunctionContractedModelRequired,"ILIC-FUNCTION-CONTRACTED-MODEL-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::FunctionDefinitionArgumentRequired,"ILIC-FUNCTION-DEFINITION-ARGUMENT-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::FunctionCallArgumentCount,"ILIC-FUNCTION-CALL-ARGUMENT-COUNT"},
    DiagnosticDefinition{DiagnosticId::FormatEncoding,"ILIC-FORMAT-ENCODING"},
    DiagnosticDefinition{DiagnosticId::FormatVersion,"ILIC-FORMAT-VERSION"},
    DiagnosticDefinition{DiagnosticId::FunctionSignature,"ILIC-FUNCTION-SIGNATURE"},
-   DiagnosticDefinition{DiagnosticId::GenericContext,"ILIC-GENERIC-CONTEXT"},
+   DiagnosticDefinition{DiagnosticId::FunctionArgumentTypeMismatch,"ILIC-FUNCTION-ARGUMENT-TYPE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::GenericContextConcreteDomainIncompatible,"ILIC-GENERIC-CONTEXT-CONCRETE-DOMAIN-INCOMPATIBLE"},
+   DiagnosticDefinition{DiagnosticId::GenericContextDefaultDomainRequired,"ILIC-GENERIC-CONTEXT-DEFAULT-DOMAIN-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::GenericContextImportedDomainExtensionRequired,"ILIC-GENERIC-CONTEXT-IMPORTED-DOMAIN-EXTENSION-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::GenericDeferredCoordinateDomainRequired,"ILIC-GENERIC-DEFERRED-COORDINATE-DOMAIN-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::GenericDeferredContextRequired,"ILIC-GENERIC-DEFERRED-CONTEXT-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::GenericDeferredDomainUnused,"ILIC-GENERIC-DEFERRED-DOMAIN-UNUSED"},
+   DiagnosticDefinition{DiagnosticId::GenericDeferredListingRequired,"ILIC-GENERIC-DEFERRED-LISTING-REQUIRED"},
    DiagnosticDefinition{DiagnosticId::GenericCoordRangeMismatch,"ILIC-GENERIC-COORD-RANGE-MISMATCH"},
-   DiagnosticDefinition{DiagnosticId::InheritanceRule,"ILIC-INHERITANCE-RULE"},
+   DiagnosticDefinition{DiagnosticId::GraphicBaseAlreadyDefined,"ILIC-GRAPHIC-BASE-ALREADY-DEFINED"},
+   DiagnosticDefinition{DiagnosticId::InheritanceExtendedAssociationRequired,"ILIC-INHERITANCE-EXTENDED-ASSOCIATION-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::InheritanceExtendedDeclarationRequired,"ILIC-INHERITANCE-EXTENDED-DECLARATION-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::InheritanceExtendedTopicRequired,"ILIC-INHERITANCE-EXTENDED-TOPIC-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::InheritanceFinalBase,"ILIC-INHERITANCE-FINAL-BASE"},
+   DiagnosticDefinition{DiagnosticId::InheritanceTargetRequired,"ILIC-INHERITANCE-TARGET-REQUIRED"},
    DiagnosticDefinition{DiagnosticId::InputLoad,"ILIC-INPUT-LOAD"},
    DiagnosticDefinition{DiagnosticId::InputUnsupportedVersion,"ILIC-INPUT-UNSUPPORTED-VERSION"},
    DiagnosticDefinition{DiagnosticId::MetaDangling,"ILIC-META-DANGLING"},
    DiagnosticDefinition{DiagnosticId::MetaSyntax,"ILIC-META-SYNTAX"},
    DiagnosticDefinition{DiagnosticId::MetaTarget,"ILIC-META-TARGET"},
+   DiagnosticDefinition{DiagnosticId::MetadataBasketNotFound,"ILIC-METADATA-BASKET-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::ModelDependency,"ILIC-MODEL-DEPENDENCY"},
-   DiagnosticDefinition{DiagnosticId::ModelInvalidDeclaration,"ILIC-MODEL-INVALID-DECLARATION"},
+   DiagnosticDefinition{DiagnosticId::ModelImportRequired,"ILIC-MODEL-IMPORT-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ModelRuntimeParameterDuplicate,"ILIC-MODEL-RUNTIME-PARAMETER-DUPLICATE"},
    DiagnosticDefinition{DiagnosticId::NameAttributeNotFound,"ILIC-NAME-ATTRIBUTE-NOT-FOUND"},
-   DiagnosticDefinition{DiagnosticId::NameDuplicate,"ILIC-NAME-DUPLICATE"},
+   DiagnosticDefinition{DiagnosticId::NameAmbiguous,"ILIC-NAME-AMBIGUOUS"},
+   DiagnosticDefinition{DiagnosticId::NameAssociationNotFound,"ILIC-NAME-ASSOCIATION-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameClassNotFound,"ILIC-NAME-CLASS-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameMultipleDeclarations,"ILIC-NAME-MULTIPLE-DECLARATIONS"},
    DiagnosticDefinition{DiagnosticId::NameElementNotFound,"ILIC-NAME-ELEMENT-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::NameEndMismatch,"ILIC-NAME-END-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::NameFunctionNotFound,"ILIC-NAME-FUNCTION-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameLineFormNotFound,"ILIC-NAME-LINE-FORM-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::NameModelNotFound,"ILIC-NAME-MODEL-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::NameNotFound,"ILIC-NAME-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NamePackageNotFound,"ILIC-NAME-PACKAGE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameParameterNotFound,"ILIC-NAME-PARAMETER-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::NameRoleNotFound,"ILIC-NAME-ROLE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameStructureNotFound,"ILIC-NAME-STRUCTURE-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::NameTopicNotFound,"ILIC-NAME-TOPIC-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::NameTypeNotFound,"ILIC-NAME-TYPE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameUnitNotFound,"ILIC-NAME-UNIT-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameViewNotFound,"ILIC-NAME-VIEW-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::NameViewableNotFound,"ILIC-NAME-VIEWABLE-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::NamespaceDuplicateDeclaration,"ILIC-NAMESPACE-DUPLICATE-DECLARATION"},
+   DiagnosticDefinition{DiagnosticId::NamespaceInheritedDeclarationConflict,"ILIC-NAMESPACE-INHERITED-DECLARATION-CONFLICT"},
+   DiagnosticDefinition{DiagnosticId::NamespaceMemberDuplicate,"ILIC-NAMESPACE-MEMBER-DUPLICATE"},
    DiagnosticDefinition{DiagnosticId::ParseEncoding,"ILIC-PARSE-ENCODING"},
    DiagnosticDefinition{DiagnosticId::ParseSyntax,"ILIC-PARSE-SYNTAX"},
-   DiagnosticDefinition{DiagnosticId::PropertyRule,"ILIC-PROPERTY-RULE"},
-   DiagnosticDefinition{DiagnosticId::ReferenceRule,"ILIC-REFERENCE-RULE"},
+   DiagnosticDefinition{DiagnosticId::PropertyAbstractFinalConflict,"ILIC-PROPERTY-ABSTRACT-FINAL-CONFLICT"},
+   DiagnosticDefinition{DiagnosticId::PropertyNotAllowed,"ILIC-PROPERTY-NOT-ALLOWED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceAttributeOfClassRequired,"ILIC-REFERENCE-ATTRIBUTE-OF-CLASS-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceClassRequired,"ILIC-REFERENCE-CLASS-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceClassOrStructureRequired,"ILIC-REFERENCE-CLASS-OR-STRUCTURE-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceClassStructureOrAssociationRequired,"ILIC-REFERENCE-CLASS-STRUCTURE-OR-ASSOCIATION-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceClassOrAssociationRequired,"ILIC-REFERENCE-CLASS-OR-ASSOCIATION-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceClassOrViewRequired,"ILIC-REFERENCE-CLASS-OR-VIEW-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceExternalRequired,"ILIC-REFERENCE-EXTERNAL-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceParentViewRequired,"ILIC-REFERENCE-PARENT-VIEW-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceStructureContextRequired,"ILIC-REFERENCE-STRUCTURE-CONTEXT-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceStructureRequired,"ILIC-REFERENCE-STRUCTURE-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceTopicRequired,"ILIC-REFERENCE-TOPIC-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceViewRequired,"ILIC-REFERENCE-VIEW-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceThatAreaViewRequired,"ILIC-REFERENCE-THATAREA-VIEW-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceThisAreaViewRequired,"ILIC-REFERENCE-THISAREA-VIEW-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceViewableContextRequired,"ILIC-REFERENCE-VIEWABLE-CONTEXT-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferenceAggregatesBaseRequired,"ILIC-REFERENCE-AGGREGATES-BASE-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferencePathElementNameRequired,"ILIC-REFERENCE-PATH-ELEMENT-NAME-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ReferencePathElementNotFound,"ILIC-REFERENCE-PATH-ELEMENT-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::RepositoryCache,"ILIC-REPO-CACHE"},
    DiagnosticDefinition{DiagnosticId::RepositoryChecksum,"ILIC-REPO-CHECKSUM"},
    DiagnosticDefinition{DiagnosticId::RepositoryCycle,"ILIC-REPO-CYCLE"},
@@ -64,31 +142,62 @@ const std::vector<DiagnosticDefinition> definitions{
    DiagnosticDefinition{DiagnosticId::SourceNotFound,"ILIC-SOURCE-NOT-FOUND"},
    DiagnosticDefinition{DiagnosticId::Syntax,"ILIC-SYNTAX"},
    DiagnosticDefinition{DiagnosticId::TranslationCoordDimensionMismatch,"ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationAbstractMismatch,"ILIC-TRANSLATION-ABSTRACT-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationAttributeMismatch,"ILIC-TRANSLATION-ATTRIBUTE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationCardinalityMismatch,"ILIC-TRANSLATION-CARDINALITY-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationCollectionMismatch,"ILIC-TRANSLATION-COLLECTION-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationConstraintMismatch,"ILIC-TRANSLATION-CONSTRAINT-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationDeclarationKindMismatch,"ILIC-TRANSLATION-DECLARATION-KIND-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationDependencyMismatch,"ILIC-TRANSLATION-DEPENDENCY-MISMATCH"},
    DiagnosticDefinition{DiagnosticId::TranslationDerivedAssociationMismatch,"ILIC-TRANSLATION-DERIVED-ASSOCIATION-MISMATCH"},
    DiagnosticDefinition{DiagnosticId::TranslationDomainReferenceMismatch,"ILIC-TRANSLATION-DOMAIN-REFERENCE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationEnumerationMismatch,"ILIC-TRANSLATION-ENUMERATION-MISMATCH"},
    DiagnosticDefinition{DiagnosticId::TranslationEnumFinalMismatch,"ILIC-TRANSLATION-ENUM-FINAL-MISMATCH"},
-   DiagnosticDefinition{DiagnosticId::TranslationMismatch,"ILIC-TRANSLATION-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationExpressionMismatch,"ILIC-TRANSLATION-EXPRESSION-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationExtendedMismatch,"ILIC-TRANSLATION-EXTENDED-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationExtendsMismatch,"ILIC-TRANSLATION-EXTENDS-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationFinalMismatch,"ILIC-TRANSLATION-FINAL-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationFunctionMismatch,"ILIC-TRANSLATION-FUNCTION-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationGenericMismatch,"ILIC-TRANSLATION-GENERIC-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationGeometryMismatch,"ILIC-TRANSLATION-GEOMETRY-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationMetadataMismatch,"ILIC-TRANSLATION-METADATA-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationModelBaseNotFound,"ILIC-TRANSLATION-MODEL-BASE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::TranslationModelCycle,"ILIC-TRANSLATION-MODEL-CYCLE"},
+   DiagnosticDefinition{DiagnosticId::TranslationModelPropertyMismatch,"ILIC-TRANSLATION-MODEL-PROPERTY-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationModelSelfReference,"ILIC-TRANSLATION-MODEL-SELF-REFERENCE"},
+   DiagnosticDefinition{DiagnosticId::TranslationOidMismatch,"ILIC-TRANSLATION-OID-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationReferenceMismatch,"ILIC-TRANSLATION-REFERENCE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationRoleMismatch,"ILIC-TRANSLATION-ROLE-MISMATCH"},
    DiagnosticDefinition{DiagnosticId::TranslationRule,"ILIC-TRANSLATION-RULE"},
-   DiagnosticDefinition{DiagnosticId::TypeMismatch,"ILIC-TYPE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationTypePropertyMismatch,"ILIC-TRANSLATION-TYPE-PROPERTY-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationUnitMismatch,"ILIC-TRANSLATION-UNIT-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationValueMismatch,"ILIC-TRANSLATION-VALUE-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TranslationViewMismatch,"ILIC-TRANSLATION-VIEW-MISMATCH"},
+   DiagnosticDefinition{DiagnosticId::TopicDependencyRequired,"ILIC-TOPIC-DEPENDENCY-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::TypeCoordinateRequired,"ILIC-TYPE-COORDINATE-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::TypeDomainRequired,"ILIC-TYPE-DOMAIN-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::TypeEnumBaseRequired,"ILIC-TYPE-ENUM-BASE-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::TypeFormattedRequired,"ILIC-TYPE-FORMATTED-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::TypeFormattedValueOutOfRange,"ILIC-TYPE-FORMATTED-VALUE-OUT-OF-RANGE"},
+   DiagnosticDefinition{DiagnosticId::TypeLineOverlapPrecision,"ILIC-TYPE-LINE-OVERLAP-PRECISION"},
+   DiagnosticDefinition{DiagnosticId::RoleCardinalityExtension,"ILIC-ROLE-CARDINALITY-EXTENSION"},
+   DiagnosticDefinition{DiagnosticId::RoleBaseFinal,"ILIC-ROLE-BASE-FINAL"},
+   DiagnosticDefinition{DiagnosticId::RoleBaseNotFound,"ILIC-ROLE-BASE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::RoleCompositionCardinality,"ILIC-ROLE-COMPOSITION-CARDINALITY"},
+   DiagnosticDefinition{DiagnosticId::RoleExtensionStrength,"ILIC-ROLE-EXTENSION-STRENGTH"},
+   DiagnosticDefinition{DiagnosticId::RoleExtensionOrdering,"ILIC-ROLE-EXTENSION-ORDERING"},
+   DiagnosticDefinition{DiagnosticId::RoleExtensionTarget,"ILIC-ROLE-EXTENSION-TARGET"},
+   DiagnosticDefinition{DiagnosticId::RoleNameDuplicate,"ILIC-ROLE-NAME-DUPLICATE"},
+   DiagnosticDefinition{DiagnosticId::TransientAttributeFactorRequired,"ILIC-ATTRIBUTE-TRANSIENT-FACTOR-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ViewAliasNotFound,"ILIC-VIEW-ALIAS-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::ViewAttributeInspectionInvalid,"ILIC-VIEW-ATTRIBUTE-INSPECTION-INVALID"},
+   DiagnosticDefinition{DiagnosticId::ViewInspectionAttributeNotFound,"ILIC-VIEW-INSPECTION-ATTRIBUTE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::ViewBaseNotFound,"ILIC-VIEW-BASE-NOT-FOUND"},
+   DiagnosticDefinition{DiagnosticId::ViewBaseExtensionRequired,"ILIC-VIEW-BASE-EXTENSION-REQUIRED"},
+   DiagnosticDefinition{DiagnosticId::ValueMinimumExceedsMaximum,"ILIC-VALUE-MINIMUM-EXCEEDS-MAXIMUM"},
    DiagnosticDefinition{DiagnosticId::ValueRange,"ILIC-VALUE-RANGE"},
    DiagnosticDefinition{DiagnosticId::Warning,"ILIC-WARNING"}
 };
-
-std::string lower(std::string_view value)
-{
-   std::string result(value);
-   std::transform(result.begin(),result.end(),result.begin(),[](unsigned char character) {
-      return static_cast<char>(std::tolower(character));
-   });
-   return result;
-}
-
-bool contains(const std::string &value,std::initializer_list<std::string_view> needles)
-{
-   return std::any_of(needles.begin(),needles.end(),[&](std::string_view needle) {
-      return value.find(needle) != std::string::npos;
-   });
-}
 
 }
 
@@ -105,81 +214,6 @@ std::string_view diagnosticCode(DiagnosticId id)
 const std::vector<DiagnosticDefinition> &diagnosticDefinitions()
 {
    return definitions;
-}
-
-std::string diagnosticCodeForMessage(std::string_view message)
-{
-   const std::string value = lower(message);
-
-   if (contains(value,{"unsupported iliversion","unsupported interlis version"}))
-      return "ILIC-INPUT-UNSUPPORTED-VERSION";
-   if (contains(value,{"internal compiler failure","internal compiler error"}))
-      return "ILIC-COMPILER-INTERNAL";
-   if (contains(value,{"unable to load root source","unable to read","could not open"}))
-      return "ILIC-INPUT-LOAD";
-   if (contains(value,{"unable to order model dependencies","dependency cycle"}))
-      return "ILIC-MODEL-DEPENDENCY";
-
-   if (contains(value,{"translation mismatch"}))
-      return "ILIC-TRANSLATION-MISMATCH";
-   if (contains(value,{"translation of","translation base","translation language",
-      "translation metadata","translation chain"}))
-      return "ILIC-TRANSLATION-RULE";
-
-   if (contains(value,{"not found","unknown ","there is no ","has no visible",
-      "has no accessible","missing a context"})) {
-      if (contains(value,{"attribute"})) return "ILIC-NAME-ATTRIBUTE-NOT-FOUND";
-      if (contains(value,{"role"})) return "ILIC-NAME-ROLE-NOT-FOUND";
-      if (contains(value,{"topic"})) return "ILIC-NAME-TOPIC-NOT-FOUND";
-      if (contains(value,{"model"})) return "ILIC-NAME-MODEL-NOT-FOUND";
-      if (contains(value,{"domain","type","unit"})) return "ILIC-NAME-TYPE-NOT-FOUND";
-      if (contains(value,{"path","reference","viewable","class","structure","association","view"}))
-         return "ILIC-NAME-ELEMENT-NOT-FOUND";
-      return "ILIC-NAME-NOT-FOUND";
-   }
-
-   if (contains(value,{"does not match","must match","should end with","must end with"," expected"}))
-      return "ILIC-NAME-END-MISMATCH";
-   if (contains(value,{"duplicate","multiple declaration","multiple declarations",
-      "already exists","there is already","same name","name conflict","several attributes"}))
-      return "ILIC-NAME-DUPLICATE";
-
-   if (contains(value,{"cardinality","multiplicity"}))
-      return "ILIC-CARDINALITY-RULE";
-   if (contains(value,{"association requires at least","association must have at least"}))
-      return "ILIC-ASSOCIATION-ROLE-COUNT";
-   if (contains(value,{"extend","extension","extended","inherited","inheritance",
-      "base class","base topic","base association","base attribute","base role",
-      "base view","final base","subrange"}))
-      return "ILIC-INHERITANCE-RULE";
-   if (contains(value,{"topic dependency","depend on","requires model","to import",
-      "cross-topic","cross topic","requires external","other topic"}))
-      return "ILIC-DEPENDENCY-RULE";
-   if (contains(value,{"constraint","unique","basket and local","set constraint",
-      "required in"}))
-      return "ILIC-CONSTRAINT-RULE";
-   if (contains(value,{"parent is only valid","thisarea is only valid",
-      "thatarea is only valid","aggregates has no aggregation base"}))
-      return "ILIC-REFERENCE-RULE";
-   if (contains(value,{"generic","deferred","context definition","context default"}))
-      return "ILIC-GENERIC-CONTEXT";
-   if (contains(value,{"enumeration","enum ","#"}))
-      return "ILIC-ENUMERATION-RULE";
-   if (contains(value,{"function","argument"}))
-      return "ILIC-FUNCTION-SIGNATURE";
-   if (contains(value,{"path","reference","referenced","target role","roleaccess"}))
-      return "ILIC-REFERENCE-RULE";
-   if (contains(value,{"datatype","type","numeric","boolean","logical","text length",
-      "formatted value","coordinate","coord ","structure","class ","association ",
-      "association","view ","domain "}))
-      return "ILIC-TYPE-MISMATCH";
-   if (contains(value,{"minimum","maximum","range","precision","overlap","outside"}))
-      return "ILIC-VALUE-RANGE";
-   if (contains(value,{"abstract","final","transient","external","ordered","hiding",
-      "mandatory","composition","aggregation","property ","properties "}))
-      return "ILIC-PROPERTY-RULE";
-
-   return "ILIC-MODEL-INVALID-DECLARATION";
 }
 
 }

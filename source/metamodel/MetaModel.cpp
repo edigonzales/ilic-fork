@@ -1,4 +1,5 @@
 #include "MetaModel.h"
+#include "DiagnosticUtil.h"
 #include "../util/Logger.h"
 
 using namespace util;
@@ -50,7 +51,9 @@ namespace metamodel {
       }
       for (DataUnit* uu : AllDataUnits) {
          if (uu->Name == u->ElementInPackage->Name) {
-            Log.error("multiple declaration of topic " + u->ElementInPackage->Name, u->_line);
+            Log.error(util::DiagnosticId::NameMultipleDeclarations,
+               "multiple declaration of topic " + u->ElementInPackage->Name,
+               diagnostic_range(u->ElementInPackage));
             return;
          }
       }

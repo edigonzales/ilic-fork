@@ -9,7 +9,8 @@ void IliParserErrorListener::syntaxError(
    size_t charPositionInLine, const std::string &msg, std::exception_ptr e
 )
 {
-   Log.error(msg,static_cast<int>(line),static_cast<int>(charPositionInLine),"ILIC-PARSE-SYNTAX");
+   Log.error(util::DiagnosticId::ParseSyntax,msg,static_cast<int>(line),
+      static_cast<int>(charPositionInLine));
 }
 
 void IliParserErrorListener::reportAmbiguity(

@@ -63,8 +63,8 @@ void applyExternalMetaAttributes(const CompilationRequest &request)
          if (target != nullptr) break;
       }
       if (target == nullptr) {
-         Log.error("external meta attribute target " + external.element + " not found",-1,0,
-            "ILIC-META-TARGET");
+         Log.error(util::DiagnosticId::MetaTarget,
+            "external meta attribute target " + external.element + " not found",-1);
          continue;
       }
       if (external.name == "ili2c.translationOf") {
@@ -72,7 +72,8 @@ void applyExternalMetaAttributes(const CompilationRequest &request)
             model->_translationOfName = external.value;
          }
          else {
-            Log.error("ili2c.translationOf may only target a model",-1,0,"ILIC-META-TARGET");
+            Log.error(util::DiagnosticId::MetaTarget,
+               "ili2c.translationOf may only target a model",-1);
          }
       }
    }
@@ -177,10 +178,10 @@ bool compileFile(
    if (file->getIliVersion() != "1.0" && file->getIliVersion() != "2.3"
        && file->getIliVersion() != "2.4") {
       Log.setCurrentSource(file->getFilePath());
-      Log.error(
+      Log.error(util::DiagnosticId::InputUnsupportedVersion,
          "unsupported INTERLIS version " + file->getIliVersion()
             + "; supported versions are 1.0, 2.3, and 2.4",
-         1,0,"ILIC-INPUT-UNSUPPORTED-VERSION");
+         1);
       appendNewEvents(transcript,diagnosticIndex,logIndex);
       return true;
    }
@@ -296,7 +297,8 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
    for (const auto &root : request.roots) {
       transcript.push_back("inf:    loading " + root + " ...");
       if (util::load_ilifiles_by_file(root) == nullptr) {
-         Log.error("unable to load root source " + root);
+         Log.error(util::DiagnosticId::InputLoad,
+            "unable to load root source " + root,-1);
          appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
          transcript.push_back("inf:    not done.");
       }
@@ -326,7 +328,8 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
             if (resolved == nullptr) {
                if (reportedMissing.insert(model).second) {
                   result.missingModels.push_back(model);
-                  Log.error("model " + model + " not found.");
+                  Log.error(util::DiagnosticId::NameModelNotFound,
+                     "model " + model + " not found.",-1);
                   appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
                   transcript.push_back("inf:    model " + model + " not found.");
                }
@@ -361,7 +364,8 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
       }
       if (allCompiled) break;
       if (pass == util::all_ilifiles.size()) {
-         Log.error("unable to order model dependencies");
+         Log.error(util::DiagnosticId::ModelDependency,
+            "unable to order model dependencies",-1);
          appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs);
       }
    }
@@ -386,7 +390,8 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
    return finish();
    }
    catch (const util::CompilerAbort &error) {
-      Log.error(std::string("internal compiler failure: ") + error.what());
+      Log.error(util::DiagnosticId::CompilerInternal,
+         std::string("internal compiler failure: ") + error.what(),-1);
       return finish();
    }
 }

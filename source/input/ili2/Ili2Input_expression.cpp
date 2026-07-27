@@ -8,6 +8,7 @@
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 /*
 
@@ -224,37 +225,45 @@ static string get_operation_type(int operation,Expression *e1,Expression *e2)
 
    if (operation == CompoundExpr_OperationType::And) {
       if (e1->_type != "BooleanType") {
-         Log.error("and: term is not of boolean type",e1->_line);
+         Log.error(DiagnosticId::ExpressionBooleanRequired,
+            "and: term is not of boolean type",e1->_line);
       }
       if (e2->_type != "BooleanType") {
-         Log.error("and: term is not of boolean type",e1->_line);
+         Log.error(DiagnosticId::ExpressionBooleanRequired,
+            "and: term is not of boolean type",e1->_line);
       }
       return "BooleanType";
    }
    else if (operation == CompoundExpr_OperationType::Or) {
       if (e1->_type != "BooleanType") {
-         Log.error("or: term is not of boolean type",e1->_line);
+         Log.error(DiagnosticId::ExpressionBooleanRequired,
+            "or: term is not of boolean type",e1->_line);
       }
       if (e2->_type != "BooleanType") {
-         Log.error("or: term is not of boolean type",e1->_line);
+         Log.error(DiagnosticId::ExpressionBooleanRequired,
+            "or: term is not of boolean type",e1->_line);
       }
       return "BooleanType";
    }
    else if (operation == CompoundExpr_OperationType::Mult) {
       if (e1->_type != "NumericType") {
-         Log.error("*: term is not of numeric type",e1->_line);
+         Log.error(DiagnosticId::ExpressionNumericRequired,
+            "*: term is not of numeric type",e1->_line);
       }
       if (e2->_type != "NumericType") {
-         Log.error("*: term is not of numeric type",e1->_line);
+         Log.error(DiagnosticId::ExpressionNumericRequired,
+            "*: term is not of numeric type",e1->_line);
       }
       return "NumericType";
    }
    else if (operation == CompoundExpr_OperationType::Div) {
       if (e1->_type != "NumericType") {
-         Log.error("/: term is not of numeric type",e1->_line);
+         Log.error(DiagnosticId::ExpressionNumericRequired,
+            "/: term is not of numeric type",e1->_line);
       }
       if (e2->_type != "NumericType") {
-         Log.error("/: term is not of numeric type",e1->_line);
+         Log.error(DiagnosticId::ExpressionNumericRequired,
+            "/: term is not of numeric type",e1->_line);
       }
       return "NumericType";
    }
@@ -264,7 +273,9 @@ static string get_operation_type(int operation,Expression *e1,Expression *e2)
       else if (e2->_type == "???") {
       }
       else if (e1->_type != e2->_type) {
-         Log.error("==: term1 and term2 have incompatible datatypes (" + e1->_type + "<>" + e2->_type + ")",e1->_line);
+         Log.error(DiagnosticId::ExpressionComparisonTypeMismatch,
+            "==: term1 and term2 have incompatible datatypes (" +
+               e1->_type + "<>" + e2->_type + ")",e1->_line);
       }
       return "BooleanType";
    }
@@ -274,7 +285,9 @@ static string get_operation_type(int operation,Expression *e1,Expression *e2)
       else if (e2->_type == "???") {
       }
       else if (e1->_type != e2->_type) {
-         Log.error("!=: term1 and term2 have incompatible datatypes (" + e1->_type + "<>" + e2->_type + ")",e1->_line);
+         Log.error(DiagnosticId::ExpressionComparisonTypeMismatch,
+            "!=: term1 and term2 have incompatible datatypes (" +
+               e1->_type + "<>" + e2->_type + ")",e1->_line);
       }
       return "BooleanType";
    }
@@ -535,7 +548,8 @@ antlrcpp::Any Ili2Input::visitFactor(parser::Ili2Parser::FactorContext *ctx)
          }
       }
       if (r->RuntimeParam == nullptr) {
-         Log.error("unknown runtime parameter " + name,get_line(ctx));
+         Log.error(DiagnosticId::NameParameterNotFound,
+            "unknown runtime parameter " + name,get_line(ctx));
       }
       f = r;
    }
@@ -772,7 +786,8 @@ antlrcpp::Any Ili2Input::visitAttributePathConst(parser::Ili2Parser::AttributePa
       c->Attribute = find_attribute(get_class_context(),ctx->NAME()->getText());
    }
    if (c->Attribute == nullptr) {
-      Log.error("attribute " + ctx->NAME()->getText() + " not found",get_line(ctx));
+      Log.error(DiagnosticId::NameAttributeNotFound,
+         "attribute " + ctx->NAME()->getText() + " not found",get_line(ctx));
    }
 
    Log.decNestLevel();

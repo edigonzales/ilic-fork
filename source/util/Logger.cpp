@@ -267,7 +267,6 @@ void Logger::displayErrors(bool state)
 void Logger::error(string message)
 {
    ilic::Diagnostic diagnostic;
-   diagnostic.code = diagnosticCodeForMessage(message);
    diagnostic.message = message;
    recordDiagnostic(diagnostic);
    errorcount++;
@@ -277,7 +276,6 @@ void Logger::error(string message)
 void Logger::errorNoIdent(string message)
 {
    ilic::Diagnostic diagnostic;
-   diagnostic.code = diagnosticCodeForMessage(message);
    diagnostic.message = message;
    recordDiagnostic(diagnostic);
    errorcount++;
@@ -308,8 +306,7 @@ void Logger::error(string message,const ilic::SourceRange &range,string code,
    vector<ilic::RelatedInformation> relatedInformation,vector<string> notes)
 {
    ilic::Diagnostic diagnostic;
-   diagnostic.code = code.empty() || code == "ILIC-SEMANTIC" || code == "ILIC-COMPILER"
-      ? diagnosticCodeForMessage(message) : std::move(code);
+   diagnostic.code = std::move(code);
    diagnostic.message = message;
    diagnostic.range = range;
    diagnostic.relatedInformation = std::move(relatedInformation);

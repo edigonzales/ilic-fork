@@ -2,6 +2,7 @@
 
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
+#include "../../metamodel/DiagnosticUtil.h"
 #include "../../metamodel/MetaModelInput.h"
 #include "../../util/StringUtil.h"
 #include "../../util/Logger.h"
@@ -9,6 +10,7 @@
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 namespace {
 
@@ -105,7 +107,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    }
 
    if (name1 != name2) {
-      Log.error(
+      Log.error(DiagnosticId::NameEndMismatch,
          "classname " + name2 + " must match " + name1,
          get_line(ctx->classname2)
       );
@@ -128,7 +130,8 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED}));
    c->Abstract = properties[ABSTRACT];
    if (get_package_context()->getClass() == "Model" && !c->Abstract) {
-      Log.error("a class in model context has to be defined ABSTRACT",get_line(ctx));
+      Log.error(DiagnosticId::ClassAbstractModelContextRequired,
+         "a class in model context has to be defined ABSTRACT",get_line(ctx));
    }
    c->Final = properties[FINAL];
    c->Extended = properties[EXTENDED];
@@ -138,7 +141,8 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
       set_reference_source(c,"inheritance",ctx->classname1);
       DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
       if (u->Super == nullptr) {
-         Log.error(string("EXTENDED can only by used in extended topics"),c->_line);
+         Log.error(DiagnosticId::InheritanceExtendedTopicRequired,
+            "EXTENDED can only by used in extended topics",diagnostic_range(c));
       }
       else {
          Class *s = find_class_or_structure(name1,c->_line);
@@ -146,7 +150,9 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
          if (s != nullptr) {
             s->Sub.push_back(c);
             if (s->Final) {
-               Log.error("class " + name1 + " can not extend FINAL base class " + get_path(s),c->_line);
+               Log.error(DiagnosticId::InheritanceFinalBase,
+                  "class " + name1 + " can not extend FINAL base class " +
+                     get_path(s),diagnostic_range(c));
             }
          }
       }
@@ -160,7 +166,9 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
       if (s != nullptr) {
          s->Sub.push_back(c);
          if (s->Final) {
-            Log.error("class " + name1 + " can not extend FINAL base class " + get_path(s),c->_line);
+            Log.error(DiagnosticId::InheritanceFinalBase,
+               "class " + name1 + " can not extend FINAL base class " +
+                  get_path(s),diagnostic_range(c));
          }
       }
    }
@@ -229,7 +237,7 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
    Log.incNestLevel();
 
    if (name1 != name2) {
-      Log.error(
+      Log.error(DiagnosticId::NameEndMismatch,
          "structurename " + name2 + " must match " + name1,
          ctx->structurename2->getLine()
       );
@@ -256,7 +264,8 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
       set_reference_source(c,"inheritance",ctx->structurename1);
       DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
       if (u->Super == nullptr) {
-         Log.error(string("EXTENDED can only by used in extended topics"),c->_line);
+         Log.error(DiagnosticId::InheritanceExtendedTopicRequired,
+            "EXTENDED can only by used in extended topics",diagnostic_range(c));
       }
       else {
          Class *s = find_structure(name1,c->_line);
@@ -264,7 +273,10 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
          if (s != nullptr) {
             s->Sub.push_back(c);
             if (s->Final) {
-               Log.error("structure " + name1 + " can not extend FINAL base structure " + get_path(s),c->_line);
+               Log.error(DiagnosticId::InheritanceFinalBase,
+                  "structure " + name1 +
+                     " can not extend FINAL base structure " + get_path(s),
+                  diagnostic_range(c));
             }
          }
       }
@@ -278,7 +290,10 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
       if (s != nullptr) {
          s->Sub.push_back(c);
          if (s->Final) {
-            Log.error("structure " + name1 + " can not extend FINAL base structure " + get_path(s),c->_line);
+            Log.error(DiagnosticId::InheritanceFinalBase,
+               "structure " + name1 +
+                  " can not extend FINAL base structure " + get_path(s),
+               diagnostic_range(c));
          }
       }
    }
@@ -387,7 +402,7 @@ static Type* any_to_type(antlrcpp::Any any)
    catch (exception e) {
    }
 
-   Log.error("any_to_type: unsupported type");
+   Log.error(DiagnosticId::CompilerUnsupportedType,"any_to_type: unsupported type",-1);
    return nullptr;
 
 }
@@ -396,7 +411,8 @@ static void check_type_restriction(Type *base_type,Type *extended_type, string n
 {
 
    if (!extended_type->isSubClassOf(base_type->getClass())) {
-      Log.error("type of attribute " + name + " must have same type as baseclass attr",line);
+      Log.error(DiagnosticId::AttributeIncompatibleExtension,
+         "type of attribute " + name + " must have same type as baseclass attr",line);
       return;
    }
 
@@ -408,10 +424,12 @@ static void check_type_restriction(Type *base_type,Type *extended_type, string n
       double min_e = atoi(e->Min.c_str());
       double max_e = atoi(e->Max.c_str());
       if (min_e < min_b) {
-         Log.error("numeric range of " + name + " must be a subrange of baseclass type");
+         Log.error(DiagnosticId::AttributeExtensionNumericRange,
+            "numeric range of " + name + " must be a subrange of baseclass type",line);
       }
       else if (max_e > max_b) {
-         Log.error("numeric range of " + name + " must be a subrange of baseclass type");
+         Log.error(DiagnosticId::AttributeExtensionNumericRange,
+            "numeric range of " + name + " must be a subrange of baseclass type",line);
       }
       return;
    }
@@ -451,11 +469,13 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    Log.incNestLevel();
 
    if (find_role(get_class_context(),name) != nullptr) {
-      Log.error("there is already a role with name " + name,get_line(ctx));
+      Log.error(DiagnosticId::AssociationAttributeNameConflict,
+         "there is already a role with name " + name,get_line(ctx));
    }
    AttrOrParam *aa = find_attribute(get_class_context(),name);
    if (aa != nullptr && aa->AttrParent == get_class_context()) {
-      Log.error("there is already an attribute with name " + name,get_line(ctx));
+      Log.error(DiagnosticId::AttributeDuplicate,
+         "there is already an attribute with name " + name,get_line(ctx));
    }
 
    // init AttrOrParam
@@ -477,16 +497,22 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
       set_reference_source(a,"inheritance",ctx->attributname);
       Class *c = get_class_context();
       if (c->Super == nullptr) {
-         Log.error(string("EXTENDED can only by used in extended classes / structures / associations"),ctx->attributname->getLine());
+         Log.error(DiagnosticId::InheritanceExtendedDeclarationRequired,
+            "EXTENDED can only be used in extended classes, structures, or associations",
+            diagnostic_range(a));
       }
       else {
          Class* s = static_cast<Class*>(c->Super);
          aa = find_attribute(s, a->Name);
          if (aa == nullptr) {
-            Log.error("base attribute of " + name + " not found in " + get_path(s), a->_line);
+            Log.error(DiagnosticId::AttributeBaseNotFound,
+               "base attribute of " + name + " not found in " + get_path(s),
+               diagnostic_range(a));
          }
          else if (aa->Final) {
-            Log.error("base attribute of " + name + " is FINAL", a->_line);
+            Log.error(DiagnosticId::AttributeBaseFinal,
+               "base attribute of " + name + " is FINAL",diagnostic_range(a),
+               related_information(aa,"Final base attribute is declared here"));
          }
          a->Extending = aa;
          //check_type_restriction(aa->Type, a->Type, name, ctx->attributname->getLine());
@@ -504,7 +530,9 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
       // Type compatibility belongs to the semantic checker, which can report
       // the named declarations and their exact source ranges.
       if (!properties[EXTENDED]) {
-         Log.error("attribute " + a->Name + " must be declared EXTENDED",get_line(ctx));
+         Log.error(DiagnosticId::AttributeExtendedRequired,
+            "attribute " + a->Name + " must be declared EXTENDED",diagnostic_range(a),
+            related_information(aa,"Inherited attribute is declared here"));
       }
    }
 
@@ -530,7 +558,9 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    // RefHB 2.3 3.8: an abstract transient attribute may defer its factor to a
    // concrete extension. This matches ili2c's attributeDef validation.
    if (a->Transient && !a->Abstract && ctx->factor().empty()) {
-      Log.error("TRANSIENT attribute " + name + " requires an assignment of a factor",get_line(ctx));
+      Log.error(DiagnosticId::TransientAttributeFactorRequired,
+         "TRANSIENT attribute " + name + " requires an assignment of a factor",
+         diagnostic_range(a));
    }
    for (auto fctx : ctx->factor()) {
       Factor *factor = visitFactor(fctx);
@@ -587,7 +617,8 @@ antlrcpp::Any Ili2Input::visitAttrTypeDef(parser::Ili2Parser::AttrTypeDefContext
          t = dt;
       }
       else {
-         Log.error("MANDATORY restriction only allowed on EXTENDED attributes",get_line(ctx));
+         Log.error(DiagnosticId::AttributeMandatoryExtensionRequired,
+            "MANDATORY restriction only allowed on EXTENDED attributes",get_line(ctx));
       }
    }
    else {
@@ -644,7 +675,9 @@ antlrcpp::Any Ili2Input::visitParameterDef(parser::Ili2Parser::ParameterDefConte
          set_reference_source(a,"inheritance",ctx->parameterName);
          Class *c = get_class_context();
          if (c->Super == nullptr) {
-            Log.error(string("EXTENDED can only by used in extended classes / structures / associations"),ctx->parameterName->getLine());
+            Log.error(DiagnosticId::InheritanceExtendedDeclarationRequired,
+               "EXTENDED can only be used in extended classes, structures, or associations",
+               diagnostic_range(a));
          }
          else {
             Class* s = static_cast<Class*>(c->Super);
@@ -801,7 +834,8 @@ antlrcpp::Any Ili2Input::visitReferenceAttr(parser::Ili2Parser::ReferenceAttrCon
    Class *c = static_cast<Class *>(get_class_context());
    if (c->Kind != Class::Structure) {
       if (ili23) {
-         Log.error("reference to is only allowed in structures",get_line(ctx));
+         Log.error(DiagnosticId::ReferenceStructureContextRequired,
+            "reference to is only allowed in structures",get_line(ctx));
       }
    }
    
@@ -812,7 +846,9 @@ antlrcpp::Any Ili2Input::visitReferenceAttr(parser::Ili2Parser::ReferenceAttrCon
       if (r->_baseclass != nullptr) {
          t->_baseclass = r->_baseclass;
          if (t->_baseclass->Kind == Class::Structure) {
-            Log.error("target of reference type must be a class or association, found structure",get_line(ctx));
+            Log.error(DiagnosticId::ReferenceClassOrAssociationRequired,
+               "target of reference type must be a class or association, found structure",
+               get_line(ctx));
          }
       }
    }

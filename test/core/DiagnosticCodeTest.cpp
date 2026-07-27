@@ -2,12 +2,58 @@
 #include "Logger.h"
 
 #include <cassert>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
 #include <regex>
 #include <set>
+#include <sstream>
+#include <vector>
+
+namespace {
+
+void assert_explicit_semantic_diagnostic_ids()
+{
+   namespace fs = std::filesystem;
+   const fs::path root = ILIC_SOURCE_DIR;
+   std::vector<fs::path> files;
+   for (const auto &entry : fs::recursive_directory_iterator(root / "source/input/ili2")) {
+      if (entry.path().extension() == ".cpp") files.push_back(entry.path());
+   }
+   files.push_back(root / "source/input/parser/IliParserErrorListener.cpp");
+   files.push_back(root / "source/metamodel/MetaModel.cpp");
+   files.push_back(root / "source/metamodel/MetaModelInput.cpp");
+   files.push_back(root / "source/metamodel/SemanticChecker.cpp");
+   files.push_back(root / "source/metamodel/TranslationChecker.cpp");
+   files.push_back(root / "source/core/Compiler.cpp");
+
+   for (const auto &file : files) {
+      std::ifstream input(file);
+      std::ostringstream buffer;
+      buffer << input.rdbuf();
+      std::string source = buffer.str();
+      size_t position = 0;
+      while ((position = source.find("Log.error(",position)) != std::string::npos) {
+         size_t argument = position + std::string("Log.error(").size();
+         while (argument < source.size() &&
+                std::isspace(static_cast<unsigned char>(source[argument]))) {
+            ++argument;
+         }
+         const bool codeLess =
+            source[argument] == '"' ||
+            source.compare(argument,std::string("string(").size(),"string(") == 0 ||
+            source.compare(argument,std::string("std::string(").size(),"std::string(") == 0;
+         assert(!codeLess);
+         position = argument;
+      }
+   }
+}
+
+}
 
 int main()
 {
-   using util::diagnosticCodeForMessage;
+   assert_explicit_semantic_diagnostic_ids();
 
    std::set<std::string_view> codes;
    const std::regex publicCode("^ILIC-[A-Z0-9]+(?:-[A-Z0-9]+)*$");
@@ -17,27 +63,6 @@ int main()
       assert(util::diagnosticCode(definition.id) == definition.code);
    }
    assert(!codes.empty());
-
-   assert(diagnosticCodeForMessage("type MissingDomain not found.")
-      == "ILIC-NAME-TYPE-NOT-FOUND");
-   assert(diagnosticCodeForMessage("duplicate role left in anonymous association")
-      == "ILIC-NAME-DUPLICATE");
-   assert(diagnosticCodeForMessage("translation mismatch for B.x against A.x: mandatory")
-      == "ILIC-TRANSLATION-MISMATCH");
-   assert(diagnosticCodeForMessage("cardinality of extended role owner is not a subset of its base")
-      == "ILIC-CARDINALITY-RULE");
-   assert(diagnosticCodeForMessage("expression must return a boolean value")
-      == "ILIC-TYPE-MISMATCH");
-   assert(diagnosticCodeForMessage("unsupported iliversion 2.2")
-      == "ILIC-INPUT-UNSUPPORTED-VERSION");
-   assert(diagnosticCodeForMessage("an association requires at least two roles")
-      == "ILIC-ASSOCIATION-ROLE-COUNT");
-   assert(diagnosticCodeForMessage("topicname TopicB must match TopicA")
-      == "ILIC-NAME-END-MISMATCH");
-   assert(diagnosticCodeForMessage("PARENT is only valid in a normal inspection view")
-      == "ILIC-REFERENCE-RULE");
-   assert(diagnosticCodeForMessage("NotAnAssociation is no association")
-      == "ILIC-TYPE-MISMATCH");
 
    Log.reset();
    Log.displayErrors(false);

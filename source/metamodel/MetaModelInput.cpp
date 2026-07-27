@@ -185,8 +185,9 @@ namespace metamodel {
             size_t equals = option.find('=');
             string name = equals == string::npos ? "" : trim_copy(option.substr(0,equals));
             if (equals == string::npos || name.empty()) {
-               Log.error("invalid meta attribute; expected !!@ name=value",lineNumber,
-                  static_cast<int>(first == string::npos ? 0 : first),"ILIC-META-SYNTAX");
+               Log.error(DiagnosticId::MetaSyntax,
+                  "invalid meta attribute; expected !!@ name=value",lineNumber,
+                  static_cast<int>(first == string::npos ? 0 : first));
                continue;
             }
             PendingMetaAttribute attribute;
@@ -204,8 +205,9 @@ namespace metamodel {
       }
       if (!pending.empty()) {
          const PendingMetaAttribute &attribute = pending.front();
-         Log.error("meta attribute is not followed by a model element",attribute.Line,
-            attribute.Column,"ILIC-META-DANGLING");
+         Log.error(DiagnosticId::MetaDangling,
+            "meta attribute is not followed by a model element",attribute.Line,
+            attribute.Column);
       }
    }
 
@@ -408,7 +410,7 @@ namespace metamodel {
          }
       }
 
-      Log.error("model " + name + " not found.", line);
+      Log.error(DiagnosticId::NameModelNotFound,"model " + name + " not found.",line);
       return nullptr;
 
    }
@@ -426,7 +428,7 @@ namespace metamodel {
             return u;
          }
       }
-      Log.error("unknown topic " + name, line);
+      Log.error(DiagnosticId::NameTopicNotFound,"unknown topic " + name,line);
       return nullptr;
    }
 
@@ -439,7 +441,8 @@ namespace metamodel {
          if (get_path(pp) == get_path(p)) {
             if (pp->ElementInPackage == nullptr ||
                 pp->ElementInPackage != p->ElementInPackage) {
-               Log.error("multiple declarations of " + get_path(p),p->_line);
+               Log.error(DiagnosticId::NameMultipleDeclarations,
+                  "multiple declarations of " + get_path(p),diagnostic_range(p));
             }
             return;
          }
@@ -470,7 +473,7 @@ namespace metamodel {
             return p;
          }
       }
-      Log.error("unknown package " + package_name, line);
+      Log.error(DiagnosticId::NamePackageNotFound,"unknown package " + package_name,line);
       return nullptr;
    }
 
@@ -482,7 +485,7 @@ namespace metamodel {
          return static_cast<SubModel *>(p);
       }
       else {
-         Log.error(name + " is not a topic");
+         Log.error(DiagnosticId::ReferenceTopicRequired,name + " is not a topic",0);
          return nullptr;
       }         
    }
@@ -496,7 +499,8 @@ namespace metamodel {
       }
       for (Unit* uu : AllUnits) {
          if (get_path(uu) == get_path(u)) {
-            Log.error("multiple declaration of unit " + u->Name, u->_line);
+            Log.error(DiagnosticId::NameMultipleDeclarations,
+               "multiple declaration of unit " + u->Name,diagnostic_range(u));
             return;
          }
       }
@@ -548,7 +552,7 @@ namespace metamodel {
             return u;
          }
       }
-      Log.error("unknown unit " + name, line);
+      Log.error(DiagnosticId::NameUnitNotFound,"unknown unit " + name,line);
       return nullptr;
    }
 
@@ -573,7 +577,8 @@ namespace metamodel {
          if (get_path(tt) == get_path(t) && t->Name != "???") {
             if (tt->ElementInPackage == nullptr ||
                 tt->ElementInPackage != t->ElementInPackage) {
-               Log.error("multiple declarations of " + get_path(t),t->_line);
+               Log.error(DiagnosticId::NameMultipleDeclarations,
+                  "multiple declarations of " + get_path(t),diagnostic_range(t));
             }
             return;
          }
@@ -650,7 +655,9 @@ namespace metamodel {
                      first_unqualified_match = unqualified;
                   }
                   else {
-                     Log.error("ambiguous path " + search + " found in " + first_unqualified_match + " and " + unqualified,line);
+                     Log.error(DiagnosticId::NameAmbiguous,
+                        "ambiguous path " + search + " found in " +
+                           first_unqualified_match + " and " + unqualified,line);
                   }
                   found = t;
                   break;
@@ -668,7 +675,9 @@ namespace metamodel {
                      first_unqualified_match = unqualified;
                   }
                   else {
-                     Log.error("ambiguous path " + search + " found in " + first_unqualified_match + " and " + unqualified,line);
+                     Log.error(DiagnosticId::NameAmbiguous,
+                        "ambiguous path " + search + " found in " +
+                           first_unqualified_match + " and " + unqualified,line);
                   }
                   found = t;
                   break;
@@ -691,7 +700,7 @@ namespace metamodel {
       }
 
       if (error) {
-         Log.error("type " + search + " not found.", line);
+         Log.error(DiagnosticId::NameTypeNotFound,"type " + search + " not found.",line);
       }
 
       return nullptr;
@@ -752,12 +761,13 @@ namespace metamodel {
 
       Type* t = find_type(name, line, false);
       if (t == nullptr) {
-         Log.error("viewable " + name + " not found",line);
+         Log.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
          return nullptr;
       }
 
       if (t->getClass() != "Class" && t->getClass() != "View") {
-         Log.error(name + " is no class or view",line);
+         Log.error(DiagnosticId::ReferenceClassOrViewRequired,
+            name + " is no class or view",line);
          return nullptr;
       }
 
@@ -770,18 +780,20 @@ namespace metamodel {
 
       Type* t = find_type(name, line, false);
       if (t == nullptr) {
-         Log.error("viewable " + name + " not found",line);
+         Log.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
          return nullptr;
       }
 
       if (t->getClass() != "Class") {
-         Log.error(name + " is no class or structure",line);
+         Log.error(DiagnosticId::ReferenceClassOrStructureRequired,
+            name + " is no class or structure",line);
          return nullptr;
       }
       
       Class *c = static_cast<Class *>(t);
       if (c->Kind != Class::ClassVal && c->Kind != Class::Structure) {
-         Log.error(name + " is no class or structure",line);
+         Log.error(DiagnosticId::ReferenceClassOrStructureRequired,
+            name + " is no class or structure",line);
          return nullptr;
       }
 
@@ -794,12 +806,13 @@ namespace metamodel {
 
       Type* t = find_type(name, line, false);
       if (t == nullptr) {
-         Log.error("viewable " + name + " not found",line);
+         Log.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
          return nullptr;
       }
 
       if (t->getClass() != "Class") {
-         Log.error(name + " is no class, structure or association ",line);
+         Log.error(DiagnosticId::ReferenceClassStructureOrAssociationRequired,
+            name + " is no class, structure or association ",line);
          return nullptr;
       }
       
@@ -822,16 +835,16 @@ namespace metamodel {
       else {
          Type* t = find_type(name, line, false);
          if (t == nullptr) {
-            Log.error("class " + name + " not found",line);
+            Log.error(DiagnosticId::NameClassNotFound,"class " + name + " not found",line);
             return nullptr;
          }
          if (t->getClass() != "Class") {
-            Log.error(name + " is no class",line);
+            Log.error(DiagnosticId::ReferenceClassRequired,name + " is no class",line);
             return nullptr;
          }
          c = static_cast<Class *>(t);
          if (c->Kind != Class::ClassVal) {
-            Log.error(name + " is no class",line);
+            Log.error(DiagnosticId::ReferenceClassRequired,name + " is no class",line);
          }
       }
       return c;
@@ -851,7 +864,7 @@ namespace metamodel {
             }
          }
       }
-      Log.error("class " + name + " not found", line);
+      Log.error(DiagnosticId::NameClassNotFound,"class " + name + " not found",line);
       return nullptr;
    }
 
@@ -860,16 +873,17 @@ namespace metamodel {
       Log.debug("find_structure " + name);
       Type* t = find_type(name, line, false);
       if (t == nullptr) {
-         Log.error("structure " + name + " not found",line);
+         Log.error(DiagnosticId::NameStructureNotFound,
+            "structure " + name + " not found",line);
          return nullptr;
       }
       if (t->getClass() != "Class") {
-         Log.error(name + " is no structure",line);
+         Log.error(DiagnosticId::ReferenceStructureRequired,name + " is no structure",line);
          return nullptr;
       }
       Class *c = static_cast<Class *>(t);
       if (c->Kind != Class::Structure) {
-         Log.error(name + " is no structure",line);
+         Log.error(DiagnosticId::ReferenceStructureRequired,name + " is no structure",line);
       }
       return c;
    }
@@ -888,7 +902,8 @@ namespace metamodel {
             }
          }
       }
-      Log.error("structure " + name + " not found", line);
+      Log.error(DiagnosticId::NameStructureNotFound,
+         "structure " + name + " not found",line);
       return nullptr;
    }
 
@@ -897,7 +912,8 @@ namespace metamodel {
       Log.debug("find_association " + name);
       Type* t = find_type(name, line, false);
       if (t == nullptr) {
-         Log.error("association " + name + " not found",line);
+         Log.error(DiagnosticId::NameAssociationNotFound,
+            "association " + name + " not found",line);
          return nullptr;
       }
       ilic::SourceRange primaryRange = referenceRange;
@@ -910,11 +926,10 @@ namespace metamodel {
       }
       if (t->getClass() != "Class") {
          const string declaration = get_path(t);
-         Log.error(
+         Log.error(DiagnosticId::AssociationInvalidBaseKind,
             declaration + " is a " + diagnostic_type_kind(t) +
                ", but an ASSOCIATION is required as an association base",
             primaryRange,
-            "ILIC-ASSOCIATION-INVALID-BASE-KIND",
             related_information(t,"Base declaration: " + declaration)
          );
          return nullptr;
@@ -922,11 +937,10 @@ namespace metamodel {
       Class *c = static_cast<Class *>(t);
       if (c->Kind != Class::Association) {
          const string declaration = get_path(c);
-         Log.error(
+         Log.error(DiagnosticId::AssociationInvalidBaseKind,
             declaration + " is a " + diagnostic_type_kind(c) +
                ", but an ASSOCIATION is required as an association base",
             primaryRange,
-            "ILIC-ASSOCIATION-INVALID-BASE-KIND",
             related_information(c,"Base declaration: " + declaration)
          );
          return nullptr;
@@ -948,7 +962,8 @@ namespace metamodel {
             }
          }
       }
-      Log.error("association " + name + " not found", line);
+      Log.error(DiagnosticId::NameAssociationNotFound,
+         "association " + name + " not found",line);
       return nullptr;
    }
 
@@ -957,11 +972,11 @@ namespace metamodel {
       Log.debug("find_view " + name);
       Type* t = find_type(name, line, false);
       if (t == nullptr) {
-         Log.error("view " + name + " not found",line);
+         Log.error(DiagnosticId::NameViewNotFound,"view " + name + " not found",line);
          return nullptr;
       }
       if (t->getClass() != "View") {
-         Log.error(name + " is no view",line);
+         Log.error(DiagnosticId::ReferenceViewRequired,name + " is no view",line);
          return nullptr;
       }
       return static_cast<View *>(t);
@@ -1028,7 +1043,8 @@ namespace metamodel {
          return find_parameter(s,name,line);
       }
       else {
-         Log.error("parameter " + name + " not found", line);
+         Log.error(DiagnosticId::NameParameterNotFound,
+            "parameter " + name + " not found",line);
          return nullptr;
       }
    }
@@ -1050,7 +1066,8 @@ namespace metamodel {
          if (get_path(gg) == get_path(g)) {
             if (gg->ElementInPackage == nullptr ||
                 gg->ElementInPackage != g->ElementInPackage) {
-               Log.error("multiple declarations of " + get_path(g),g->_line);
+               Log.error(DiagnosticId::NameMultipleDeclarations,
+                  "multiple declarations of " + get_path(g),diagnostic_range(g));
             }
             return;
          }
@@ -1167,7 +1184,8 @@ namespace metamodel {
          }
       }
 
-      Log.error("function " + name + " not found", line);
+      Log.error(DiagnosticId::NameFunctionNotFound,
+         "function " + name + " not found",line);
       return nullptr;
 
    }
@@ -1208,7 +1226,8 @@ namespace metamodel {
          }
       }
 
-      Log.error("lineform " + name + " not found.", line);
+      Log.error(DiagnosticId::NameLineFormNotFound,
+         "lineform " + name + " not found.",line);
       return nullptr;
 
    }

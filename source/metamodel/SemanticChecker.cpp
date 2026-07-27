@@ -57,7 +57,17 @@ string diagnostic_type_name(Type *type)
    if (declared != nullptr && declared->ElementInPackage != nullptr) {
       return get_path(declared);
    }
-   return type == nullptr ? "unknown type" : type->getClass();
+   if (type == nullptr) return "unknown type";
+   if (dynamic_cast<FormattedType *>(type) != nullptr) return "FORMAT";
+   if (dynamic_cast<ReferenceType *>(type) != nullptr) return "REFERENCE";
+   if (auto text = dynamic_cast<TextType *>(type)) {
+      return text->Kind == TextType::MText ? "MTEXT" : "TEXT";
+   }
+   if (dynamic_cast<NumType *>(type) != nullptr) return "NUMERIC";
+   if (dynamic_cast<CoordType *>(type) != nullptr) return "COORD";
+   if (dynamic_cast<EnumType *>(type) != nullptr) return "ENUMERATION";
+   if (dynamic_cast<LineType *>(type) != nullptr) return "LINE";
+   return type->getClass();
 }
 
 void append_related(
@@ -205,7 +215,9 @@ bool validate_enum_literal(Expression *expression,const Descriptor &target,bool 
       });
    }
    if (!found) {
-      Log.error("enumeration value #" + constant->Value + " is not valid for the compared domain",expression->_line);
+      Log.error(DiagnosticId::EnumerationValueInvalid,
+         "enumeration value #" + constant->Value + " is not valid for the compared domain",
+         diagnostic_range(expression));
       return false;
    }
    constant->ResolvedType = target;
@@ -285,7 +297,9 @@ bool validate_formatted_literal(Expression *literal,const Descriptor &formatted)
    }
    auto type = dynamic_cast<FormattedType *>(formatted.DeclaredType);
    if (type == nullptr || !validate_standard_formatted_value(type,value)) {
-      Log.error("formatted value \"" + value + "\" is outside the domain format or range",literal->_line);
+      Log.error(DiagnosticId::TypeFormattedValueOutOfRange,
+         "formatted value \"" + value + "\" is outside the domain format or range",
+         diagnostic_range(literal));
       return false;
    }
    return true;
@@ -486,7 +500,8 @@ bool validate_unique_enum_nodes(EnumNode *parent,const string &prefix)
       }
       string path = prefix.empty() ? node->Name : prefix + "." + node->Name;
       if (!siblings.insert(node->Name).second) {
-         Log.error("duplicate enumeration element " + path,node->_line);
+         Log.error(DiagnosticId::EnumerationDuplicateElement,
+            "duplicate enumeration element " + path,diagnostic_range(node));
          valid = false;
       }
       if (!validate_unique_enum_nodes(node,path)) {
@@ -508,7 +523,8 @@ void validate_enum_extension_nodes(EnumNode *parent,const string &prefix,
       }
       string path = prefix.empty() ? node->Name : prefix + "." + node->Name;
       if (baseValues.find(path) != baseValues.end() && node->Node.empty() && !node->Final) {
-         Log.error("enumeration extension duplicates element " + path,node->_line);
+         Log.error(DiagnosticId::EnumerationExtensionDuplicate,
+            "enumeration extension duplicates element " + path,diagnostic_range(node));
       }
       validate_enum_extension_nodes(node,path,baseValues);
    }
@@ -762,7 +778,8 @@ public:
       if (auto unary = dynamic_cast<UnaryExpr *>(expression)) {
          Descriptor operand = evaluate(unary->SubExpression,domain);
          if (unary->Operation == UnaryExpr::Not) {
-            require(operand,Kind::Boolean,"logical expression required",expression->_line);
+            require(operand,Kind::Boolean,DiagnosticId::ExpressionLogicalRequired,
+               "logical expression required",expression);
             result.Kind = Kind::Boolean;
          }
          else if (unary->Operation == UnaryExpr::Defined) {
@@ -823,30 +840,37 @@ public:
       if (domain != nullptr &&
           (dynamic_cast<ClassRefType *>(canonical_declared_type(domain)) != nullptr ||
            dynamic_cast<AttributeRefType *>(canonical_declared_type(domain)) != nullptr)) {
-         Log.error("domain constraints are not supported for CLASS, STRUCTURE, or ATTRIBUTE domains",constraint->_line);
+         Log.error(DiagnosticId::ConstraintDomainTargetUnsupported,
+            "domain constraints are not supported for CLASS, STRUCTURE, or ATTRIBUTE domains",
+            diagnostic_range(constraint));
       }
 
       if (auto simple = dynamic_cast<SimpleConstraint *>(constraint)) {
          Descriptor value = evaluate(simple->LogicalExpression,domain);
-         require(value,Kind::Boolean,"logical expression required",constraint->_line);
+         require(value,Kind::Boolean,DiagnosticId::ExpressionLogicalRequired,
+            "logical expression required",constraint);
       }
       else if (auto existence = dynamic_cast<ExistenceConstraint *>(constraint)) {
          Descriptor required = evaluate(existence->Attr,domain);
          for (ExistenceDef *candidate : existence->ExistsIn) {
             Descriptor available = evaluate(candidate,domain);
             if (!equality_compatible(existence->Attr,required,candidate,available,false)) {
-               Log.error("existence constraint paths have incompatible datatypes",constraint->_line);
+               Log.error(DiagnosticId::ConstraintExistenceTypeMismatch,
+                  "existence constraint paths have incompatible datatypes",
+                  diagnostic_range(constraint));
             }
          }
       }
       else if (auto unique = dynamic_cast<UniqueConstraint *>(constraint)) {
          for (Expression *where : unique->Where) {
-            require(evaluate(where,domain),Kind::Boolean,"logical expression required",where->_line);
+            require(evaluate(where,domain),Kind::Boolean,
+               DiagnosticId::ExpressionLogicalRequired,"logical expression required",where);
          }
          if (unique->PerBasket && unique->Kind == UniqueConstraint::LocalU) {
             // RefHB 2.4 section 3.12 and ili2c uniquenessConstraint: LOCAL is
             // already scoped by its owning object and cannot also be BASKET.
-            Log.error("UNIQUE cannot combine BASKET and LOCAL",constraint->_line);
+            Log.error(DiagnosticId::ConstraintUniqueBasketLocal,
+               "UNIQUE cannot combine BASKET and LOCAL",diagnostic_range(constraint));
          }
          for (PathOrInspFactor *path : unique->UniqueDef) {
             evaluate(path,domain);
@@ -863,8 +887,9 @@ public:
                if (auto attribute = dynamic_cast<AttrOrParam *>(element->Ref)) {
                   Multiplicity cardinality = attribute_cardinality(attribute->Type);
                   if (cardinality.Max < 0 || cardinality.Max > 1) {
-                     Log.error("global UNIQUE path contains multivalued attribute " +
-                               attribute->Name,constraint->_line);
+                     Log.error(DiagnosticId::ConstraintGlobalUniqueMultivalueAttribute,
+                        "global UNIQUE path contains multivalued attribute " +
+                           attribute->Name,diagnostic_range(constraint));
                   }
                }
                else if (auto role = dynamic_cast<Role *>(element->Ref)) {
@@ -877,8 +902,9 @@ public:
                   }
                   Multiplicity cardinality = effective_role_cardinality(role);
                   if (cardinality.Max < 0 || cardinality.Max > 1) {
-                     Log.error("global UNIQUE path contains multivalued role " +
-                               role->Name,constraint->_line);
+                     Log.error(DiagnosticId::ConstraintGlobalUniqueMultivalueRole,
+                        "global UNIQUE path contains multivalued role " +
+                           role->Name,diagnostic_range(constraint));
                   }
                }
             }
@@ -886,12 +912,15 @@ public:
       }
       else if (auto set = dynamic_cast<SetConstraint *>(constraint)) {
          if (set->ToClass != nullptr && set->ToClass->Kind == Class::Structure) {
-            Log.error("SET CONSTRAINT is not allowed in a STRUCTURE",constraint->_line);
+            Log.error(DiagnosticId::ConstraintSetOnStructure,
+               "SET CONSTRAINT is not allowed in a STRUCTURE",diagnostic_range(constraint));
          }
          for (Expression *where : set->Where) {
-            require(evaluate(where,domain),Kind::Boolean,"logical expression required",where->_line);
+            require(evaluate(where,domain),Kind::Boolean,
+               DiagnosticId::ExpressionLogicalRequired,"logical expression required",where);
          }
-         require(evaluate(set->Constraint,domain),Kind::Boolean,"logical expression required",constraint->_line);
+         require(evaluate(set->Constraint,domain),Kind::Boolean,
+            DiagnosticId::ExpressionLogicalRequired,"logical expression required",constraint);
       }
    }
 
@@ -923,19 +952,21 @@ public:
          }
          if (auto graphic = dynamic_cast<Graphic *>(element)) {
             require_topic_dependency(containing_topic(graphic),
-                                     containing_topic(graphic->Base),graphic->_line,
+                                     containing_topic(graphic->Base),graphic,
                                      "graphic base");
-            require(evaluate(graphic->Where),Kind::Boolean,"logical expression required",graphic->_line);
+            require(evaluate(graphic->Where),Kind::Boolean,
+               DiagnosticId::ExpressionLogicalRequired,"logical expression required",graphic);
          }
          if (auto basket = dynamic_cast<MetaBasketDef *>(element)) {
             require_model_import(containing_model(basket),
                                  basket->MetaDataTopic == nullptr ? nullptr :
                                     containing_model(basket->MetaDataTopic->ElementInPackage),
-                                 basket->_line,"metadata basket topic");
+                                 basket,"metadata basket topic");
          }
          if (auto rule = dynamic_cast<DrawingRule *>(element)) {
             for (CondSignParamAssignment *assignment : rule->Rule) {
-               require(evaluate(assignment->Where),Kind::Boolean,"logical expression required",rule->_line);
+               require(evaluate(assignment->Where),Kind::Boolean,
+                  DiagnosticId::ExpressionLogicalRequired,"logical expression required",rule);
                for (SignParamAssignment *parameter : assignment->Assignments) {
                   evaluate(parameter->Assignment);
                }
@@ -965,8 +996,9 @@ private:
          DomainType *generic = definition->GenericDomain.front();
          auto genericCoordinate = dynamic_cast<CoordType *>(generic);
          if (genericCoordinate == nullptr || !generic->Generic) {
-            Log.error("context " + context->Name + " requires a GENERIC coordinate domain",
-                      definition->_line);
+            Log.error(DiagnosticId::GenericContextDefaultDomainRequired,
+               "context " + context->Name + " requires a GENERIC coordinate domain",
+               diagnostic_range(definition));
             continue;
          }
 
@@ -989,21 +1021,21 @@ private:
                   "Concrete coordinate domain: " + get_path(concrete));
                append_related(related,generic,
                   "Generic coordinate domain: " + get_path(generic));
-               Log.error(
+               Log.error(DiagnosticId::GenericCoordRangeMismatch,
                   "context mapping " + get_path(concrete) + " to " +
                      get_path(generic) + " is outside the generic coordinate " +
                      "range on axis " + to_string(fit.Axis) + ": " + bound +
                      " " + fit.Actual + " " + relation + " " + fit.Expected,
                   diagnostic_range(definition),
-                  "ILIC-GENERIC-COORD-RANGE-MISMATCH",
                   std::move(related)
                );
                continue;
             }
             if (!fit.fits()) {
-               Log.error("concrete domain " + (concrete == nullptr ? string("???") : concrete->Name) +
-                         " is not a compatible specialization of generic domain " + generic->Name,
-                         definition->_line);
+               Log.error(DiagnosticId::GenericContextConcreteDomainIncompatible,
+                  "concrete domain " + (concrete == nullptr ? string("???") : concrete->Name) +
+                     " is not a compatible specialization of generic domain " + generic->Name,
+                  diagnostic_range(definition));
                continue;
             }
             if (imported == nullptr) {
@@ -1017,9 +1049,10 @@ private:
                }
             }
             if (!allowed) {
-               Log.error("concrete domain " + concrete->Name +
-                         " does not extend a concrete domain from the imported context",
-                         definition->_line);
+               Log.error(DiagnosticId::GenericContextImportedDomainExtensionRequired,
+                  "concrete domain " + concrete->Name +
+                     " does not extend a concrete domain from the imported context",
+                  diagnostic_range(definition));
             }
          }
       }
@@ -1135,35 +1168,42 @@ private:
          }
          deferred.insert(domain);
          if (!domain->Generic || dynamic_cast<CoordType *>(domain) == nullptr) {
-            Log.error("DEFERRED GENERICS requires a GENERIC coordinate domain",
-                      reference.Line);
+            Log.error(DiagnosticId::GenericDeferredCoordinateDomainRequired,
+               "DEFERRED GENERICS requires a GENERIC coordinate domain",
+               diagnostic_range(topic));
          }
          if (visible_generic_definition(model,domain) == nullptr) {
-            Log.error("deferred generic domain " + domain->Name + " has no visible context",
-                      reference.Line);
+            Log.error(DiagnosticId::GenericDeferredContextRequired,
+               "deferred generic domain " + domain->Name + " has no visible context",
+               diagnostic_range(topic));
          }
          if (used.find(domain) == used.end()) {
-            Log.error("deferred generic domain " + domain->Name + " is not used by topic " +
-                      topic->Name,reference.Line);
+            Log.error(DiagnosticId::GenericDeferredDomainUnused,
+               "deferred generic domain " + domain->Name + " is not used by topic " +
+                  topic->Name,diagnostic_range(topic));
          }
       }
 
       for (DomainType *domain : used) {
          GenericDef *definition = visible_generic_definition(model,domain);
          if (definition == nullptr) {
-            Log.error("generic domain " + domain->Name + " has no visible context",topic->_line);
+            Log.error(DiagnosticId::GenericDeferredContextRequired,
+               "generic domain " + domain->Name + " has no visible context",
+               diagnostic_range(topic));
          }
          else if (definition->ConcreteDomain.size() > 1 && deferred.find(domain) == deferred.end()) {
-            Log.error("generic domain " + domain->Name + " must be listed in DEFERRED GENERICS",
-                      topic->_line);
+            Log.error(DiagnosticId::GenericDeferredListingRequired,
+               "generic domain " + domain->Name + " must be listed in DEFERRED GENERICS",
+               diagnostic_range(topic));
          }
       }
    }
 
-   void require(const Descriptor &descriptor,Kind expected,const string &message,int line)
+   void require(const Descriptor &descriptor,Kind expected,DiagnosticId id,
+                const string &message,const MMObject *owner)
    {
       if (descriptor.Kind != Kind::Unknown && descriptor.Kind != expected) {
-         Log.error(message,line);
+         Log.error(id,message,diagnostic_range(owner));
       }
    }
 
@@ -1181,7 +1221,7 @@ private:
          target = role->_baseclass;
       }
       require_topic_dependency(containing_topic(path->OccurrencePackage),
-                               containing_topic(target),path->_line,"object path");
+                               containing_topic(target),path,"object path");
       if (terminal->Kind == PathEl::This) {
          DomainType *valueDomain = domain != nullptr ? domain : dynamic_cast<DomainType *>(path->OccurrenceScope);
          if (valueDomain != nullptr) {
@@ -1217,7 +1257,8 @@ private:
          case CompoundExpr_OperationType::Or:
          case CompoundExpr_OperationType::Implication:
             for (const Descriptor &type : types) {
-               require(type,Kind::Boolean,"logical expression required",compound->_line);
+               require(type,Kind::Boolean,DiagnosticId::ExpressionLogicalRequired,
+                  "logical expression required",compound);
             }
             result.Kind = Kind::Boolean;
             break;
@@ -1226,14 +1267,16 @@ private:
          case CompoundExpr_OperationType::Mult:
          case CompoundExpr_OperationType::Div:
             for (const Descriptor &type : types) {
-               require(type,Kind::Numeric,"numeric expression required",compound->_line);
+               require(type,Kind::Numeric,DiagnosticId::ExpressionNumericRequired,
+                  "numeric expression required",compound);
             }
             result.Kind = Kind::Numeric;
             break;
          case CompoundExpr_OperationType::Relation_Equal:
          case CompoundExpr_OperationType::Relation_NotEqual:
             if (operands.size() >= 2 && !equality_compatible(operands[0],types[0],operands[1],types[1],true)) {
-               Log.error("incompatible datatypes",compound->_line);
+               Log.error(DiagnosticId::ExpressionComparisonTypeMismatch,
+                  "incompatible datatypes",diagnostic_range(compound));
             }
             result.Kind = Kind::Boolean;
             break;
@@ -1242,7 +1285,9 @@ private:
          case CompoundExpr_OperationType::Relation_Greater:
          case CompoundExpr_OperationType::Relation_GreaterOrEqual:
             if (operands.size() >= 2 && !ordering_compatible(operands[0],types[0],operands[1],types[1])) {
-               Log.error("incompatible datatypes for ordering comparison",compound->_line);
+               Log.error(DiagnosticId::ExpressionOrderingTypeMismatch,
+                  "incompatible datatypes for ordering comparison",
+                  diagnostic_range(compound));
             }
             result.Kind = Kind::Boolean;
             break;
@@ -1360,7 +1405,9 @@ private:
                                 expected.Viewable->Name == "ANYSTRUCTURE" &&
                                 (supplied.Kind == Kind::Object || supplied.Kind == Kind::Structure);
             if (!anyStructure && !equality_compatible(argument->Expression,supplied,nullptr,expected,false)) {
-               Log.error("incompatible function argument type for " + call->Function->Name,argument->_line);
+               Log.error(DiagnosticId::FunctionArgumentTypeMismatch,
+                  "incompatible function argument type for " + call->Function->Name,
+                  diagnostic_range(argument));
             }
          }
          ++formal;
@@ -1395,12 +1442,14 @@ private:
                dynamic_cast<ObjectType *>(attribute->Type);
             if (object != nullptr) {
                require_topic_dependency(containing_topic(view),
-                                        containing_topic(object->_baseclass),view->_line,
+                                        containing_topic(object->_baseclass),view,
                                         "view base");
             }
          }
          if (view->Where != nullptr) {
-            require(evaluate(view->Where),Kind::Boolean,"logical expression required",view->Where->_line);
+            require(evaluate(view->Where),Kind::Boolean,
+               DiagnosticId::ExpressionLogicalRequired,"logical expression required",
+               view->Where);
          }
          for (Expression *parameter : view->FormationParameter) evaluate(parameter);
       }
@@ -1422,13 +1471,12 @@ private:
           topic != baseTopic && package_is_same_or_extension(topic,baseTopic)) {
          const string viewablePath = get_path(viewable);
          const string basePath = get_path(base);
-         Log.error(
+         Log.error(DiagnosticId::ClassExtendedRequired,
             declaration_kind(viewable) + " " + viewablePath + " in TOPIC " +
                get_path(topic) + " extends same-named " + declaration_kind(base) +
                " " + basePath + " from extended TOPIC " + get_path(baseTopic) +
                "; declare " + viewable->Name + " using the EXTENDED form",
             diagnostic_range(viewable),
-            "ILIC-CLASS-EXTENDED-REQUIRED",
             related_information(base,"Base declaration: " + basePath)
          );
          return;
@@ -1449,9 +1497,10 @@ private:
                continue;
             }
             if (extended_class_chain_contains(viewable,otherBase)) {
-               Log.error("class or structure " + viewable->Name +
-                         " cannot be EXTENDED because " + other->Name +
-                         " specializes the same base",viewable->_line);
+               Log.error(DiagnosticId::ClassSpecializationConflict,
+                  "class or structure " + viewable->Name +
+                     " cannot be EXTENDED because " + other->Name +
+                     " specializes the same base",diagnostic_range(viewable));
                return;
             }
          }
@@ -1500,9 +1549,10 @@ private:
             }
          }
          if (!concretized) {
-            Log.error("concrete topic " + topic->Name +
-                      " contains abstract class " + abstractClass->Name +
-                      " without a concrete extension",topic->_line);
+            Log.error(DiagnosticId::ClassAbstractInConcreteTopic,
+               "concrete topic " + topic->Name +
+                  " contains abstract class " + abstractClass->Name +
+                  " without a concrete extension",diagnostic_range(topic));
          }
       }
    }
@@ -1520,12 +1570,11 @@ private:
          if (existing != localNames.end()) {
             MetaElement *first = existing->second;
             const string container = get_path(package);
-            Log.error(
+            Log.error(DiagnosticId::NamespaceDuplicateDeclaration,
                declaration_kind(element) + " " + element->Name +
                   " duplicates " + declaration_kind(first) + " " + first->Name +
                   " in " + declaration_kind(package) + " " + container,
                diagnostic_range(element),
-               "ILIC-NAMESPACE-DUPLICATE-DECLARATION",
                related_information(first,
                   "First declaration: " + declaration_kind(first) + " " +
                      get_path(first))
@@ -1543,8 +1592,9 @@ private:
                continue;
             }
             if (!runtimeParameterNames.insert(parameter->Name).second) {
-               Log.error("duplicate runtime parameter " + parameter->Name + " in model " + model->Name,
-                         parameter->_line);
+               Log.error(DiagnosticId::ModelRuntimeParameterDuplicate,
+                  "duplicate runtime parameter " + parameter->Name + " in model " +
+                     model->Name,diagnostic_range(parameter));
             }
          }
       }
@@ -1578,8 +1628,9 @@ private:
          bool sameNameSpecialization = viewable != nullptr &&
             viewable->Super == inherited->second && !viewable->Extended;
          if (!explicitOverride && !sameNameSpecialization) {
-            Log.error("declaration " + element->Name + " in topic " + topic->Name +
-                      " conflicts with an inherited declaration",element->_line);
+            Log.error(DiagnosticId::NamespaceInheritedDeclarationConflict,
+               "declaration " + element->Name + " in topic " + topic->Name +
+                  " conflicts with an inherited declaration",diagnostic_range(element));
          }
       }
    }
@@ -1589,8 +1640,9 @@ private:
       unordered_set<string> names;
       for (AttrOrParam *attribute : viewable->ClassAttribute) {
          if (attribute != nullptr && !names.insert(attribute->Name).second) {
-            Log.error("duplicate attribute or view-base name " + attribute->Name +
-                      " in " + viewable->Name,attribute->_line);
+            Log.error(DiagnosticId::NamespaceMemberDuplicate,
+               "duplicate attribute or view-base name " + attribute->Name +
+                  " in " + viewable->Name,diagnostic_range(attribute));
          }
       }
    }
@@ -1618,7 +1670,9 @@ private:
                (!axis->Min.empty() ? axis->Min : axis->Max);
             if (!coordinateLimit.empty() &&
                 decimal_accuracy(line->MaxOverlap) != decimal_accuracy(coordinateLimit)) {
-               Log.error("line overlap must use the coordinate domain precision",line->_line);
+               Log.error(DiagnosticId::TypeLineOverlapPrecision,
+                  "line overlap must use the coordinate domain precision",
+                  diagnostic_range(line));
             }
          }
       }
@@ -1631,12 +1685,14 @@ private:
          if (dynamic_cast<FormattedType *>(numeric) == nullptr &&
              !numeric->Min.empty() && !numeric->Max.empty() &&
              compare_exact_decimal(numeric->Min,numeric->Max) > 0) {
-            Log.error("minimum value must not exceed maximum value",numeric->_line);
+            Log.error(DiagnosticId::ValueMinimumExceedsMaximum,
+               "minimum value must not exceed maximum value",
+               diagnostic_range(numeric));
          }
          require_model_import(occurrenceModel,
                               numeric->Unit == nullptr ? nullptr :
                                  containing_model(numeric->Unit),
-                              numeric->_line,"unit reference");
+                              numeric,"unit reference");
       }
       if (auto multi = dynamic_cast<MultiValue *>(type)) {
          check_type(multi->BaseType,occurrenceModel);
@@ -1657,12 +1713,14 @@ private:
       Multiplicity baseCardinality = attribute_cardinality(base->Type);
       Multiplicity cardinality = attribute_cardinality(attribute->Type);
       if (!cardinality_is_subset(cardinality,baseCardinality)) {
-         Log.error("cardinality of extended attribute " + attribute->Name +
-                   " is not a subset of its base",attribute->_line);
+         Log.error(DiagnosticId::AttributeCardinalityExtension,
+            "cardinality of extended attribute " + attribute->Name +
+               " is not a subset of its base",diagnostic_range(attribute));
       }
       if (attribute->Transient != base->Transient) {
-         Log.error("TRANSIENT mode of extended attribute " + attribute->Name +
-                   " differs from its base",attribute->_line);
+         Log.error(DiagnosticId::AttributeExtensionTransient,
+            "TRANSIENT mode of extended attribute " + attribute->Name +
+               " differs from its base",diagnostic_range(attribute));
       }
 
       Type *baseDeclared = canonical_declared_type(base->Type);
@@ -1677,11 +1735,10 @@ private:
             "Base attribute: " + get_path(base) + " uses " + expectedType);
          append_related(related,baseDeclared,
             "Expected base domain: " + expectedType);
-         Log.error(
+         Log.error(DiagnosticId::AttributeIncompatibleExtension,
             "extended attribute " + get_path(attribute) + " uses " + actualType +
                ", but its type must extend " + expectedType,
             diagnostic_range(attribute),
-            "ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION",
             std::move(related)
          );
          return;
@@ -1690,11 +1747,10 @@ private:
       if (base->Type->getClass() != attribute->Type->getClass()) {
          const string actualType = diagnostic_type_name(attribute->Type);
          const string expectedType = diagnostic_type_name(base->Type);
-         Log.error(
+         Log.error(DiagnosticId::AttributeIncompatibleExtension,
             "extended attribute " + get_path(attribute) + " uses " + actualType +
                ", but its type must be compatible with " + expectedType,
             diagnostic_range(attribute),
-            "ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION",
             related_information(base,
                "Base attribute: " + get_path(base) + " uses " + expectedType)
          );
@@ -1703,11 +1759,15 @@ private:
       if (auto text = dynamic_cast<TextType *>(attribute->Type)) {
          auto baseText = static_cast<TextType *>(base->Type);
          if (text->Kind != baseText->Kind) {
-            Log.error("TEXT and MTEXT kinds may not change in an attribute extension",attribute->_line);
+            Log.error(DiagnosticId::AttributeExtensionTextKind,
+               "TEXT and MTEXT kinds may not change in an attribute extension",
+               diagnostic_range(attribute));
          }
          if (baseText->MaxLength >= 0 &&
              (text->MaxLength < 0 || text->MaxLength > baseText->MaxLength)) {
-            Log.error("text length of extended attribute exceeds its base",attribute->_line);
+            Log.error(DiagnosticId::AttributeExtensionTextLength,
+               "text length of extended attribute exceeds its base",
+               diagnostic_range(attribute));
          }
       }
       if (attribute->TypeExplicitlyDefined) {
@@ -1723,28 +1783,38 @@ private:
       if (auto multi = dynamic_cast<MultiValue *>(attribute->Type)) {
          auto baseMulti = static_cast<MultiValue *>(base->Type);
          if (baseMulti->Ordered && !multi->Ordered) {
-            Log.error("an extended LIST attribute may not become an unordered BAG",attribute->_line);
+            Log.error(DiagnosticId::AttributeExtensionListOrdering,
+               "an extended LIST attribute may not become an unordered BAG",
+               diagnostic_range(attribute));
          }
          auto target = dynamic_cast<Class *>(multi->BaseType);
          auto baseTarget = dynamic_cast<Class *>(baseMulti->BaseType);
          if (target != nullptr && baseTarget != nullptr &&
              !class_is_same_or_extension(target,baseTarget)) {
-            Log.error("structure target of extended attribute does not extend its base",attribute->_line);
+            Log.error(DiagnosticId::AttributeExtensionStructureTarget,
+               "structure target of extended attribute does not extend its base",
+               diagnostic_range(attribute));
          }
       }
    }
 
-   void require_model_import(Model *source,Model *target,int line,const string &kind)
+   void require_model_import(Model *source,Model *target,const MMObject *owner,
+                             const string &kind)
    {
       if (!model_imports_directly(source,target)) {
-         Log.error(kind + " requires model " + source->Name + " to import " + target->Name,line);
+         Log.error(DiagnosticId::ModelImportRequired,
+            kind + " requires model " + source->Name + " to import " + target->Name,
+            diagnostic_range(owner));
       }
    }
 
-   void require_topic_dependency(SubModel *source,SubModel *target,int line,const string &kind)
+   void require_topic_dependency(SubModel *source,SubModel *target,const MMObject *owner,
+                                 const string &kind)
    {
       if (!topic_has_dependency(source,target)) {
-         Log.error(kind + " requires topic " + source->Name + " to depend on " + target->Name,line);
+         Log.error(DiagnosticId::TopicDependencyRequired,
+            kind + " requires topic " + source->Name + " to depend on " + target->Name,
+            diagnostic_range(owner));
       }
    }
 
@@ -1761,15 +1831,17 @@ private:
          if (!roleNames.insert(role->Name).second) {
             const string associationName = association->Name.empty() || association->Name == "???"
                ? "anonymous association" : "association \"" + association->Name + "\"";
-            Log.error(
+            Log.error(DiagnosticId::AssociationDuplicateRole,
                "duplicate role \"" + role->Name + "\" in " + associationName,
-               role->_line,0,"ILIC-ASSOCIATION-DUPLICATE-ROLE");
+               diagnostic_range(role));
          }
          if (role->Strongness != Role::Assoc) {
             ++aggregateRoles;
          }
          if (role->_baseclass != nullptr && role->_baseclass->Kind == Class::Structure) {
-            Log.error("role " + role->Name + " may only reference a class or association",role->_line);
+            Log.error(DiagnosticId::ReferenceClassOrAssociationRequired,
+               "role " + role->Name + " may only reference a class or association",
+               diagnostic_range(role));
          }
 
          auto associationTopic = dynamic_cast<SubModel *>(association->ElementInPackage);
@@ -1777,37 +1849,53 @@ private:
             dynamic_cast<SubModel *>(role->_baseclass->ElementInPackage);
          if (associationTopic != nullptr && targetTopic != nullptr &&
              !package_is_same_or_extension(associationTopic,targetTopic) && !role->External) {
-            Log.error("cross-topic role " + role->Name + " requires EXTERNAL",role->_line);
+            Log.error(DiagnosticId::ReferenceExternalRequired,
+               "cross-topic role " + role->Name + " requires EXTERNAL",
+               diagnostic_range(role));
          }
 
          Multiplicity cardinality = effective_role_cardinality(role);
          if (role->Strongness == Role::Comp && (cardinality.Max < 0 || cardinality.Max > 1)) {
-            Log.error("composition role " + role->Name + " has maximum cardinality greater than 1",role->_line);
+            Log.error(DiagnosticId::RoleCompositionCardinality,
+               "composition role " + role->Name +
+                  " has maximum cardinality greater than 1",diagnostic_range(role));
          }
 
          if (auto base = dynamic_cast<Role *>(role->Super)) {
             Multiplicity baseCardinality = effective_role_cardinality(base);
             if (!cardinality_is_subset(cardinality,baseCardinality)) {
-               Log.error("cardinality of extended role " + role->Name + " is not a subset of its base",role->_line);
+               Log.error(DiagnosticId::RoleCardinalityExtension,
+                  "cardinality of extended role " + role->Name +
+                     " is not a subset of its base",diagnostic_range(role));
             }
             if (role->Strongness < base->Strongness) {
-               Log.error("extended role " + role->Name + " weakens its aggregation strength",role->_line);
+               Log.error(DiagnosticId::RoleExtensionStrength,
+                  "extended role " + role->Name + " weakens its aggregation strength",
+                  diagnostic_range(role));
             }
             if (role->_baseclass != nullptr && base->_baseclass != nullptr &&
                 !class_is_same_or_extension(role->_baseclass,base->_baseclass)) {
-               Log.error("target of extended role " + role->Name + " does not extend its base target",role->_line);
+               Log.error(DiagnosticId::RoleExtensionTarget,
+                  "target of extended role " + role->Name +
+                     " does not extend its base target",diagnostic_range(role));
             }
             if (base->Ordered && !role->Ordered && cardinality.Max != 1) {
-               Log.error("extended role " + role->Name + " removes ordering",role->_line);
+               Log.error(DiagnosticId::RoleExtensionOrdering,
+                  "extended role " + role->Name + " removes ordering",
+                  diagnostic_range(role));
             }
          }
       }
 
       if (aggregateRoles > 1) {
-         Log.error("an association may have only one aggregation or composition role",association->_line);
+         Log.error(DiagnosticId::AssociationMultipleAggregationRoles,
+            "an association may have only one aggregation or composition role",
+            diagnostic_range(association));
       }
       if (aggregateRoles == 1 && association->Role.size() > 2) {
-         Log.error("aggregation and composition associations must be binary",association->_line);
+         Log.error(DiagnosticId::AssociationAggregationBinary,
+            "aggregation and composition associations must be binary",
+            diagnostic_range(association));
       }
    }
 };

@@ -6,6 +6,7 @@
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 antlrcpp::Any Ili2Input::visitPath(parser::Ili2Parser::PathContext * ctx)
 {
@@ -100,7 +101,9 @@ antlrcpp::Any Ili2Input::visitRestrictedRef(parser::Ili2Parser::RestrictedRefCon
    
    for (auto c : r->_classrestriction) {
       if (!c->isSubClassOf(r->_baseclass->getClass())) {
-         Log.error(c->getClass() + " is no extension of " + r->_baseclass->getClass(),c->_line);
+         Log.error(DiagnosticId::InheritanceTargetRequired,
+            c->getClass() + " is no extension of " + r->_baseclass->getClass(),
+            c->_line);
       }
    }
       
@@ -256,7 +259,8 @@ AttrOrParam *find_contextual_attribute(Class *base,Package *scope,const string &
    list<AttrOrParam *> matches;
    find_contextual_attributes(base,scope,name,matches);
    if (matches.size() > 1) {
-      Log.error("ambiguous contextual attribute " + name + " from " + get_path(base),line);
+      Log.error(DiagnosticId::NameAmbiguous,
+         "ambiguous contextual attribute " + name + " from " + get_path(base),line);
       return nullptr;
    }
    return matches.empty() ? nullptr : matches.front();
@@ -283,7 +287,8 @@ MetaElement *resolve_through_view_bases(View *view,Package *scope,string name,Cl
          continue;
       }
       if (found != nullptr && found != candidate) {
-         Log.error("ambiguous path element " + name + " in view " + get_path(view),line);
+         Log.error(DiagnosticId::NameAmbiguous,
+            "ambiguous path element " + name + " in view " + get_path(view),line);
          return nullptr;
       }
       found = candidate;
@@ -314,7 +319,8 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
       if (state.enclosingView == nullptr ||
           state.enclosingView->FormationKind != View::Inspection_Normal ||
           state.enclosingView->_inspectionParent == nullptr) {
-         Log.error("PARENT is only valid in a normal inspection view",get_line(ctx));
+         Log.error(DiagnosticId::ReferenceParentViewRequired,
+            "PARENT is only valid in a normal inspection view",get_line(ctx));
          state.current = nullptr;
       }
       else {
@@ -330,8 +336,10 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
       if (state.enclosingView == nullptr ||
           state.enclosingView->FormationKind != View::Inspection_Area ||
           state.enclosingView->_inspectionParent == nullptr) {
-         Log.error(string(thatArea ? "THATAREA" : "THISAREA") +
-                   " is only valid in an area inspection view",get_line(ctx));
+         Log.error(thatArea ? DiagnosticId::ReferenceThatAreaViewRequired :
+            DiagnosticId::ReferenceThisAreaViewRequired,
+            string(thatArea ? "THATAREA" : "THISAREA") +
+               " is only valid in an area inspection view",get_line(ctx));
          state.current = nullptr;
       }
       else {
@@ -363,20 +371,23 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
       element->Ref = alias;
       state.current = alias == nullptr ? nullptr : path_target(alias->Type);
       if (alias == nullptr) {
-         Log.error("AGGREGATES has no aggregation base",get_line(ctx));
+         Log.error(DiagnosticId::ReferenceAggregatesBaseRequired,
+            "AGGREGATES has no aggregation base",get_line(ctx));
       }
       return element;
    }
 
    if (object->name == nullptr) {
-      Log.error("path element has no name",get_line(ctx));
+      Log.error(DiagnosticId::ReferencePathElementNameRequired,
+         "path element has no name",get_line(ctx));
       state.current = nullptr;
       return element;
    }
 
    string name = object->name->getText();
    if (state.current == nullptr) {
-      Log.error("path element " + name + " has no viewable context",get_line(ctx));
+      Log.error(DiagnosticId::ReferenceViewableContextRequired,
+         "path element " + name + " has no viewable context",get_line(ctx));
       return element;
    }
 
@@ -419,7 +430,9 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
       }
    }
 
-   Log.error("path element " + name + " not found in " + get_path(state.current),get_line(ctx));
+   Log.error(DiagnosticId::ReferencePathElementNotFound,
+      "path element " + name + " not found in " + get_path(state.current),
+      get_line(ctx));
    state.current = nullptr;
    return element;
 }

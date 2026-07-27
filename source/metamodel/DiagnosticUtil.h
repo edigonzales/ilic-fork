@@ -19,6 +19,21 @@ inline ilic::SourceRange diagnostic_range(const MMObject *object)
    return object->_source;
 }
 
+inline ilic::SourceRange diagnostic_reference_range(
+   const MMObject *object,
+   const std::string &kind
+)
+{
+   if (object == nullptr) {
+      return {};
+   }
+   const auto found = object->_referenceSources.find(kind);
+   if (found != object->_referenceSources.end() && found->second.valid) {
+      return found->second;
+   }
+   return diagnostic_range(object);
+}
+
 inline MetaElement *diagnostic_owner(MetaElement *element)
 {
    if (auto node = dynamic_cast<EnumNode *>(element)) {

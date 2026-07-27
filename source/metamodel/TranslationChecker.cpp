@@ -23,6 +23,102 @@ template<typename T> vector<T *> as_vector(const list<T *> &values)
    return vector<T *>(values.begin(),values.end());
 }
 
+DiagnosticId translation_diagnostic_id(
+   MetaElement *translated,
+   const string &property
+)
+{
+   if (property == "abstract") return DiagnosticId::TranslationAbstractMismatch;
+   if (property == "generic") return DiagnosticId::TranslationGenericMismatch;
+   if (property == "final") return DiagnosticId::TranslationFinalMismatch;
+   if (property == "extended") return DiagnosticId::TranslationExtendedMismatch;
+   if (property == "extends") return DiagnosticId::TranslationExtendsMismatch;
+   if (property.find("cardinality") != string::npos ||
+       property.find("minimum") != string::npos ||
+       property.find("maximum") != string::npos) {
+      return DiagnosticId::TranslationCardinalityMismatch;
+   }
+   if (property.find("count") != string::npos ||
+       property == "elements" || property == "attributes" ||
+       property == "parameters" || property == "roles" ||
+       property == "constraints" || property == "external constraints" ||
+       property == "domain constraints" || property == "arguments" ||
+       property == "coordinate dimensions" ||
+       property == "enumeration elements" ||
+       property == "metadata objects") {
+      return DiagnosticId::TranslationCollectionMismatch;
+   }
+   if (property == "element kind" || property == "class kind" ||
+       property == "model kind" || property == "argument kind") {
+      return DiagnosticId::TranslationDeclarationKindMismatch;
+   }
+   if (property.find("constraint") != string::npos ||
+       property.find("unique") != string::npos ||
+       property.find("uniqueness") != string::npos ||
+       property.find("REQUIRED IN") != string::npos ||
+       property.find("set ") == 0 || property == "existence attribute") {
+      return DiagnosticId::TranslationConstraintMismatch;
+   }
+   if (property == "topic dependencies" || property == "imports") {
+      return DiagnosticId::TranslationDependencyMismatch;
+   }
+   if (property.find("enumeration") != string::npos) {
+      return DiagnosticId::TranslationEnumerationMismatch;
+   }
+   if (property.find("derivation") != string::npos) {
+      return DiagnosticId::TranslationExpressionMismatch;
+   }
+   if (property.find("metadata") != string::npos ||
+       property == "meta attributes") {
+      return DiagnosticId::TranslationMetadataMismatch;
+   }
+   if (property.find("OID") != string::npos) {
+      return DiagnosticId::TranslationOidMismatch;
+   }
+   if (property.find("role ") == 0) {
+      return DiagnosticId::TranslationRoleMismatch;
+   }
+   if (property == "unit" || property == "unit definition" ||
+       property == "unit kind") {
+      return DiagnosticId::TranslationUnitMismatch;
+   }
+   if (property.find("view ") == 0 || property == "transient view" ||
+       property == "OR NULL view bases") {
+      return DiagnosticId::TranslationViewMismatch;
+   }
+   if (property == "contracted" || property == "runtime parameters") {
+      return DiagnosticId::TranslationModelPropertyMismatch;
+   }
+   if (property == "class reference" || property == "class restrictions" ||
+       property.find("reference") != string::npos ||
+       property.find("restriction") != string::npos ||
+       property == "line attributes" || property == "vertex type" ||
+       property == "format structure" || property == "base format") {
+      return DiagnosticId::TranslationReferenceMismatch;
+   }
+   if (dynamic_cast<AttrOrParam *>(translated) != nullptr ||
+       property == "subdivision" || property == "transient") {
+      return DiagnosticId::TranslationAttributeMismatch;
+   }
+   if (dynamic_cast<Type *>(translated) != nullptr) {
+      if (dynamic_cast<LineType *>(translated) != nullptr ||
+          dynamic_cast<CoordType *>(translated) != nullptr ||
+          property == "clockwise" || property == "direction" ||
+          property.find("axis") != string::npos ||
+          property.find("overlap") != string::npos ||
+          property.find("line ") == 0) {
+         return DiagnosticId::TranslationGeometryMismatch;
+      }
+      return DiagnosticId::TranslationTypePropertyMismatch;
+   }
+   if (dynamic_cast<FunctionDef *>(translated) != nullptr ||
+       dynamic_cast<Argument *>(translated) != nullptr ||
+       property.find("function") != string::npos) {
+      return DiagnosticId::TranslationFunctionMismatch;
+   }
+   return DiagnosticId::TranslationValueMismatch;
+}
+
 class Checker {
 public:
    void run()
@@ -75,10 +171,14 @@ private:
          }
          Model *base = find_model(model->_translationOfName);
          if (base == nullptr) {
-            Log.error("translation base model " + model->_translationOfName + " not found",model->_line);
+            Log.error(DiagnosticId::TranslationModelBaseNotFound,
+               "translation base model " + model->_translationOfName + " not found",
+               diagnostic_range(model));
          }
          else if (base == model) {
-            Log.error("model " + model->Name + " cannot be a translation of itself",model->_line);
+            Log.error(DiagnosticId::TranslationModelSelfReference,
+               "model " + model->Name + " cannot be a translation of itself",
+               diagnostic_range(model));
             cyclic_models.insert(model);
          }
       }
@@ -93,7 +193,9 @@ private:
                for (auto it = found; it != chain.end(); ++it) {
                   cyclic_models.insert(*it);
                }
-               Log.error("cycle in TRANSLATION OF chain at model " + current->Name,current->_line);
+               Log.error(DiagnosticId::TranslationModelCycle,
+                  "cycle in TRANSLATION OF chain at model " + current->Name,
+                  diagnostic_range(current));
                break;
             }
             chain.push_back(current);
@@ -136,24 +238,15 @@ private:
 
    void mismatch(MetaElement *translated,MetaElement *base,const string &property)
    {
-      const int line = translated != nullptr && translated->_line > 0 ? translated->_line
-         : base != nullptr && base->_line > 0 ? base->_line : 1;
-      vector<ilic::RelatedInformation> relatedInformation;
-      if (base != nullptr && base->_line > 0 && !Log.getCurrentSource().empty()) {
-         ilic::RelatedInformation related;
-         related.message = "Corresponding base declaration: " + label(base);
-         related.range.valid = true;
-         related.range.uri = Log.getCurrentSource();
-         related.range.start.line = static_cast<size_t>(base->_line - 1);
-         related.range.start.character = 0;
-         related.range.end = related.range.start;
-         related.range.end.character = 1;
-         relatedInformation.push_back(std::move(related));
-      }
-      Log.error(
+      vector<ilic::RelatedInformation> relatedInformation =
+         related_information(base,
+            "Corresponding base declaration: " + label(base));
+      const ilic::SourceRange primary = diagnostic_range(
+         diagnostic_owner(translated != nullptr ? translated : base));
+      Log.error(translation_diagnostic_id(translated,property),
          "translated declaration \"" + label(translated) + "\" does not match \""
             + label(base) + "\" for " + property,
-         line,0,"ILIC-TRANSLATION-MISMATCH",std::move(relatedInformation));
+         primary,std::move(relatedInformation));
    }
 
    void append_related(
@@ -209,12 +302,11 @@ private:
          "Actual domain declaration: " + actualName);
       append_related(related,expectedDomain,
          "Expected domain declaration: " + expectedName);
-      Log.error(
+      Log.error(DiagnosticId::TranslationDomainReferenceMismatch,
          "translated attribute " + label(translatedAttribute) + " uses " +
             actualName + ", but " + label(baseAttribute) + " uses " +
             expectedName,
          diagnostic_range(translatedAttribute),
-         "ILIC-TRANSLATION-DOMAIN-REFERENCE-MISMATCH",
          std::move(related)
       );
       return true;
@@ -253,13 +345,12 @@ private:
          vector<ilic::RelatedInformation> related;
          append_related(related,expected,
             "Corresponding base coordinate domain: " + label(expected));
-         Log.error(
+         Log.error(DiagnosticId::TranslationCoordDimensionMismatch,
             "translated coordinate domain " + label(actual) + " has " +
                to_string(actual->Axis.size()) + " dimensions, but " +
                label(expected) + " has " +
                to_string(expected->Axis.size()) + " dimensions",
             diagnostic_range(actual),
-            "ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH",
             std::move(related)
          );
          return true;
@@ -288,12 +379,11 @@ private:
       append_related(related,baseAttribute,
          "Corresponding base attribute: " + label(baseAttribute) +
             " declares a final enumeration");
-      Log.error(
+      Log.error(DiagnosticId::TranslationEnumFinalMismatch,
          "translated attribute " + label(translatedAttribute) +
             " extends the enumeration with " + additions + ", but " +
             label(baseAttribute) + " requires a final enumeration",
          diagnostic_range(translatedAttribute),
-         "ILIC-TRANSLATION-ENUM-FINAL-MISMATCH",
          std::move(related)
       );
       specialized_mismatches.insert(translated);
@@ -309,13 +399,12 @@ private:
          "Actual derivation view: " + label(translated->View));
       append_related(related,base->View,
          "Expected derivation view: " + label(base->View));
-      Log.error(
+      Log.error(DiagnosticId::TranslationDerivedAssociationMismatch,
          "translated association " + label(translated) + " is derived from " +
             label(translated->View) + ", but the translation of " +
             label(base) + " must be derived from " + label(base->View) +
             "; the role derivations must refer to that corresponding view",
          diagnostic_range(translated),
-         "ILIC-TRANSLATION-DERIVED-ASSOCIATION-MISMATCH",
          std::move(related)
       );
    }

@@ -89,6 +89,35 @@ END AbiModel.
    assert(rejected.find("ILIC-ABI-REQUEST") != std::string::npos);
    assert(rejected.find("\"success\":false") != std::string::npos);
 
+   const char *baseUri = "memory:///abi/Base.ili";
+   const char *translatedUri = "memory:///abi/Translated.ili";
+   const char *baseSource = R"ili(INTERLIS 2.3;
+MODEL AbiBase (de) AT "https://example.invalid" VERSION "1" =
+  CLASS BaseClass = Value : TEXT * 20; END BaseClass;
+END AbiBase.
+)ili";
+   const char *translatedSource = R"ili(INTERLIS 2.3;
+MODEL AbiTranslated (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF AbiBase [ "1" ] =
+  CLASS TranslatedClass = TranslatedValue : TEXT * 30; END TranslatedClass;
+END AbiTranslated.
+)ili";
+   assert(put(session,baseUri,baseSource) == 0);
+   assert(put(session,translatedUri,translatedSource) == 0);
+   const std::string crossFileRequest =
+      R"json({"schemaVersion":1,"roots":["memory:///abi/Translated.ili","memory:///abi/Base.ili"]})json";
+   const std::string crossFile =
+      resultJson(ilic_compile(session,crossFileRequest.data(),crossFileRequest.size()));
+   assert(crossFile.find("\"schemaVersion\":1") != std::string::npos);
+   assert(crossFile.find("ILIC-TRANSLATION-TYPE-PROPERTY-MISMATCH")
+      != std::string::npos);
+   assert(crossFile.find("\"uri\":\"memory:///abi/Translated.ili\"")
+      != std::string::npos);
+   assert(crossFile.find("\"uri\":\"memory:///abi/Base.ili\"")
+      != std::string::npos);
+   assert(crossFile.find("\"relatedInformation\":[{\"message\":")
+      != std::string::npos);
+
    assert(ilic_session_remove_source(session,uri,std::strlen(uri)) == 0);
    ilic_session_destroy(session);
    assert(ilic_session_put_source(session,uri,std::strlen(uri),nullptr,0,0) == -1);

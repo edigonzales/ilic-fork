@@ -11,6 +11,7 @@
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 string input_file = "";
 
@@ -174,7 +175,9 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBask
    if (ctx->metaDataBasketRef() != nullptr) {
       basket->Super = find_meta_basket(ctx->metaDataBasketRef()->getText());
       if (basket->Super == nullptr) {
-         Log.error("metadata basket " + ctx->metaDataBasketRef()->getText() + " not found",get_line(ctx));
+         Log.error(DiagnosticId::MetadataBasketNotFound,
+            "metadata basket " + ctx->metaDataBasketRef()->getText() + " not found",
+            get_line(ctx));
       }
    }
 
@@ -206,7 +209,10 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBask
          Package *objectPackage = basket->MetaDataTopic == nullptr
             ? get_package_context() : basket->MetaDataTopic->ElementInPackage;
          objectClass = find_viewable_in(objectPackage,text);
-         if (objectClass == nullptr) Log.error("viewable " + text + " not found",get_line(terminal));
+         if (objectClass == nullptr) {
+            Log.error(DiagnosticId::NameViewableNotFound,
+               "viewable " + text + " not found",get_line(terminal));
+         }
          expectClass = false;
       }
       else if (expectObject) {

@@ -8,6 +8,7 @@
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 /*
 
@@ -100,7 +101,9 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
    
    if (ctx->BASED() != nullptr) {
       if (g->Base != nullptr) {
-         Log.error("graphic definition is already based on " + get_path(g->Base),get_line(ctx->BASED()));
+         Log.error(DiagnosticId::GraphicBaseAlreadyDefined,
+            "graphic definition is already based on " + get_path(g->Base),
+            get_line(ctx->BASED()));
       }
       else {
          g->Base = find_class_or_view(ctx->bpath->getText(),get_line(ctx->bpath));

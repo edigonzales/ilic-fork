@@ -8,6 +8,7 @@
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext *ctx)
 {
@@ -64,7 +65,8 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
    add_function(f);
    
    if (ili23 && !get_model_context()->Contracted) {
-      Log.error("functions can only be defined in contracted models");
+      Log.error(DiagnosticId::FunctionContractedModelRequired,
+         "functions can only be defined in contracted models",0);
    }
    
    // FunctionDef attributes
@@ -94,7 +96,9 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
    }
 
    if (ili23 && f->Argument.size() == 0) {
-      Log.error("function definition of " + name + "() needs at least one argument",get_line(ctx));
+      Log.error(DiagnosticId::FunctionDefinitionArgumentRequired,
+         "function definition of " + name + "() needs at least one argument",
+         get_line(ctx));
    }
 
    // f->LocalType ???
@@ -149,7 +153,9 @@ antlrcpp::Any Ili2Input::visitFunctionCall(parser::Ili2Parser::FunctionCallConte
    
    if (c->Function != nullptr) {
       if (c->Arguments.size() != c->Function->Argument.size()) {
-         Log.error("function call of " + name + "() needs " + to_string(c->Function->Argument.size()) + " arguments",get_line(ctx));
+         Log.error(DiagnosticId::FunctionCallArgumentCount,
+            "function call of " + name + "() needs " +
+               to_string(c->Function->Argument.size()) + " arguments",get_line(ctx));
       }
       else {
          auto argp = c->Function->Argument.begin();
@@ -164,7 +170,7 @@ antlrcpp::Any Ili2Input::visitFunctionCall(parser::Ili2Parser::FunctionCallConte
                continue;
             }
             if (!check_type_compatibility(formal->Type->getClass(),a->Expression->_type)) {
-               Log.error(
+               Log.error(DiagnosticId::FunctionArgumentTypeMismatch,
                   "incompatible type for " + name + "() argument " + formal->Name +
                   " (" + a->Expression->_type + "<>" + formal->Type->getClass() + ")",
                   get_line(ctx)

@@ -63,7 +63,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[ABSTRACT] = true;
       }
       else {
-         Log.error("property " + ABSTRACT + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + ABSTRACT + " not allowed",line);
       }
    }
    else if (ctx->ABSTRACT().size() > 1) {
@@ -83,7 +84,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[EXTENDED] = true;
       }
       else {
-         Log.error("property " + EXTENDED + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + EXTENDED + " not allowed",line);
       }
    }
    else if (EXTENDED.size() > 1) {
@@ -103,7 +105,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[FINAL] = true;
       }
       else {
-         Log.error("property " + FINAL + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + FINAL + " not allowed",line);
       }
    }
    else if (ctx->FINAL().size() > 1) {
@@ -123,7 +126,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[TRANSIENT] = true;
       }
       else {
-         Log.error("property " + TRANSIENT + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + TRANSIENT + " not allowed",line);
       }
    }
    else if (ctx->TRANSIENT().size() > 1) {
@@ -143,7 +147,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[OID] = true;
       }
       else {
-         Log.error("property " + OID + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + OID + " not allowed",line);
       }
    }
    else if (ctx->OID().size() > 1) {
@@ -163,7 +168,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[HIDING] = true;
       }
       else {
-         Log.error("property " + HIDING + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + HIDING + " not allowed",line);
       }
    }
    else if (ctx->HIDING().size() > 1) {
@@ -183,7 +189,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[ORDERED] = true;
       }
       else {
-         Log.error("property " + ORDERED + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + ORDERED + " not allowed",line);
       }
    }
    else if (ctx->ORDERED().size() > 1) {
@@ -203,7 +210,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[EXTERNAL] = true;
       }
       else {
-         Log.error("property " + EXTERNAL + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + EXTERNAL + " not allowed",line);
       }
    }
    else if (ctx->EXTERNAL().size() > 1) {
@@ -220,7 +228,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[GENERIC] = true;
       }
       else {
-         Log.error("property " + GENERIC + " not allowed",line);
+         Log.error(DiagnosticId::PropertyNotAllowed,
+            "property " + GENERIC + " not allowed",line);
       }
    }
    else {
@@ -229,7 +238,8 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
    }
    
    if (properties[ABSTRACT] && properties[FINAL]) {
-      Log.error(ABSTRACT + " and " + FINAL + " can not be used at the same time",line);
+      Log.error(DiagnosticId::PropertyAbstractFinalConflict,
+         ABSTRACT + " and " + FINAL + " can not be used at the same time",line);
    }
 
    return properties;
@@ -285,13 +295,16 @@ void input::check_references(Class *c,string name,int line)
             }
             if (sourceTopic != nullptr && targetTopic != nullptr &&
                 !targetIsBaseTopic && !t->External) {
-               Log.error("reference to other topic must be declared EXTERNAL",l);
+               Log.error(DiagnosticId::ReferenceExternalRequired,
+                  "reference to other topic must be declared EXTERNAL",l);
                break;
             }
          }
          for (auto c: classrestriction) {
             if (c != nullptr && !depends_on(c->ElementInPackage)) {
-               Log.error(n + " requires topic dependency on " + get_path(t->_baseclass->ElementInPackage),l);
+               Log.error(DiagnosticId::TopicDependencyRequired,
+                  n + " requires topic dependency on " +
+                  get_path(t->_baseclass->ElementInPackage),l);
                break;
             }
          }

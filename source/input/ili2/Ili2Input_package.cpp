@@ -2,12 +2,14 @@
 
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
+#include "../../metamodel/DiagnosticUtil.h"
 #include "../../metamodel/MetaModelInput.h"
 #include "../../util/Logger.h"
 
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 extern string input_file;
 
@@ -51,7 +53,7 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
    debug(ctx,">>> visitModelDef(" + name1 + ")");
    Log.incNestLevel();
    if (name1 != name2) {
-      Log.error(
+      Log.error(DiagnosticId::NameEndMismatch,
          "modelname " + name2 + " must match " + name1,
          ctx->modelname2->getLine()
       );
@@ -242,7 +244,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    Log.incNestLevel();
 
    if (name1 != name2) {
-      Log.error(
+      Log.error(DiagnosticId::NameEndMismatch,
          "topicname " + name2 + " must match " + name1,
          get_line(ctx->topicname2)
       );
@@ -275,7 +277,9 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
       s->_super = ss;
       if (ss != nullptr) {
          if (ss->_dataunit->Final) {
-            Log.error("topic " + name1 + " can not extend FINAL topic " + get_path(s->_super),s->_line);
+            Log.error(DiagnosticId::InheritanceFinalBase,
+               "topic " + name1 + " can not extend FINAL topic " +
+                  get_path(s->_super),diagnostic_range(s));
          }
          d->Super = find_dataunit(get_path(ss),get_line(ctx->topicbase));
          if (d->Super != nullptr) {

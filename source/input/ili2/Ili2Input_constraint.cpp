@@ -8,6 +8,7 @@
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 antlrcpp::Any Ili2Input::visitConstraintDef(parser::Ili2Parser::ConstraintDefContext *ctx)
 {
@@ -95,7 +96,8 @@ antlrcpp::Any Ili2Input::visitMandatoryConstraint(parser::Ili2Parser::MandatoryC
    c->Kind = SimpleConstraint::MandC;
    c->LogicalExpression = visitExpression(ctx->expression());
    if (c->LogicalExpression != nullptr && !is_boolean_expression(c->LogicalExpression)) {
-      Log.error("expression must return a boolean value", ctx->expression()->start->getLine());
+      Log.error(DiagnosticId::ExpressionBooleanRequired,
+         "expression must return a boolean value",ctx->expression()->start->getLine());
    }
    
    Log.decNestLevel();
@@ -132,7 +134,8 @@ antlrcpp::Any Ili2Input::visitPlausibilityConstraint(parser::Ili2Parser::Plausib
    c->Kind = SimpleConstraint::MandC;
    c->LogicalExpression = visitExpression(ctx->expression());
    if (!is_boolean_expression(c->LogicalExpression)) {
-      Log.error("expression must return a boolean value", ctx->expression()->start->getLine());
+      Log.error(DiagnosticId::ExpressionBooleanRequired,
+         "expression must return a boolean value",ctx->expression()->start->getLine());
    }
    if (ctx->LESSEQUAL() != nullptr) {
       c->_percentage_operation = SimpleConstraint::LessEqual;

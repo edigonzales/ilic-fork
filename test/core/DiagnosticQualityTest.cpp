@@ -2,7 +2,10 @@
 
 #include <cassert>
 #include <initializer_list>
+#include <iostream>
+#include <map>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -15,6 +18,18 @@ ilic::CompilationResult compile(const char *uri,const char *source)
    return session.compile(request);
 }
 
+ilic::CompilationResult compile(
+   const std::map<std::string,std::string> &sources,
+   const std::vector<std::string> &roots
+)
+{
+   ilic::CompilerSession session;
+   for (const auto &[uri,source] : sources) session.putSource(uri,source);
+   ilic::CompilationRequest request;
+   request.roots = roots;
+   return session.compile(request);
+}
+
 const ilic::Diagnostic &assert_single_diagnostic(
    const ilic::CompilationResult &result,
    const std::string &code,
@@ -23,6 +38,14 @@ const ilic::Diagnostic &assert_single_diagnostic(
    size_t minimumRelatedInformation = 1
 )
 {
+   if (result.errorCount != 1 || result.diagnostics.size() != 1) {
+      std::cerr << "Expected one " << code << " diagnostic, got "
+                << result.errorCount << " errors and "
+                << result.diagnostics.size() << " diagnostics\n";
+      for (const auto &diagnostic : result.diagnostics) {
+         std::cerr << diagnostic.code << ": " << diagnostic.message << "\n";
+      }
+   }
    assert(!result.success);
    assert(result.errorCount == 1);
    assert(result.diagnostics.size() == 1);
@@ -32,6 +55,10 @@ const ilic::Diagnostic &assert_single_diagnostic(
    assert(diagnostic.range.start.line == line);
    assert(diagnostic.relatedInformation.size() >= minimumRelatedInformation);
    for (const auto &part : messageParts) {
+      if (diagnostic.message.find(part) == std::string::npos) {
+         std::cerr << code << " message does not contain \"" << part
+                   << "\": " << diagnostic.message << "\n";
+      }
       assert(diagnostic.message.find(part) != std::string::npos);
    }
    assert(diagnostic.message.find("TOP") == std::string::npos);
@@ -215,5 +242,113 @@ END GenericCoordinateRangeMismatch.
       == genericRangeUri);
    assert(genericRangeDiagnostic.relatedInformation[1].range.uri
       == genericRangeUri);
+
+   const std::string translationBaseUri = "memory:///translation/Base.ili";
+   const std::string translationUri = "memory:///translation/Translated.ili";
+   const std::map<std::string,std::string> translationSources{
+      {translationBaseUri,R"ili(INTERLIS 2.3;
+MODEL BaseModel (de) AT "https://example.invalid" VERSION "1" =
+  TOPIC BaseTopic =
+    CLASS BaseClass = Value : TEXT * 20; END BaseClass;
+  END BaseTopic;
+END BaseModel.
+)ili"},
+      {translationUri,R"ili(INTERLIS 2.3;
+MODEL TranslatedModel (fr) AT "https://example.invalid" VERSION "1"
+TRANSLATION OF BaseModel [ "1" ] =
+  TOPIC TranslatedTopic =
+    CLASS TranslatedClass = ValueTranslated : TEXT * 30; END TranslatedClass;
+  END TranslatedTopic;
+END TranslatedModel.
+)ili"}
+   };
+   for (const auto &roots : std::vector<std::vector<std::string>>{
+      {translationBaseUri,translationUri},
+      {translationUri,translationBaseUri}}) {
+      const auto result = compile(translationSources,roots);
+      const auto &diagnostic = assert_single_diagnostic(
+         result,"ILIC-TRANSLATION-TYPE-PROPERTY-MISMATCH",4,
+         {"ValueTranslated","Value","text length"});
+      assert(diagnostic.range.uri == translationUri);
+      assert(diagnostic.relatedInformation.front().range.uri == translationBaseUri);
+      assert(diagnostic.range.start.character == 28);
+      assert(diagnostic.range.end.character == 43);
+      assert(diagnostic.relatedInformation.front().range.start.line == 3);
+      assert(diagnostic.relatedInformation.front().range.start.character == 22);
+      assert(diagnostic.relatedInformation.front().range.end.line == 3);
+      assert(diagnostic.relatedInformation.front().range.end.character == 27);
+   }
+
+   const std::string inheritanceBaseUri = "memory:///inheritance/Base.ili";
+   const std::string inheritanceUri = "memory:///inheritance/Derived.ili";
+   const std::map<std::string,std::string> inheritanceSources{
+      {inheritanceBaseUri,R"ili(INTERLIS 2.3;
+MODEL BaseTypes AT "https://example.invalid" VERSION "1" =
+  CLASS BaseClass (ABSTRACT) =
+    Value : TEXT * 20;
+  END BaseClass;
+END BaseTypes.
+)ili"},
+      {inheritanceUri,R"ili(INTERLIS 2.3;
+MODEL DerivedTypes AT "https://example.invalid" VERSION "1" =
+  IMPORTS BaseTypes;
+  CLASS Child (ABSTRACT) EXTENDS BaseTypes.BaseClass =
+    Value (EXTENDED) : NUMERIC;
+  END Child;
+END DerivedTypes.
+)ili"}
+   };
+   for (const auto &roots : std::vector<std::vector<std::string>>{
+      {inheritanceBaseUri,inheritanceUri},
+      {inheritanceUri,inheritanceBaseUri}}) {
+      const auto result = compile(inheritanceSources,roots);
+      const auto &diagnostic = assert_single_diagnostic(
+         result,"ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION",4,
+         {"Value","NUMERIC","TEXT"});
+      assert(diagnostic.range.uri == inheritanceUri);
+      assert(diagnostic.relatedInformation.front().range.uri == inheritanceBaseUri);
+      assert(diagnostic.range.start.character == 4);
+      assert(diagnostic.range.end.character == 9);
+      assert(diagnostic.relatedInformation.front().range.start.line == 3);
+      assert(diagnostic.relatedInformation.front().range.start.character == 4);
+      assert(diagnostic.relatedInformation.front().range.end.line == 3);
+      assert(diagnostic.relatedInformation.front().range.end.character == 9);
+   }
+
+   const std::string genericBaseUri = "memory:///generic/Base.ili";
+   const std::string genericUri = "memory:///generic/Concrete.ili";
+   const std::map<std::string,std::string> genericSources{
+      {genericBaseUri,R"ili(INTERLIS 2.4;
+MODEL GenericBase AT "https://example.invalid" VERSION "1" =
+  DOMAIN GenericCoord (GENERIC) = COORD 0 .. 100, NUMERIC;
+END GenericBase.
+)ili"},
+      {genericUri,R"ili(INTERLIS 2.4;
+MODEL ConcreteModel AT "https://example.invalid" VERSION "1" =
+  IMPORTS GenericBase;
+  DOMAIN ConcreteCoord = COORD 0 .. 200, 0 .. 200;
+  CONTEXT default =
+    GenericBase.GenericCoord = ConcreteCoord;
+END ConcreteModel.
+)ili"}
+   };
+   for (const auto &roots : std::vector<std::vector<std::string>>{
+      {genericBaseUri,genericUri},
+      {genericUri,genericBaseUri}}) {
+      const auto result = compile(genericSources,roots);
+      const auto &diagnostic = assert_single_diagnostic(
+         result,"ILIC-GENERIC-COORD-RANGE-MISMATCH",5,
+         {"ConcreteCoord","GenericCoord","axis 1","maximum 200",
+          "allowed maximum 100"},2);
+      assert(diagnostic.range.uri == genericUri);
+      assert(diagnostic.relatedInformation[0].range.uri == genericUri);
+      assert(diagnostic.relatedInformation[1].range.uri == genericBaseUri);
+      assert(diagnostic.relatedInformation[0].range.start.line == 3);
+      assert(diagnostic.relatedInformation[0].range.start.character == 9);
+      assert(diagnostic.relatedInformation[0].range.end.character == 22);
+      assert(diagnostic.relatedInformation[1].range.start.line == 2);
+      assert(diagnostic.relatedInformation[1].range.start.character == 9);
+      assert(diagnostic.relatedInformation[1].range.end.character == 21);
+   }
    return 0;
 }

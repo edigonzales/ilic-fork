@@ -214,6 +214,8 @@ if(BUILD_TESTING)
     add_executable(ilic_diagnostic_code_test test/core/DiagnosticCodeTest.cpp)
     target_include_directories(ilic_diagnostic_code_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/source/util")
+    target_compile_definitions(ilic_diagnostic_code_test PRIVATE
+        ILIC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(ilic_diagnostic_code_test PRIVATE ilic-core)
     add_test(NAME ilic_diagnostic_code COMMAND ilic_diagnostic_code_test)
     add_executable(ilic_diagnostic_quality_test test/core/DiagnosticQualityTest.cpp)

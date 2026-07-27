@@ -8,6 +8,7 @@
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 // general
 
@@ -93,7 +94,8 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
 
       t = dynamic_cast<DomainType *>(tt);
       if (t == nullptr) {
-         Log.error("domain " + name + " requires a domain type",get_line(ctx));
+         Log.error(DiagnosticId::TypeDomainRequired,
+            "domain " + name + " requires a domain type",get_line(ctx));
          basetype = nullptr;
          Log.decNestLevel();
          return static_cast<DomainType *>(nullptr);
@@ -453,7 +455,8 @@ antlrcpp::Any Ili2Input::visitEnumerationType(parser::Ili2Parser::EnumerationTyp
 
    if (basetype != nullptr) {
       if (basetype->getClass() != "EnumType") {
-         Log.error("incompatible base type " + basetype->getClass(),get_line(ctx));
+         Log.error(DiagnosticId::TypeEnumBaseRequired,
+            "incompatible base type " + basetype->getClass(),get_line(ctx));
       }
    }
 
@@ -616,7 +619,9 @@ antlrcpp::Any Ili2Input::visitAttributePathType(parser::Ili2Parser::AttributePat
       }
       if (terminal == nullptr || terminal->Type == nullptr ||
           terminal->Type->getClass() != "ClassRefType") {
-         Log.error("ATTRIBUTE OF restriction must end at a CLASS attribute",get_line(ctx->attributePath()));
+         Log.error(DiagnosticId::ReferenceAttributeOfClassRequired,
+            "ATTRIBUTE OF restriction must end at a CLASS attribute",
+            get_line(ctx->attributePath()));
       }
    }
    for (auto restriction : ctx->attrTypeDef()) {
@@ -769,7 +774,8 @@ antlrcpp::Any Ili2Input::visitFormattedType(parser::Ili2Parser::FormattedTypeCon
          t->Struct = static_cast<Class*>(tt);
       }
       else {
-         Log.error(ctx->structref->getText() + " must be a structure", get_line(ctx->structref));
+         Log.error(DiagnosticId::ReferenceStructureRequired,
+            ctx->structref->getText() + " must be a structure",get_line(ctx->structref));
       }
       string format = visitFormatDef(ctx->formatDef());
       t->Format = format;
@@ -786,7 +792,8 @@ antlrcpp::Any Ili2Input::visitFormattedType(parser::Ili2Parser::FormattedTypeCon
          t->Max = visitString(ctx->max);
       }
       else {
-         Log.error(ctx->formatref->getText() + " must be a formatted type",get_line(ctx));
+         Log.error(DiagnosticId::TypeFormattedRequired,
+            ctx->formatref->getText() + " must be a formatted type",get_line(ctx));
       }
    }
    else {
@@ -1084,7 +1091,7 @@ antlrcpp::Any Ili2Input::visitLineType(parser::Ili2Parser::LineTypeContext *ctx)
       }
       catch (exception e) {
          string path = visitPath(ctx->coordref);
-         Log.error(path + " is no coord type");
+         Log.error(DiagnosticId::TypeCoordinateRequired,path + " is no coord type",0);
       }
    }
 
@@ -1098,7 +1105,8 @@ antlrcpp::Any Ili2Input::visitLineType(parser::Ili2Parser::LineTypeContext *ctx)
          t->LAStructure = find_structure(path,get_line(ctx->lineattrstruct));
       }
       catch (exception e) {
-         Log.error(path + " is no structure type");
+         Log.error(DiagnosticId::ReferenceStructureRequired,
+            path + " is no structure type",0);
       }
    }
    

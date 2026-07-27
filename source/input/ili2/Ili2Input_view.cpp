@@ -2,12 +2,14 @@
 
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
+#include "../../metamodel/DiagnosticUtil.h"
 #include "../../metamodel/MetaModelInput.h"
 #include "../../util/Logger.h"
 
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 namespace {
 
@@ -107,7 +109,8 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
    Log.incNestLevel();
    
    if (name1 != name2) {
-      Log.error(name1 + " expected",get_line(ctx->viewname2));
+      Log.error(DiagnosticId::NameEndMismatch,name1 + " expected",
+         get_line(ctx->viewname2));
    }
 
    View* v = new View;
@@ -135,7 +138,8 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
       SubModel *topic = dynamic_cast<SubModel *>(get_package_context());
       Package *baseTopic = topic == nullptr ? nullptr : topic->_super;
       if (baseTopic == nullptr) {
-         Log.error("EXTENDED can only be used in an extended topic",get_line(ctx));
+         Log.error(DiagnosticId::InheritanceExtendedTopicRequired,
+            "EXTENDED can only be used in an extended topic",diagnostic_range(v));
       }
       else {
          for (MetaElement *element : baseTopic->Element) {
@@ -146,7 +150,8 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
             }
          }
          if (v->Super == nullptr) {
-            Log.error("base view " + name1 + " not found",get_line(ctx));
+            Log.error(DiagnosticId::ViewBaseNotFound,
+               "base view " + name1 + " not found",diagnostic_range(v));
          }
       }
    }
@@ -244,7 +249,8 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
             line = get_line(nameToken);
             inspectedAttribute = find_attribute(current,attrname);
             if (inspectedAttribute == nullptr) {
-               Log.error("inspection attribute " + attrname + " not found",line);
+               Log.error(DiagnosticId::ViewInspectionAttributeNotFound,
+                  "inspection attribute " + attrname + " not found",line);
                current = nullptr;
                break;
             }
@@ -273,7 +279,9 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
                }
             }
             else {
-               Log.error("attribute " + inspectedAttribute->Name + " can not be inspected",line);
+               Log.error(DiagnosticId::ViewAttributeInspectionInvalid,
+                  "attribute " + inspectedAttribute->Name + " can not be inspected",
+                  line);
             }
          }
          if (baseAliasType != nullptr && decomposedStructure != nullptr) {
@@ -406,7 +414,8 @@ antlrcpp::Any Ili2Input::visitBaseExtensionDef(parser::Ili2Parser::BaseExtension
       baseClass = static_cast<ObjectType *>(baseAlias->Type)->_baseclass;
    }
    if (baseClass == nullptr) {
-      Log.error("view base " + baseName + " not found",get_line(ctx->basename));
+      Log.error(DiagnosticId::ViewBaseNotFound,
+         "view base " + baseName + " not found",get_line(ctx->basename));
    }
 
    for (auto refContext : ctx->renamedViewableRef()) {
@@ -424,7 +433,10 @@ antlrcpp::Any Ili2Input::visitBaseExtensionDef(parser::Ili2Parser::BaseExtension
          candidate = static_cast<Class *>(candidate->Super);
       }
       if (extension != nullptr && baseClass != nullptr && !extendsBase) {
-         Log.error(get_path(extension) + " does not extend " + get_path(baseClass),get_line(refContext));
+         Log.error(DiagnosticId::ViewBaseExtensionRequired,
+            get_path(extension) + " does not extend " + get_path(baseClass),
+            get_line(refContext),0,
+            related_information(baseClass,"Expected view base is declared here"));
       }
    }
 
@@ -465,7 +477,8 @@ antlrcpp::Any Ili2Input::visitViewAttribute(parser::Ili2Parser::ViewAttributeCon
          }
       }
       if (baseattr == nullptr) {
-         Log.error("alias " + name + " not found",get_line(ctx->ALL()));
+         Log.error(DiagnosticId::ViewAliasNotFound,
+            "alias " + name + " not found",get_line(ctx->ALL()));
       }
       else {
          baseattr->_visible = true;

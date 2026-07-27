@@ -50,8 +50,8 @@ zusätzlich den Fehlerzähler.
 ```json
 {
   "severity": "error",
-  "code": "ILIC-SEMANTIC",
-    "message": "type MissingDomain not found.",
+  "code": "ILIC-NAME-TYPE-NOT-FOUND",
+  "message": "type MissingDomain not found.",
   "range": {
     "uri": "memory:///Invalid.ili",
     "start": { "line": 5, "character": 0, "byteOffset": 0 },
@@ -98,13 +98,23 @@ Werte sind Teil des stabilen öffentlichen Typs und können direkt auf
 
 ## Diagnostic-Codes
 
-Wichtige Codefamilien:
+Codes sind stabile, regelbezogene Bezeichner. Die Fachprüfung wählt intern
+zuerst eine getypte `DiagnosticId`; erst daraus wird der öffentliche
+`ILIC-<AREA>-<REASON>`-String erzeugt. Der Meldungstext wird nicht analysiert
+und darf verbessert werden, ohne dass sich der Code ändert.
+
+Wichtige Codefamilien und Beispiele:
 
 | Code | Bedeutung |
 | --- | --- |
 | `ILIC-PARSE-SYNTAX` | Lexer- oder Parserfehler |
 | `ILIC-PARSE-ENCODING` | Source konnte nicht als erwartet dekodiert werden |
-| `ILIC-SEMANTIC` | semantische Modellverletzung |
+| `ILIC-NAME-*` | Namensauflösung und Deklarationskonflikte |
+| `ILIC-ATTRIBUTE-*` | Attributdefinitionen und -erweiterungen |
+| `ILIC-ASSOCIATION-*`, `ILIC-ROLE-*` | Assoziations- und Rollenregeln |
+| `ILIC-CONSTRAINT-*` | Constraint-Regeln |
+| `ILIC-GENERIC-*` | generische Domains und Context-Zuordnungen |
+| `ILIC-TRANSLATION-*` | konkrete Übersetzungsäquivalenz-Regeln |
 | `ILIC-META-SYNTAX` | ungültige `!!@`-Syntax |
 | `ILIC-META-DANGLING` | Metaattribut ohne nachfolgendes Zielelement |
 | `ILIC-META-TARGET` | ungültiges externes Metaattributziel |
@@ -112,11 +122,19 @@ Wichtige Codefamilien:
 | `ILIC-FORMAT-ENCODING` | ISO-8859-1 wurde nach UTF-8 konvertiert |
 | `ILIC-REPO-*` | Repository-Index, Download, Auflösung oder Integrität |
 | `ILIC-ABI-REQUEST` | ungültiger JSON-Request an der C-ABI |
-| `ILIC-COMPILER` | allgemeiner oder nicht genauer lokalisierter Compilerfehler |
+| `ILIC-COMPILER-INTERNAL` | interner Compilerfehler ohne fachliche Regel |
 
 Diagnostic-Texte müssen nicht mit ili2c identisch sein. Anwendungen sollen
 Severity, Code und Range verwenden und den Text für Menschen anzeigen, nicht
-parsen.
+parsen. Die früher provisorisch verwendeten semantischen Sammelcodes wurden vor
+der ersten stabilen Code-Zusage entfernt. Rohe Parserfehler dürfen weiterhin
+den Sammelcode `ILIC-PARSE-SYNTAX` verwenden.
+
+Semantische Primärorte stammen aus der betroffenen Deklaration oder dem
+Referenz-Token. `relatedInformation` trägt den unabhängigen URI und Bereich der
+Basis-, Ziel- oder Erstdeklaration. Deshalb können Primärdiagnose und Related
+Information in unterschiedlichen Dateien liegen; die zuletzt verarbeitete
+Datei hat keinen Einfluss auf diese Orte.
 
 ## Struktur eines LogEvents
 

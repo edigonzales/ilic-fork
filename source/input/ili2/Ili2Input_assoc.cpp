@@ -2,12 +2,14 @@
 
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
+#include "../../metamodel/DiagnosticUtil.h"
 #include "../../metamodel/MetaModelInput.h"
 #include "../../util/Logger.h"
 
 using namespace input;
 using namespace parser;
 using namespace metamodel;
+using namespace util;
 
 antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefContext *ctx)
 {
@@ -83,24 +85,21 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    
    if (name1.empty() != name2.empty()) {
       if (name1.empty()) {
-         Log.error(
+         Log.error(DiagnosticId::AssociationUnexpectedEndName,
             "anonymous association must not have the closing name \"" + name2 + "\"",
-            ctx->END()->getSymbol()->getLine(),0,
-            "ILIC-ASSOCIATION-UNEXPECTED-END-NAME");
+            ctx->END()->getSymbol()->getLine());
       }
       else {
-         Log.error(
+         Log.error(DiagnosticId::AssociationMissingEndName,
             "association \"" + name1 + "\" must end with \"END " + name1 + "\"",
-            ctx->END()->getSymbol()->getLine(),0,
-            "ILIC-ASSOCIATION-MISSING-END-NAME");
+            ctx->END()->getSymbol()->getLine());
       }
    }
    else if (!name1.empty() && name1 != name2) {
-      Log.error(
+      Log.error(DiagnosticId::AssociationEndNameMismatch,
          "association \"" + name1 + "\" must end with \"END " + name1
             + "\"; found \"END " + name2 + "\"",
-         ctx->END()->getSymbol()->getLine(),0,
-         "ILIC-ASSOCIATION-END-NAME-MISMATCH");
+         ctx->END()->getSymbol()->getLine());
    }
 
    // init Class
@@ -124,7 +123,8 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
       set_reference_source(c,"inheritance",ctx->associationname1);
       DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
       if (u->Super == nullptr) {
-         Log.error(string("EXTENDED can only by used in extended topics"),c->_line);
+         Log.error(DiagnosticId::InheritanceExtendedTopicRequired,
+            "EXTENDED can only by used in extended topics",diagnostic_range(c));
       }
       else {
          Class *s = find_association(
@@ -133,7 +133,10 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
          if (s != nullptr) {
             s->Sub.push_back(c);
             if (s->Final) {
-               Log.error("association " + name1 + " can not extend FINAL base association " + get_path(s),c->_line);
+               Log.error(DiagnosticId::InheritanceFinalBase,
+                  "association " + name1 +
+                     " can not extend FINAL base association " + get_path(s),
+                  diagnostic_range(c));
             }
          }
       }
@@ -149,7 +152,10 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
       if (s != nullptr) {
          s->Sub.push_back(c);
          if (s->Final) {
-            Log.error("association " + name1 + " can not extend FINAL base association " + get_path(s),c->_line);
+            Log.error(DiagnosticId::InheritanceFinalBase,
+               "association " + name1 +
+                  " can not extend FINAL base association " + get_path(s),
+               diagnostic_range(c));
          }
       }
    }
@@ -180,10 +186,14 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    for (auto rctx : ctx->roleDef()) {
       Role *r = visitRoleDef(rctx);
       if (r->Abstract && !c->Abstract) {
-         Log.error("concrete association " + get_path(c) + " can not contain abstract role " + r->Name,get_line(rctx));
+         Log.error(DiagnosticId::AssociationAbstractRoleInConcrete,
+            "concrete association " + get_path(c) +
+               " can not contain abstract role " + r->Name,diagnostic_range(r));
       }
       if (c->Super != nullptr && !r->Extended) {
-         Log.error("can not add role " + r->Name + " in extended association",get_line(rctx));
+         Log.error(DiagnosticId::AssociationAdditionalRoleInExtension,
+            "can not add role " + r->Name + " in extended association",
+            diagnostic_range(r));
       }
       else {
          r->Association = c;
@@ -198,7 +208,8 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
       cc = static_cast<Class *>(cc->Super);
    }
    if (rolecount < 2) {
-      Log.error("an association requires at least two roles",get_line(ctx));
+      Log.error(DiagnosticId::AssociationRoleCount,
+         "an association requires at least two roles",diagnostic_range(c));
    }
    
    if (ctx->CARDINALITY() != nullptr) {
@@ -226,13 +237,18 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
                continue;
             }
             if (find_attribute(r1->_baseclass,r2->Name)) {
-               Log.error("attribute with name " + r2->Name + " already exists in " + get_path(r1->_baseclass),r2->_line); 
+               Log.error(DiagnosticId::AssociationAttributeNameConflict,
+                  "attribute with name " + r2->Name + " already exists in " +
+                     get_path(r1->_baseclass),diagnostic_range(r2));
             }
             else if (Role *existing = find_role(r1->_baseclass,r2->Name)) {
                // A ternary self-association reaches the same access through
                // more than one opposite role; that is one access, not a clash.
                if (existing != r2) {
-                  Log.error("role or roleaccess with name " + r2->Name + " already exists in " + get_path(r1->_baseclass),r2->_line);
+                  Log.error(DiagnosticId::AssociationRoleAccessNameConflict,
+                     "role or roleaccess with name " + r2->Name +
+                        " already exists in " + get_path(r1->_baseclass),
+                     diagnostic_range(r2));
                }
             }
             else {
@@ -313,7 +329,8 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
    Log.incNestLevel();
 
    if (find_attribute(get_class_context(),name)) {
-      Log.error("there is already an attribute with name " + name,get_line(ctx));
+      Log.error(DiagnosticId::AttributeDuplicate,
+         "there is already an attribute with name " + name,get_line(ctx));
    }
 
    Role *r = new Role;
@@ -335,16 +352,20 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
       set_reference_source(r,"inheritance",ctx->rolename);
       Class* c = get_class_context();
       if (c->Super == nullptr) {
-         Log.error("EXTENDED can only be used in extended associations",r->_line);
+         Log.error(DiagnosticId::InheritanceExtendedAssociationRequired,
+            "EXTENDED can only be used in extended associations",diagnostic_range(r));
       }
       else {
          Class* s = static_cast<Class*>(c->Super);
          Role *rr = find_role(s,r->Name);
          if (rr == nullptr) {
-            Log.error("base of role " + r->Name + " not found in " + get_path(s),r->_line);
+            Log.error(DiagnosticId::RoleBaseNotFound,
+               "base of role " + r->Name + " not found in " + get_path(s),
+               diagnostic_range(r));
          }
          else if (rr->Final) {
-            Log.error("base of role " + r->Name + " is FINAL",r->_line);
+            Log.error(DiagnosticId::RoleBaseFinal,
+               "base of role " + r->Name + " is FINAL",diagnostic_range(r));
          }
          r->Super = rr;
       }
