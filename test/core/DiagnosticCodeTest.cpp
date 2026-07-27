@@ -32,6 +32,9 @@ void assert_explicit_semantic_diagnostic_ids()
       std::ostringstream buffer;
       buffer << input.rdbuf();
       std::string source = buffer.str();
+      if (file.filename() == "TranslationChecker.cpp") {
+         assert(source.find("translation_diagnostic_id") == std::string::npos);
+      }
       size_t position = 0;
       while ((position = source.find("Log.error(",position)) != std::string::npos) {
          size_t argument = position + std::string("Log.error(").size();
