@@ -100,6 +100,7 @@ namespace metamodel {
       CurrentSourceText = source;
       if (ilic::SourceManager *sources = ilic::activeSourceManager();
           sources != nullptr && !Log.getCurrentSource().empty() &&
+          Log.getCurrentSource() != "internal" &&
           !sources->contains(Log.getCurrentSource())) {
          sources->put(Log.getCurrentSource(),source,0);
       }
