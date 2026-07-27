@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   build-macos-arm64:
+    # Temporarily disabled while the native release publication is stabilized.
+    if: ${{ false }}
     runs-on: macos-14
     timeout-minutes: 50
     steps:
@@ -69,6 +71,8 @@ jobs:
           if-no-files-found: error
 
   build-windows-x86_64:
+    # Temporarily disabled while the native release publication is stabilized.
+    if: ${{ false }}
     runs-on: windows-latest
     timeout-minutes: 55
     steps:
@@ -106,9 +110,7 @@ jobs:
   publish-release:
     name: Publish GitHub release
     needs:
-      - build-macos-arm64
       - build-linux-x86_64
-      - build-windows-x86_64
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -117,20 +119,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download macOS archive
-        uses: actions/download-artifact@v7
-        with:
-          name: ilic-macos-arm64
-          path: dist
       - name: Download Linux archive
         uses: actions/download-artifact@v7
         with:
           name: ilic-linux-x86_64
-          path: dist
-      - name: Download Windows archive
-        uses: actions/download-artifact@v7
-        with:
-          name: ilic-windows-x86_64
           path: dist
       - name: Create checksums
         shell: bash
@@ -141,6 +133,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          api_root="repos/$GITHUB_REPOSITORY"
+          release_id=
 
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             release_tag=snapshot
@@ -148,42 +142,68 @@ jobs:
             release_notes=$(printf 'Moving snapshot built from `%s` ([workflow run](%s/actions/runs/%s)).\n' \
               "$GITHUB_SHA" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
 
-            if gh api --silent "repos/$GITHUB_REPOSITORY/git/ref/tags/$release_tag" >/dev/null 2>&1; then
-              gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$release_tag" \
+            if gh api --silent "$api_root/git/ref/tags/$release_tag" >/dev/null 2>&1; then
+              gh api --method PATCH "$api_root/git/refs/tags/$release_tag" \
                 -f sha="$GITHUB_SHA" -F force=true >/dev/null
             else
-              gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              gh api --method POST "$api_root/git/refs" \
                 -f ref="refs/tags/$release_tag" -f sha="$GITHUB_SHA" >/dev/null
             fi
 
-            if gh release view "$release_tag" >/dev/null 2>&1; then
-              gh release edit "$release_tag" \
-                --title "$release_title" \
-                --notes "$release_notes" \
-                --prerelease \
-                --latest=false
+            if release_id=$(gh api "$api_root/releases/tags/$release_tag" --jq .id 2>/dev/null); then
+              gh api --method PATCH "$api_root/releases/$release_id" \
+                -f name="$release_title" \
+                -f body="$release_notes" \
+                -F draft=false \
+                -F prerelease=true \
+                -f make_latest=false >/dev/null
             else
-              gh release create "$release_tag" \
-                --title "$release_title" \
-                --notes "$release_notes" \
-                --prerelease \
-                --latest=false
+              release_id=$(gh api --method POST "$api_root/releases" \
+                -f tag_name="$release_tag" \
+                -f name="$release_title" \
+                -f body="$release_notes" \
+                -F draft=false \
+                -F prerelease=true \
+                -f make_latest=false \
+                --jq .id)
             fi
-            gh release upload "$release_tag" dist/* --clobber
-            exit 0
+          else
+            release_tag="$GITHUB_REF_NAME"
+            # Keep this job checkout-free: validate the pushed tag through the API.
+            if ! gh api --silent "$api_root/git/ref/tags/$release_tag" >/dev/null 2>&1; then
+              echo "The pushed tag $release_tag does not exist on GitHub; refusing to create a release." >&2
+              exit 1
+            fi
+            if gh api --silent "$api_root/releases/tags/$release_tag" >/dev/null 2>&1; then
+              echo "A release already exists for $release_tag; stable releases are immutable." >&2
+              exit 1
+            fi
+            release_id=$(gh api --method POST "$api_root/releases" \
+              -f tag_name="$release_tag" \
+              -f name="ilic $release_tag" \
+              -F draft=false \
+              -F prerelease=false \
+              -F generate_release_notes=true \
+              -f make_latest=true \
+              --jq .id)
           fi
 
-          release_tag="$GITHUB_REF_NAME"
-          # Keep this job checkout-free: local tag verification requires git metadata.
-          if ! gh api --silent "repos/$GITHUB_REPOSITORY/git/ref/tags/$release_tag" >/dev/null 2>&1; then
-            echo "The pushed tag $release_tag does not exist on GitHub; refusing to create a release." >&2
-            exit 1
-          fi
-          if gh release view "$release_tag" >/dev/null 2>&1; then
-            echo "A release already exists for $release_tag; stable releases are immutable." >&2
-            exit 1
-          fi
-          gh release create "$release_tag" dist/* \
-            --generate-notes \
-            --title "ilic $release_tag" \
-            --latest=true
+          while IFS=$'\t' read -r existing_asset_id existing_asset_name; do
+            [[ -n "$existing_asset_id" ]] || continue
+            gh api --method DELETE "$api_root/releases/assets/$existing_asset_id" >/dev/null
+          done < <(
+            gh api --paginate "$api_root/releases/$release_id/assets?per_page=100" \
+              --jq '.[] | [.id, .name] | @tsv'
+          )
+
+          for asset_path in dist/*; do
+            asset_name=${asset_path##*/}
+            curl --fail --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header 'Accept: application/vnd.github+json' \
+              --header 'Content-Type: application/octet-stream' \
+              --data-binary "@$asset_path" \
+              "https://uploads.github.com/$api_root/releases/$release_id/assets?name=$asset_name" \
+              >/dev/null
+          done
