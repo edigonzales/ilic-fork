@@ -65,7 +65,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/check-windows-runtime-deps.ps1 -Binary build/ci/Release/ilic.exe
-
   native-debug-linux:
     name: Native Debug (Linux x86_64)
     runs-on: ubuntu-latest
@@ -86,7 +85,6 @@ jobs:
         run: cmake --build build/debug --parallel
       - name: Run native debug tests
         run: ctest --test-dir build/debug --output-on-failure
-
   native-sanitizers-linux:
     name: Native ASan+UBSan (Linux x86_64)
     runs-on: ubuntu-latest
@@ -114,7 +112,6 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
           LSAN_OPTIONS: exitcode=23
         run: ctest --test-dir build/sanitizers --output-on-failure -j2
-
   wasm-and-packages:
     name: WASM and JavaScript packages
     runs-on: ubuntu-latest
