@@ -292,7 +292,7 @@ namespace metamodel {
       // MetaElement.Name := AttributeName, ParameterName
       //                    as defined in the INTERLIS-Model
    public:
-      enum { NoSubDiv, SubDiv, ContSubDiv } SubdivisionKind;
+      enum { NoSubDiv, SubDiv, ContSubDiv } SubdivisionKind = NoSubDiv;
       bool Transient = false;
       list<Expression *> Derivates; // LIST
       // ROLE from ASSOCIATION LocalType
@@ -751,7 +751,7 @@ namespace metamodel {
 
    class View : public Class {
    public:
-      enum {Projection, Join, Union, Aggregation_All, Aggregation_Equal, Inspection_Normal, Inspection_Area} FormationKind;
+      enum {Projection, Join, Union, Aggregation_All, Aggregation_Equal, Inspection_Normal, Inspection_Area} FormationKind = Projection;
       list<Expression *> FormationParameter; // LIST
                           // PathOrInspFactor only
                           // Aggr.Equal: UniqueEl

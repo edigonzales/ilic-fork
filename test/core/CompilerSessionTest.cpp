@@ -1,7 +1,7 @@
 #include "ilic/Compiler.h"
 
 #include <algorithm>
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <iostream>
 #include <regex>
 
@@ -26,10 +26,10 @@ END AnyClassRegression.
    for (const auto &diagnostic : result.diagnostics) {
       if (!result.success) std::cerr << diagnostic.code << ": " << diagnostic.message << "\n";
    }
-   assert(result.success);
-   assert(result.errorCount == 0);
-   assert(!result.models.empty());
-   assert(session.sources().position(uri, 0).line == 0);
+   ILIC_REQUIRE(result.success);
+   ILIC_REQUIRE(result.errorCount == 0);
+   ILIC_REQUIRE(!result.models.empty());
+   ILIC_REQUIRE(session.sources().position(uri, 0).line == 0);
 
    const char *invalidUri = "memory:///UnknownDomain.ili";
    session.putSource(invalidUri, R"ili(INTERLIS 2.3;
@@ -44,12 +44,12 @@ END UnknownDomain.
    ilic::CompilationRequest invalidRequest;
    invalidRequest.roots.push_back(invalidUri);
    ilic::CompilationResult invalid = session.compile(invalidRequest);
-   assert(!invalid.success);
-   assert(!invalid.diagnostics.empty());
+   ILIC_REQUIRE(!invalid.success);
+   ILIC_REQUIRE(!invalid.diagnostics.empty());
    const std::regex completion("^inf: ilic completed with [0-9]+ errors?, no warnings [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$");
-   assert(std::any_of(invalid.transcript.begin(),invalid.transcript.end(),
+   ILIC_REQUIRE(std::any_of(invalid.transcript.begin(),invalid.transcript.end(),
       [&completion](const auto &line) { return std::regex_match(line,completion); }));
-   assert(std::none_of(invalid.transcript.begin(),invalid.transcript.end(),
+   ILIC_REQUIRE(std::none_of(invalid.transcript.begin(),invalid.transcript.end(),
       [](const auto &line) { return line.find("compiler run failed") != std::string::npos; }));
    bool located = false;
    bool specificallyCoded = false;
@@ -57,8 +57,8 @@ END UnknownDomain.
       if (diagnostic.range.valid && diagnostic.range.uri == invalidUri) located = true;
       if (diagnostic.code == "ILIC-NAME-TYPE-NOT-FOUND") specificallyCoded = true;
    }
-   assert(located);
-   assert(specificallyCoded);
+   ILIC_REQUIRE(located);
+   ILIC_REQUIRE(specificallyCoded);
 
    ilic::CompilerSession metaSession;
    const char *metaUri = "memory:///MetaAttributes.ili";
@@ -72,7 +72,7 @@ END MetaAttributes.
    ilic::CompilationRequest metaRequest;
    metaRequest.roots.push_back(metaUri);
    ilic::CompilationResult meta = metaSession.compile(metaRequest);
-   assert(meta.success);
+   ILIC_REQUIRE(meta.success);
    bool metaFound = false;
    for (const auto &model : meta.models) {
       if (model.name != "MetaAttributes") continue;
@@ -80,7 +80,7 @@ END MetaAttributes.
          if (attribute.name == "displayName" && attribute.value == "A model with spaces") metaFound = true;
       }
    }
-   assert(metaFound);
+   ILIC_REQUIRE(metaFound);
 
    ilic::CompilerSession translationSession;
    const char *translationUri = "memory:///ExternalTranslation.ili";
@@ -95,7 +95,7 @@ END Translation.
    translationRequest.externalMetaAttributes.push_back(
       {"Translation","ili2c.translationOf","Base"});
    ilic::CompilationResult translation = translationSession.compile(translationRequest);
-   assert(translation.success);
+   ILIC_REQUIRE(translation.success);
 
    ilic::CompilerSession diagnosticSession;
    const char *diagnosticUri = "memory:///DiagnosticQuality.ili";
@@ -125,8 +125,8 @@ END ModelB.
    ilic::CompilationRequest diagnosticRequest;
    diagnosticRequest.roots.push_back(diagnosticUri);
    const ilic::CompilationResult diagnosticResult = diagnosticSession.compile(diagnosticRequest);
-   assert(!diagnosticResult.success);
-   assert(std::count_if(diagnosticResult.diagnostics.begin(),diagnosticResult.diagnostics.end(),
+   ILIC_REQUIRE(!diagnosticResult.success);
+   ILIC_REQUIRE(std::count_if(diagnosticResult.diagnostics.begin(),diagnosticResult.diagnostics.end(),
       [](const auto &diagnostic) {
          return diagnostic.code == "ILIC-TRANSLATION-ABSTRACT-MISMATCH" &&
             diagnostic.message.find("nullptr") == std::string::npos &&
@@ -152,8 +152,8 @@ END AnonymousAssociation.
    ilic::CompilationRequest anonymousRequest;
    anonymousRequest.roots.push_back(anonymousUri);
    const auto anonymousResult = anonymousAssociationSession.compile(anonymousRequest);
-   assert(!anonymousResult.success);
-   assert(std::any_of(anonymousResult.diagnostics.begin(),anonymousResult.diagnostics.end(),
+   ILIC_REQUIRE(!anonymousResult.success);
+   ILIC_REQUIRE(std::any_of(anonymousResult.diagnostics.begin(),anonymousResult.diagnostics.end(),
       [](const auto &diagnostic) {
          return diagnostic.code == "ILIC-ASSOCIATION-DUPLICATE-ROLE" &&
             diagnostic.message.find("anonymous association") != std::string::npos &&
@@ -179,28 +179,29 @@ END InvalidAssociationBase.
    invalidAssociationRequest.roots.push_back(invalidAssociationUri);
    const auto invalidAssociationResult =
       invalidAssociationSession.compile(invalidAssociationRequest);
-   assert(!invalidAssociationResult.success);
-   assert(std::count_if(
+   ILIC_REQUIRE(!invalidAssociationResult.success);
+   ILIC_REQUIRE(std::count_if(
       invalidAssociationResult.diagnostics.begin(),
       invalidAssociationResult.diagnostics.end(),
       [](const auto &diagnostic) {
          return diagnostic.severity == ilic::DiagnosticSeverity::Error;
       }) == 1);
+   ILIC_REQUIRE(invalidAssociationResult.diagnostics.size() == 1);
    const auto &invalidAssociationDiagnostic =
       invalidAssociationResult.diagnostics.front();
-   assert(invalidAssociationDiagnostic.code
+   ILIC_REQUIRE(invalidAssociationDiagnostic.code
       == "ILIC-ASSOCIATION-INVALID-BASE-KIND");
-   assert(invalidAssociationDiagnostic.message.find("NotAnAssociation")
+   ILIC_REQUIRE(invalidAssociationDiagnostic.message.find("NotAnAssociation")
       != std::string::npos);
-   assert(invalidAssociationDiagnostic.message.find("CLASS")
+   ILIC_REQUIRE(invalidAssociationDiagnostic.message.find("CLASS")
       != std::string::npos);
-   assert(invalidAssociationDiagnostic.message.find("ASSOCIATION")
+   ILIC_REQUIRE(invalidAssociationDiagnostic.message.find("ASSOCIATION")
       != std::string::npos);
-   assert(invalidAssociationDiagnostic.range.valid);
-   assert(invalidAssociationDiagnostic.range.start.line == 6);
-   assert(invalidAssociationDiagnostic.relatedInformation.size() == 1);
-   assert(invalidAssociationDiagnostic.relatedInformation.front().range.valid);
-   assert(invalidAssociationDiagnostic.relatedInformation.front().range.start.line == 5);
+   ILIC_REQUIRE(invalidAssociationDiagnostic.range.valid);
+   ILIC_REQUIRE(invalidAssociationDiagnostic.range.start.line == 6);
+   ILIC_REQUIRE(invalidAssociationDiagnostic.relatedInformation.size() == 1);
+   ILIC_REQUIRE(invalidAssociationDiagnostic.relatedInformation.front().range.valid);
+   ILIC_REQUIRE(invalidAssociationDiagnostic.relatedInformation.front().range.start.line == 5);
 
    ilic::CompilerSession attributeExtensionSession;
    const char *attributeExtensionUri =
@@ -221,19 +222,20 @@ END IncompatibleAttributeExtension.
    attributeExtensionRequest.roots.push_back(attributeExtensionUri);
    const auto attributeExtensionResult =
       attributeExtensionSession.compile(attributeExtensionRequest);
-   assert(!attributeExtensionResult.success);
-   assert(attributeExtensionResult.errorCount == 1);
+   ILIC_REQUIRE(!attributeExtensionResult.success);
+   ILIC_REQUIRE(attributeExtensionResult.errorCount == 1);
+   ILIC_REQUIRE(attributeExtensionResult.diagnostics.size() == 1);
    const auto &attributeExtensionDiagnostic =
       attributeExtensionResult.diagnostics.front();
-   assert(attributeExtensionDiagnostic.code
+   ILIC_REQUIRE(attributeExtensionDiagnostic.code
       == "ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION");
-   assert(attributeExtensionDiagnostic.message.find("Position")
+   ILIC_REQUIRE(attributeExtensionDiagnostic.message.find("Position")
       != std::string::npos);
-   assert(attributeExtensionDiagnostic.message.find("Height")
+   ILIC_REQUIRE(attributeExtensionDiagnostic.message.find("Height")
       != std::string::npos);
-   assert(attributeExtensionDiagnostic.range.valid);
-   assert(attributeExtensionDiagnostic.range.start.line == 7);
-   assert(attributeExtensionDiagnostic.relatedInformation.size() == 2);
+   ILIC_REQUIRE(attributeExtensionDiagnostic.range.valid);
+   ILIC_REQUIRE(attributeExtensionDiagnostic.range.start.line == 7);
+   ILIC_REQUIRE(attributeExtensionDiagnostic.relatedInformation.size() == 2);
 
    ilic::CompilerSession classExtensionSession;
    const char *classExtensionUri = "memory:///ClassExtendedRequired.ili";
@@ -252,20 +254,21 @@ END ClassExtendedRequired.
    classExtensionRequest.roots.push_back(classExtensionUri);
    const auto classExtensionResult =
       classExtensionSession.compile(classExtensionRequest);
-   assert(!classExtensionResult.success);
-   assert(classExtensionResult.errorCount == 1);
+   ILIC_REQUIRE(!classExtensionResult.success);
+   ILIC_REQUIRE(classExtensionResult.errorCount == 1);
+   ILIC_REQUIRE(classExtensionResult.diagnostics.size() == 1);
    const auto &classExtensionDiagnostic =
       classExtensionResult.diagnostics.front();
-   assert(classExtensionDiagnostic.code == "ILIC-CLASS-EXTENDED-REQUIRED");
-   assert(classExtensionDiagnostic.message.find("DerivedTopic")
+   ILIC_REQUIRE(classExtensionDiagnostic.code == "ILIC-CLASS-EXTENDED-REQUIRED");
+   ILIC_REQUIRE(classExtensionDiagnostic.message.find("DerivedTopic")
       != std::string::npos);
-   assert(classExtensionDiagnostic.message.find("BaseTopic")
+   ILIC_REQUIRE(classExtensionDiagnostic.message.find("BaseTopic")
       != std::string::npos);
-   assert(classExtensionDiagnostic.message.find("EXTENDED")
+   ILIC_REQUIRE(classExtensionDiagnostic.message.find("EXTENDED")
       != std::string::npos);
-   assert(classExtensionDiagnostic.range.valid);
-   assert(classExtensionDiagnostic.range.start.line == 6);
-   assert(classExtensionDiagnostic.relatedInformation.size() == 1);
+   ILIC_REQUIRE(classExtensionDiagnostic.range.valid);
+   ILIC_REQUIRE(classExtensionDiagnostic.range.start.line == 6);
+   ILIC_REQUIRE(classExtensionDiagnostic.relatedInformation.size() == 1);
 
    struct NamespaceCase {
       const char *uri;
@@ -316,20 +319,21 @@ END DuplicateClass.
       ilic::CompilationRequest namespaceRequest;
       namespaceRequest.roots.push_back(namespaceCase.uri);
       const auto namespaceResult = namespaceSession.compile(namespaceRequest);
-      assert(!namespaceResult.success);
-      assert(namespaceResult.errorCount == 1);
+      ILIC_REQUIRE(!namespaceResult.success);
+      ILIC_REQUIRE(namespaceResult.errorCount == 1);
+      ILIC_REQUIRE(namespaceResult.diagnostics.size() == 1);
       const auto &namespaceDiagnostic = namespaceResult.diagnostics.front();
-      assert(namespaceDiagnostic.code
+      ILIC_REQUIRE(namespaceDiagnostic.code
          == "ILIC-NAMESPACE-DUPLICATE-DECLARATION");
-      assert(namespaceDiagnostic.message.find(namespaceCase.firstKind)
+      ILIC_REQUIRE(namespaceDiagnostic.message.find(namespaceCase.firstKind)
          != std::string::npos);
-      assert(namespaceDiagnostic.message.find(namespaceCase.secondKind)
+      ILIC_REQUIRE(namespaceDiagnostic.message.find(namespaceCase.secondKind)
          != std::string::npos);
-      assert(namespaceDiagnostic.range.valid);
-      assert(namespaceDiagnostic.range.start.line == namespaceCase.duplicateLine);
-      assert(namespaceDiagnostic.relatedInformation.size() == 1);
-      assert(namespaceDiagnostic.relatedInformation.front().range.valid);
-      assert(namespaceDiagnostic.relatedInformation.front().range.start.line
+      ILIC_REQUIRE(namespaceDiagnostic.range.valid);
+      ILIC_REQUIRE(namespaceDiagnostic.range.start.line == namespaceCase.duplicateLine);
+      ILIC_REQUIRE(namespaceDiagnostic.relatedInformation.size() == 1);
+      ILIC_REQUIRE(namespaceDiagnostic.relatedInformation.front().range.valid);
+      ILIC_REQUIRE(namespaceDiagnostic.relatedInformation.front().range.start.line
          < namespaceDiagnostic.range.start.line);
    }
    return 0;

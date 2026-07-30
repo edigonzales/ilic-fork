@@ -1,7 +1,7 @@
 #include "ilic/Compiler.h"
 #include "ilic/Formatter.h"
 
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 
 int main()
 {
@@ -26,16 +26,17 @@ END Formatting.
 
    ilic::Formatter formatter;
    ilic::FormatResult formatted = formatter.format(uri,source);
-   assert(formatted.success && formatted.applicable);
-   assert(formatted.text.find("!! this comment must survive") != std::string::npos);
-   assert(formatted.text.find("!!@ displayName=\"Formatting test\"") != std::string::npos);
-   assert(formatted.text.find("  TOPIC Topic =") != std::string::npos);
-   assert(formatter.format(uri,formatted.text).text == formatted.text);
+   ILIC_REQUIRE(formatted.success);
+   ILIC_REQUIRE(formatted.applicable);
+   ILIC_REQUIRE(formatted.text.find("!! this comment must survive") != std::string::npos);
+   ILIC_REQUIRE(formatted.text.find("!!@ displayName=\"Formatting test\"") != std::string::npos);
+   ILIC_REQUIRE(formatted.text.find("  TOPIC Topic =") != std::string::npos);
+   ILIC_REQUIRE(formatter.format(uri,formatted.text).text == formatted.text);
 
    ilic::CompilerSession session;
    session.putSource(uri,formatted.text);
    ilic::CompilationRequest request;
    request.roots.push_back(uri);
-   assert(session.compile(request).success);
+   ILIC_REQUIRE(session.compile(request).success);
    return 0;
 }

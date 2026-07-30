@@ -1,6 +1,6 @@
 #include "ilic/Compiler.h"
 
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
@@ -32,7 +32,7 @@ ilic::CompilationResult compile(
    return session.compile(request);
 }
 
-const ilic::Diagnostic &assert_single_diagnostic(
+const ilic::Diagnostic &require_single_diagnostic(
    const ilic::CompilationResult &result,
    const std::string &code,
    size_t line,
@@ -48,27 +48,27 @@ const ilic::Diagnostic &assert_single_diagnostic(
          std::cerr << diagnostic.code << ": " << diagnostic.message << "\n";
       }
    }
-   assert(!result.success);
-   assert(result.errorCount == 1);
-   assert(result.diagnostics.size() == 1);
+   ILIC_REQUIRE(!result.success);
+   ILIC_REQUIRE(result.errorCount == 1);
+   ILIC_REQUIRE(result.diagnostics.size() == 1);
    const auto &diagnostic = result.diagnostics.front();
-   assert(diagnostic.code == code);
-   assert(diagnostic.range.valid);
+   ILIC_REQUIRE(diagnostic.code == code);
+   ILIC_REQUIRE(diagnostic.range.valid);
    if (diagnostic.range.start.line != line) {
       std::cerr << code << " expected zero-based line " << line
                 << ", got " << diagnostic.range.start.line << "\n";
    }
-   assert(diagnostic.range.start.line == line);
-   assert(diagnostic.relatedInformation.size() >= minimumRelatedInformation);
+   ILIC_REQUIRE(diagnostic.range.start.line == line);
+   ILIC_REQUIRE(diagnostic.relatedInformation.size() >= minimumRelatedInformation);
    for (const auto &part : messageParts) {
       if (diagnostic.message.find(part) == std::string::npos) {
          std::cerr << code << " message does not contain \"" << part
                    << "\": " << diagnostic.message << "\n";
       }
-      assert(diagnostic.message.find(part) != std::string::npos);
+      ILIC_REQUIRE(diagnostic.message.find(part) != std::string::npos);
    }
-   assert(diagnostic.message.find("TOP") == std::string::npos);
-   assert(diagnostic.message.find("nullptr") == std::string::npos);
+   ILIC_REQUIRE(diagnostic.message.find("TOP") == std::string::npos);
+   ILIC_REQUIRE(diagnostic.message.find("nullptr") == std::string::npos);
    return diagnostic;
 }
 
@@ -114,14 +114,14 @@ TRANSLATION OF ModelA [ "1" ] =
   END TopicB;
 END ModelB.
 )ili");
-   const auto &associationDiagnostic = assert_single_diagnostic(
+   const auto &associationDiagnostic = require_single_diagnostic(
       association,
       "ILIC-TRANSLATION-DERIVED-ASSOCIATION-MISMATCH",
       30,
       {"assocB4","IntersectionB2","assocA4","IntersectionA1"},
       3
    );
-   assert(associationDiagnostic.relatedInformation.front().range.uri
+   ILIC_REQUIRE(associationDiagnostic.relatedInformation.front().range.uri
       == associationUri);
 
    const char *coordinateUri = "memory:///CoordinateDimensionMismatch.ili";
@@ -143,7 +143,7 @@ TRANSLATION OF ModelA [ "1" ] =
   END TopicB;
 END ModelB.
 )ili");
-   assert_single_diagnostic(
+   require_single_diagnostic(
       coordinate,
       "ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH",
       12,
@@ -170,7 +170,7 @@ TRANSLATION OF ModelA [ "1" ] =
   END TopicB;
 END ModelB.
 )ili");
-   assert_single_diagnostic(
+   require_single_diagnostic(
       enumeration,
       "ILIC-TRANSLATION-ENUM-FINAL-MISMATCH",
       14,
@@ -191,14 +191,14 @@ TRANSLATION OF ModelA [ "1" ] =
   END TopicB;
 END ModelB.
 )ili");
-   const auto &horizontalDiagnostic = assert_single_diagnostic(
+   const auto &horizontalDiagnostic = require_single_diagnostic(
       horizontal,
       "ILIC-TRANSLATION-DOMAIN-REFERENCE-MISMATCH",
       9,
       {"attrB3","INTERLIS.VALIGNMENT","attrA3","INTERLIS.HALIGNMENT"},
       3
    );
-   assert(horizontalDiagnostic.relatedInformation.front().range.uri
+   ILIC_REQUIRE(horizontalDiagnostic.relatedInformation.front().range.uri
       == horizontalUri);
 
    const char *verticalUri = "memory:///VerticalAlignmentMismatch.ili";
@@ -215,7 +215,7 @@ TRANSLATION OF ModelA [ "1" ] =
   END TopicB;
 END ModelB.
 )ili");
-   assert_single_diagnostic(
+   require_single_diagnostic(
       vertical,
       "ILIC-TRANSLATION-DOMAIN-REFERENCE-MISMATCH",
       9,
@@ -236,7 +236,7 @@ MODEL GenericCoordinateRangeMismatch AT "https://example.invalid" VERSION "1" =
   END Topic;
 END GenericCoordinateRangeMismatch.
 )ili");
-   const auto &genericRangeDiagnostic = assert_single_diagnostic(
+   const auto &genericRangeDiagnostic = require_single_diagnostic(
       genericRange,
       "ILIC-GENERIC-COORD-RANGE-MISMATCH",
       6,
@@ -244,9 +244,9 @@ END GenericCoordinateRangeMismatch.
        "allowed maximum 100"},
       2
    );
-   assert(genericRangeDiagnostic.relatedInformation.front().range.uri
+   ILIC_REQUIRE(genericRangeDiagnostic.relatedInformation.front().range.uri
       == genericRangeUri);
-   assert(genericRangeDiagnostic.relatedInformation[1].range.uri
+   ILIC_REQUIRE(genericRangeDiagnostic.relatedInformation[1].range.uri
       == genericRangeUri);
 
    const char *runtimeParameterUri = "memory:///RuntimeParameterMismatch.ili";
@@ -259,20 +259,20 @@ TRANSLATION OF ModelA [ "1" ] =
   PARAMETER paramB : TEXT * 20;
 END ModelB.
 )ili");
-   const auto &runtimeParameterDiagnostic = assert_single_diagnostic(
+   const auto &runtimeParameterDiagnostic = require_single_diagnostic(
       runtimeParameter,
       "ILIC-TRANSLATION-TYPE-PROPERTY-MISMATCH",
       6,
       {"paramB","paramA","mandatory"}
    );
-   assert(runtimeParameterDiagnostic.range.uri == runtimeParameterUri);
-   assert(runtimeParameterDiagnostic.range.start.character == 12);
-   assert(runtimeParameterDiagnostic.range.end.character == 18);
-   assert(runtimeParameterDiagnostic.relatedInformation.front().range.uri
+   ILIC_REQUIRE(runtimeParameterDiagnostic.range.uri == runtimeParameterUri);
+   ILIC_REQUIRE(runtimeParameterDiagnostic.range.start.character == 12);
+   ILIC_REQUIRE(runtimeParameterDiagnostic.range.end.character == 18);
+   ILIC_REQUIRE(runtimeParameterDiagnostic.relatedInformation.front().range.uri
       == runtimeParameterUri);
-   assert(runtimeParameterDiagnostic.relatedInformation.front().range.start.line == 2);
-   assert(runtimeParameterDiagnostic.relatedInformation.front().range.start.character == 12);
-   assert(runtimeParameterDiagnostic.relatedInformation.front().range.end.character == 18);
+   ILIC_REQUIRE(runtimeParameterDiagnostic.relatedInformation.front().range.start.line == 2);
+   ILIC_REQUIRE(runtimeParameterDiagnostic.relatedInformation.front().range.start.character == 12);
+   ILIC_REQUIRE(runtimeParameterDiagnostic.relatedInformation.front().range.end.character == 18);
 
    const char *duplicateRuntimeParameterUri =
       "memory:///DuplicateRuntimeParameter.ili";
@@ -284,17 +284,17 @@ MODEL DuplicateRuntimeParameter AT "https://example.invalid" VERSION "1" =
     repeated : TEXT * 20;
 END DuplicateRuntimeParameter.
 )ili");
-   const auto &duplicateRuntimeParameterDiagnostic = assert_single_diagnostic(
+   const auto &duplicateRuntimeParameterDiagnostic = require_single_diagnostic(
       duplicateRuntimeParameter,
       "ILIC-MODEL-RUNTIME-PARAMETER-DUPLICATE",
       4,
       {"repeated","DuplicateRuntimeParameter"},
       0
    );
-   assert(duplicateRuntimeParameterDiagnostic.range.uri
+   ILIC_REQUIRE(duplicateRuntimeParameterDiagnostic.range.uri
       == duplicateRuntimeParameterUri);
-   assert(duplicateRuntimeParameterDiagnostic.range.start.character == 4);
-   assert(duplicateRuntimeParameterDiagnostic.range.end.character == 12);
+   ILIC_REQUIRE(duplicateRuntimeParameterDiagnostic.range.start.character == 4);
+   ILIC_REQUIRE(duplicateRuntimeParameterDiagnostic.range.end.character == 12);
 
    const char *derivedViewAttributeUri =
       "memory:///DerivedViewAttributeMismatch.ili";
@@ -324,16 +324,16 @@ TRANSLATION OF ModelA [ "1" ] =
   END TopicB;
 END ModelB.
 )ili");
-   const auto &derivedViewAttributeDiagnostic = assert_single_diagnostic(
+   const auto &derivedViewAttributeDiagnostic = require_single_diagnostic(
       derivedViewAttribute,
       "ILIC-TRANSLATION-REFERENCE-MISMATCH",
       20,
       {"B0p","A0p","class reference"}
    );
-   assert(derivedViewAttributeDiagnostic.range.uri == derivedViewAttributeUri);
-   assert(derivedViewAttributeDiagnostic.relatedInformation.front().range.uri
+   ILIC_REQUIRE(derivedViewAttributeDiagnostic.range.uri == derivedViewAttributeUri);
+   ILIC_REQUIRE(derivedViewAttributeDiagnostic.relatedInformation.front().range.uri
       == derivedViewAttributeUri);
-   assert(derivedViewAttributeDiagnostic.relatedInformation.front().range.start.line == 8);
+   ILIC_REQUIRE(derivedViewAttributeDiagnostic.relatedInformation.front().range.start.line == 8);
 
    const char *viewDependencyUri = "memory:///ViewDependencyLocation.ili";
    const auto viewDependency = compile(viewDependencyUri,R"ili(INTERLIS 2.3;
@@ -350,18 +350,18 @@ MODEL ViewDependencyLocation AT "https://example.invalid" VERSION "1" =
   END Usage;
 END ViewDependencyLocation.
 )ili");
-   const auto &viewDependencyDiagnostic = assert_single_diagnostic(
+   const auto &viewDependencyDiagnostic = require_single_diagnostic(
       viewDependency,
       "ILIC-TOPIC-DEPENDENCY-REQUIRED",
       8,
       {"view base","Usage","Base"}
    );
-   assert(viewDependencyDiagnostic.range.uri == viewDependencyUri);
-   assert(viewDependencyDiagnostic.range.start.character == 48);
-   assert(viewDependencyDiagnostic.range.end.character == 52);
-   assert(viewDependencyDiagnostic.relatedInformation.front().range.uri
+   ILIC_REQUIRE(viewDependencyDiagnostic.range.uri == viewDependencyUri);
+   ILIC_REQUIRE(viewDependencyDiagnostic.range.start.character == 48);
+   ILIC_REQUIRE(viewDependencyDiagnostic.range.end.character == 52);
+   ILIC_REQUIRE(viewDependencyDiagnostic.relatedInformation.front().range.uri
       == viewDependencyUri);
-   assert(viewDependencyDiagnostic.relatedInformation.front().range.start.line == 2);
+   ILIC_REQUIRE(viewDependencyDiagnostic.relatedInformation.front().range.start.line == 2);
 
    const auto fileBackedViewDependencyUri =
       std::filesystem::temp_directory_path() /
@@ -388,16 +388,16 @@ END FileBackedLocation.
    fileBackedRequest.roots.push_back(fileBackedViewDependencyUri.string());
    const auto fileBackedViewDependency = fileBackedSession.compile(fileBackedRequest);
    std::filesystem::remove(fileBackedViewDependencyUri);
-   const auto &fileBackedViewDependencyDiagnostic = assert_single_diagnostic(
+   const auto &fileBackedViewDependencyDiagnostic = require_single_diagnostic(
       fileBackedViewDependency,
       "ILIC-TOPIC-DEPENDENCY-REQUIRED",
       8,
       {"view base","Usage","Base"}
    );
-   assert(fileBackedViewDependencyDiagnostic.range.uri
+   ILIC_REQUIRE(fileBackedViewDependencyDiagnostic.range.uri
       == fileBackedViewDependencyUri.string());
-   assert(fileBackedViewDependencyDiagnostic.range.start.character == 44);
-   assert(fileBackedViewDependencyDiagnostic.range.end.character == 48);
+   ILIC_REQUIRE(fileBackedViewDependencyDiagnostic.range.start.character == 44);
+   ILIC_REQUIRE(fileBackedViewDependencyDiagnostic.range.end.character == 48);
 
    const char *viewNamespaceUri = "memory:///ViewNamespaceLocation.ili";
    const auto viewNamespace = compile(viewNamespaceUri,R"ili(INTERLIS 2.3;
@@ -418,18 +418,18 @@ MODEL ViewNamespaceLocation AT "https://example.invalid" VERSION "1" =
   END Usage;
 END ViewNamespaceLocation.
 )ili");
-   const auto &viewNamespaceDiagnostic = assert_single_diagnostic(
+   const auto &viewNamespaceDiagnostic = require_single_diagnostic(
       viewNamespace,
       "ILIC-NAMESPACE-MEMBER-DUPLICATE",
       13,
       {"base","Items"}
    );
-   assert(viewNamespaceDiagnostic.range.uri == viewNamespaceUri);
-   assert(viewNamespaceDiagnostic.range.start.character == 15);
-   assert(viewNamespaceDiagnostic.range.end.character == 19);
-   assert(viewNamespaceDiagnostic.relatedInformation.front().range.uri
+   ILIC_REQUIRE(viewNamespaceDiagnostic.range.uri == viewNamespaceUri);
+   ILIC_REQUIRE(viewNamespaceDiagnostic.range.start.character == 15);
+   ILIC_REQUIRE(viewNamespaceDiagnostic.range.end.character == 19);
+   ILIC_REQUIRE(viewNamespaceDiagnostic.relatedInformation.front().range.uri
       == viewNamespaceUri);
-   assert(viewNamespaceDiagnostic.relatedInformation.front().range.start.line == 10);
+   ILIC_REQUIRE(viewNamespaceDiagnostic.relatedInformation.front().range.start.line == 10);
 
    const std::string translationBaseUri = "memory:///translation/Base.ili";
    const std::string translationUri = "memory:///translation/Translated.ili";
@@ -454,17 +454,17 @@ END TranslatedModel.
       {translationBaseUri,translationUri},
       {translationUri,translationBaseUri}}) {
       const auto result = compile(translationSources,roots);
-      const auto &diagnostic = assert_single_diagnostic(
+      const auto &diagnostic = require_single_diagnostic(
          result,"ILIC-TRANSLATION-TYPE-PROPERTY-MISMATCH",4,
          {"ValueTranslated","Value","text length"});
-      assert(diagnostic.range.uri == translationUri);
-      assert(diagnostic.relatedInformation.front().range.uri == translationBaseUri);
-      assert(diagnostic.range.start.character == 28);
-      assert(diagnostic.range.end.character == 43);
-      assert(diagnostic.relatedInformation.front().range.start.line == 3);
-      assert(diagnostic.relatedInformation.front().range.start.character == 22);
-      assert(diagnostic.relatedInformation.front().range.end.line == 3);
-      assert(diagnostic.relatedInformation.front().range.end.character == 27);
+      ILIC_REQUIRE(diagnostic.range.uri == translationUri);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.uri == translationBaseUri);
+      ILIC_REQUIRE(diagnostic.range.start.character == 28);
+      ILIC_REQUIRE(diagnostic.range.end.character == 43);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.start.line == 3);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.start.character == 22);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.end.line == 3);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.end.character == 27);
    }
 
    const std::string inheritanceBaseUri = "memory:///inheritance/Base.ili";
@@ -490,17 +490,17 @@ END DerivedTypes.
       {inheritanceBaseUri,inheritanceUri},
       {inheritanceUri,inheritanceBaseUri}}) {
       const auto result = compile(inheritanceSources,roots);
-      const auto &diagnostic = assert_single_diagnostic(
+      const auto &diagnostic = require_single_diagnostic(
          result,"ILIC-ATTRIBUTE-INCOMPATIBLE-EXTENSION",4,
          {"Value","NUMERIC","TEXT"});
-      assert(diagnostic.range.uri == inheritanceUri);
-      assert(diagnostic.relatedInformation.front().range.uri == inheritanceBaseUri);
-      assert(diagnostic.range.start.character == 4);
-      assert(diagnostic.range.end.character == 9);
-      assert(diagnostic.relatedInformation.front().range.start.line == 3);
-      assert(diagnostic.relatedInformation.front().range.start.character == 4);
-      assert(diagnostic.relatedInformation.front().range.end.line == 3);
-      assert(diagnostic.relatedInformation.front().range.end.character == 9);
+      ILIC_REQUIRE(diagnostic.range.uri == inheritanceUri);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.uri == inheritanceBaseUri);
+      ILIC_REQUIRE(diagnostic.range.start.character == 4);
+      ILIC_REQUIRE(diagnostic.range.end.character == 9);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.start.line == 3);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.start.character == 4);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.end.line == 3);
+      ILIC_REQUIRE(diagnostic.relatedInformation.front().range.end.character == 9);
    }
 
    const std::string genericBaseUri = "memory:///generic/Base.ili";
@@ -524,19 +524,19 @@ END ConcreteModel.
       {genericBaseUri,genericUri},
       {genericUri,genericBaseUri}}) {
       const auto result = compile(genericSources,roots);
-      const auto &diagnostic = assert_single_diagnostic(
+      const auto &diagnostic = require_single_diagnostic(
          result,"ILIC-GENERIC-COORD-RANGE-MISMATCH",5,
          {"ConcreteCoord","GenericCoord","axis 1","maximum 200",
           "allowed maximum 100"},2);
-      assert(diagnostic.range.uri == genericUri);
-      assert(diagnostic.relatedInformation[0].range.uri == genericUri);
-      assert(diagnostic.relatedInformation[1].range.uri == genericBaseUri);
-      assert(diagnostic.relatedInformation[0].range.start.line == 3);
-      assert(diagnostic.relatedInformation[0].range.start.character == 9);
-      assert(diagnostic.relatedInformation[0].range.end.character == 22);
-      assert(diagnostic.relatedInformation[1].range.start.line == 2);
-      assert(diagnostic.relatedInformation[1].range.start.character == 9);
-      assert(diagnostic.relatedInformation[1].range.end.character == 21);
+      ILIC_REQUIRE(diagnostic.range.uri == genericUri);
+      ILIC_REQUIRE(diagnostic.relatedInformation[0].range.uri == genericUri);
+      ILIC_REQUIRE(diagnostic.relatedInformation[1].range.uri == genericBaseUri);
+      ILIC_REQUIRE(diagnostic.relatedInformation[0].range.start.line == 3);
+      ILIC_REQUIRE(diagnostic.relatedInformation[0].range.start.character == 9);
+      ILIC_REQUIRE(diagnostic.relatedInformation[0].range.end.character == 22);
+      ILIC_REQUIRE(diagnostic.relatedInformation[1].range.start.line == 2);
+      ILIC_REQUIRE(diagnostic.relatedInformation[1].range.start.character == 9);
+      ILIC_REQUIRE(diagnostic.relatedInformation[1].range.end.character == 21);
    }
    return 0;
 }

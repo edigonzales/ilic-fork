@@ -2,7 +2,7 @@
 #include "ilic/Semantic.h"
 
 #include <algorithm>
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <regex>
 #include <string>
 
@@ -50,99 +50,100 @@ END Semantic.
    request.roots = {uri};
    const auto compileCountBefore = ilic::CompilerSessionTestAccess::compileInvocationCount(session);
    const ilic::CompilationAnalysisResult analysis = session.compileAndAnalyze(request);
-   assert(ilic::CompilerSessionTestAccess::compileInvocationCount(session) == compileCountBefore + 1);
+   ILIC_REQUIRE(ilic::CompilerSessionTestAccess::compileInvocationCount(session) == compileCountBefore + 1);
    const ilic::SemanticSnapshot &snapshot = analysis.semantic;
-   assert(snapshot.success);
-   assert(analysis.compilation.success);
+   ILIC_REQUIRE(snapshot.success);
+   ILIC_REQUIRE(analysis.compilation.success);
    const std::regex completion("^inf: ilic completed with no errors, no warnings [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$");
-   assert(std::any_of(analysis.compilation.transcript.begin(),analysis.compilation.transcript.end(),
+   ILIC_REQUIRE(std::any_of(analysis.compilation.transcript.begin(),analysis.compilation.transcript.end(),
       [&completion](const auto &line) { return std::regex_match(line,completion); }));
-   assert(std::none_of(analysis.compilation.transcript.begin(),analysis.compilation.transcript.end(),
+   ILIC_REQUIRE(std::none_of(analysis.compilation.transcript.begin(),analysis.compilation.transcript.end(),
       [](const auto &line) { return line.find("compiler run done") != std::string::npos; }));
-   assert(snapshot.documentVersions.at(uri) == 9);
-   assert(snapshot.documentVersions.count(unrelatedUri) == 0);
-   assert(analysis.syntax.size() == 2);
-   assert(std::any_of(analysis.syntax.begin(),analysis.syntax.end(),[&baseUri](const auto &syntax) {
+   ILIC_REQUIRE(snapshot.documentVersions.count(uri) == 1);
+   ILIC_REQUIRE(snapshot.documentVersions.at(uri) == 9);
+   ILIC_REQUIRE(snapshot.documentVersions.count(unrelatedUri) == 0);
+   ILIC_REQUIRE(analysis.syntax.size() == 2);
+   ILIC_REQUIRE(std::any_of(analysis.syntax.begin(),analysis.syntax.end(),[&baseUri](const auto &syntax) {
       return syntax.uri == baseUri;
    }));
-   assert(std::none_of(analysis.syntax.begin(),analysis.syntax.end(),[&unrelatedUri](const auto &syntax) {
+   ILIC_REQUIRE(std::none_of(analysis.syntax.begin(),analysis.syntax.end(),[&unrelatedUri](const auto &syntax) {
       return syntax.uri == unrelatedUri;
    }));
-   assert(snapshot.missingModels.empty());
-   assert(std::any_of(snapshot.symbols.begin(),snapshot.symbols.end(),[](const auto &symbol) {
+   ILIC_REQUIRE(snapshot.missingModels.empty());
+   ILIC_REQUIRE(std::any_of(snapshot.symbols.begin(),snapshot.symbols.end(),[](const auto &symbol) {
       return symbol.qualifiedName == "Semantic.Data.Item" && symbol.kind == "class" &&
          symbol.selectionRange.valid && symbol.selectionRange.start.line == 7 &&
          symbol.selectionRange.start.character == 10 && symbol.selectionRange.end.character == 14 &&
          symbol.endRange.valid && symbol.endRange.start.line == 9 &&
          symbol.endRange.start.character == 8 && symbol.endRange.end.character == 12;
    }));
-   assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
+   ILIC_REQUIRE(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
       return reference.kind == "inheritance" && reference.range.valid &&
          reference.range.start.line == 7 && reference.range.start.character == 23 &&
          reference.range.end.character == 27;
    }));
-   assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),
+   ILIC_REQUIRE(std::any_of(snapshot.references.begin(),snapshot.references.end(),
       [&semanticSource](const auto &reference) {
       return reference.kind == "type" && reference.range.valid &&
          reference.range.start.line == 5 && reference.range.start.character == 56 &&
          reference.range.end.character == 62 &&
          reference.range.start.byteOffset == semanticSource.find("Remote;");
    }));
-   assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
+   ILIC_REQUIRE(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
       return reference.kind == "qualifier" && reference.range.valid &&
          reference.range.start.line == 5 && reference.range.start.character == 44 &&
          reference.range.end.character == 55;
    }));
-   assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
+   ILIC_REQUIRE(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
       return reference.kind == "role" && reference.range.valid &&
          reference.range.start.line == 11 && reference.range.start.character == 18 &&
          reference.range.end.character == 22;
    }));
-   assert(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
+   ILIC_REQUIRE(std::any_of(snapshot.references.begin(),snapshot.references.end(),[](const auto &reference) {
       return reference.kind == "import" && reference.range.valid &&
          reference.range.start.line == 2 && reference.range.start.character == 10 &&
          reference.range.end.character == 21;
    }));
-   assert(std::any_of(snapshot.dependencies.begin(),snapshot.dependencies.end(),
+   ILIC_REQUIRE(std::any_of(snapshot.dependencies.begin(),snapshot.dependencies.end(),
       [&uri,&baseUri](const auto &dependency) {
       return dependency.sourceUri == uri && dependency.targetUri == baseUri &&
          dependency.model == "BaseLibrary" && dependency.range.valid &&
          dependency.range.start.line == 2 && dependency.range.start.character == 10;
    }));
-   assert(std::any_of(snapshot.diagram.edges.begin(),snapshot.diagram.edges.end(),[](const auto &edge) {
+   ILIC_REQUIRE(std::any_of(snapshot.diagram.edges.begin(),snapshot.diagram.edges.end(),[](const auto &edge) {
       return edge.kind == "association" && edge.label == "left–right" &&
          edge.sourceCardinality == "1" && edge.targetCardinality == "0..*" &&
          edge.cardinality == "left 1 / right 0..*";
    }));
-   assert(!snapshot.documentation.title.empty());
-   assert(snapshot.documentation.models.size() == 1);
+   ILIC_REQUIRE(!snapshot.documentation.title.empty());
+   ILIC_REQUIRE(snapshot.documentation.models.size() == 1);
    const auto &documentationModel = snapshot.documentation.models.front();
-   assert(documentationModel.name == "Semantic");
-   assert(documentationModel.uri == uri);
-   assert(documentationModel.topics.size() == 1);
-   assert(documentationModel.topics.front().name == "Data");
+   ILIC_REQUIRE(documentationModel.name == "Semantic");
+   ILIC_REQUIRE(documentationModel.uri == uri);
+   ILIC_REQUIRE(documentationModel.topics.size() == 1);
+   ILIC_REQUIRE(documentationModel.topics.front().name == "Data");
    const auto itemDocumentation = std::find_if(
       documentationModel.topics.front().viewables.begin(),
       documentationModel.topics.front().viewables.end(),
       [](const auto &viewable) { return viewable.name == "Item"; });
-   assert(itemDocumentation != documentationModel.topics.front().viewables.end());
-   assert(std::any_of(itemDocumentation->rows.begin(),itemDocumentation->rows.end(),
+   ILIC_REQUIRE(itemDocumentation != documentationModel.topics.front().viewables.end());
+   ILIC_REQUIRE(std::any_of(itemDocumentation->rows.begin(),itemDocumentation->rows.end(),
       [](const auto &row) {
          return row.name == "left" && row.cardinality == "1" && row.type == "Base";
       }));
-   assert(std::any_of(itemDocumentation->rows.begin(),itemDocumentation->rows.end(),
+   ILIC_REQUIRE(std::any_of(itemDocumentation->rows.begin(),itemDocumentation->rows.end(),
       [](const auto &row) {
          return row.name == "Code" && row.description == "";
       }));
-   assert(std::none_of(documentationModel.topics.front().viewables.begin(),
+   ILIC_REQUIRE(std::none_of(documentationModel.topics.front().viewables.begin(),
       documentationModel.topics.front().viewables.end(),
       [](const auto &viewable) { return viewable.name == "Link"; }));
    const auto baseDocumentation = std::find_if(
       documentationModel.topics.front().viewables.begin(),
       documentationModel.topics.front().viewables.end(),
       [](const auto &viewable) { return viewable.name == "Base"; });
-   assert(baseDocumentation != documentationModel.topics.front().viewables.end());
-   assert(std::any_of(baseDocumentation->rows.begin(),baseDocumentation->rows.end(),
+   ILIC_REQUIRE(baseDocumentation != documentationModel.topics.front().viewables.end());
+   ILIC_REQUIRE(std::any_of(baseDocumentation->rows.begin(),baseDocumentation->rows.end(),
       [](const auto &row) {
          return row.name == "Name" && row.description == "Base name documentation";
       }));
@@ -164,14 +165,14 @@ END Extended.
    ilic::CompilationRequest extendedRequest;
    extendedRequest.roots = {extendedUri};
    const ilic::SemanticSnapshot extended = extendedSession.analyze(extendedRequest);
-   assert(extended.success);
+   ILIC_REQUIRE(extended.success);
    const auto baseAttribute = std::find_if(extended.symbols.begin(),extended.symbols.end(),
       [](const auto &symbol) { return symbol.qualifiedName == "Extended.Data.Base.Name"; });
    const auto childAttribute = std::find_if(extended.symbols.begin(),extended.symbols.end(),
       [](const auto &symbol) { return symbol.qualifiedName == "Extended.Data.Child.Name"; });
-   assert(baseAttribute != extended.symbols.end());
-   assert(childAttribute != extended.symbols.end());
-   assert(std::any_of(extended.references.begin(),extended.references.end(),
+   ILIC_REQUIRE(baseAttribute != extended.symbols.end());
+   ILIC_REQUIRE(childAttribute != extended.symbols.end());
+   ILIC_REQUIRE(std::any_of(extended.references.begin(),extended.references.end(),
       [&baseAttribute,&childAttribute](const auto &reference) {
       return reference.kind == "inheritance" &&
          reference.sourceId == childAttribute->id && reference.targetId == baseAttribute->id &&
@@ -200,13 +201,13 @@ END Root23.
    ilic::CompilationRequest ili23Request;
    ili23Request.roots = {ili23Uri};
    const ilic::SemanticSnapshot ili23 = ili23Session.analyze(ili23Request);
-   assert(ili23.success);
-   assert(std::any_of(ili23.references.begin(),ili23.references.end(),[](const auto &reference) {
+   ILIC_REQUIRE(ili23.success);
+   ILIC_REQUIRE(std::any_of(ili23.references.begin(),ili23.references.end(),[](const auto &reference) {
       return reference.kind == "type" && reference.range.valid &&
          reference.range.start.line == 5 && reference.range.start.character == 24 &&
          reference.range.end.character == 28;
    }));
-   assert(std::any_of(ili23.references.begin(),ili23.references.end(),[](const auto &reference) {
+   ILIC_REQUIRE(std::any_of(ili23.references.begin(),ili23.references.end(),[](const auto &reference) {
       return reference.kind == "qualifier" && reference.range.valid &&
          reference.range.start.line == 5 && reference.range.start.character == 14 &&
          reference.range.end.character == 23;
@@ -271,80 +272,81 @@ END DiagramRoot.
    ilic::CompilationRequest diagramRequest;
    diagramRequest.roots = {diagramRootUri};
    const ilic::SemanticSnapshot diagram = diagramSession.analyze(diagramRequest);
-   assert(diagram.success);
-   assert(diagram.documentation.models.size() == 1);
+   ILIC_REQUIRE(diagram.success);
+   ILIC_REQUIRE(diagram.documentation.models.size() == 1);
    const auto &diagramDocumentation = diagram.documentation.models.front();
-   assert(diagramDocumentation.name == "DiagramRoot");
-   assert(diagramDocumentation.topics.size() == 1);
-   assert(diagramDocumentation.enumerations.size() == 1);
-   assert(diagramDocumentation.enumerations.front().name == "RootColors");
-   assert(diagramDocumentation.enumerations.front().entries.size() == 2);
-   assert(diagramDocumentation.enumerations.front().entries.front().value == "red");
+   ILIC_REQUIRE(diagramDocumentation.name == "DiagramRoot");
+   ILIC_REQUIRE(diagramDocumentation.topics.size() == 1);
+   ILIC_REQUIRE(diagramDocumentation.enumerations.size() == 1);
+   ILIC_REQUIRE(diagramDocumentation.enumerations.front().name == "RootColors");
+   ILIC_REQUIRE(diagramDocumentation.enumerations.front().entries.size() == 2);
+   ILIC_REQUIRE(diagramDocumentation.enumerations.front().entries.front().value == "red");
    const auto documentationRootClass = std::find_if(
       diagramDocumentation.viewables.begin(),diagramDocumentation.viewables.end(),
       [](const auto &viewable) { return viewable.name == "RootClass"; });
-   assert(documentationRootClass != diagramDocumentation.viewables.end());
-   assert(documentationRootClass->isAbstract);
+   ILIC_REQUIRE(documentationRootClass != diagramDocumentation.viewables.end());
+   ILIC_REQUIRE(documentationRootClass->isAbstract);
    const auto documentationState = std::find_if(
       documentationRootClass->rows.begin(),documentationRootClass->rows.end(),
       [](const auto &row) { return row.name == "State"; });
-   assert(documentationState != documentationRootClass->rows.end());
-   assert(documentationState->type == "Enumeration");
-   assert(documentationState->description == "open, closed, archived");
-   assert(diagramDocumentation.topics.front().enumerations.size() == 2);
-   assert(std::any_of(diagramDocumentation.topics.front().enumerations.begin(),
+   ILIC_REQUIRE(documentationState != documentationRootClass->rows.end());
+   ILIC_REQUIRE(documentationState->type == "Enumeration");
+   ILIC_REQUIRE(documentationState->description == "open, closed, archived");
+   ILIC_REQUIRE(diagramDocumentation.topics.front().enumerations.size() == 2);
+   ILIC_REQUIRE(std::any_of(diagramDocumentation.topics.front().enumerations.begin(),
       diagramDocumentation.topics.front().enumerations.end(),[](const auto &enumeration) {
          return enumeration.name == "TopicTree" && enumeration.entries.size() == 2;
       }));
-   assert(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
+   ILIC_REQUIRE(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
       return symbol.qualifiedName == "DiagramLibrary.ImportedData.ImportedClass";
    }));
    const auto modelScope = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "modelScope" && node.label == "Model Scope"; });
-   assert(modelScope != diagram.diagram.nodes.end());
-   assert(modelScope->containerId.empty());
+   ILIC_REQUIRE(modelScope != diagram.diagram.nodes.end());
+   ILIC_REQUIRE(modelScope->containerId.empty());
    const auto rootColors = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "enumeration" && node.label == "RootColors"; });
-   assert(rootColors != diagram.diagram.nodes.end());
-   assert(rootColors->containerId == modelScope->id);
-   assert((rootColors->stereotypes ==
+   ILIC_REQUIRE(rootColors != diagram.diagram.nodes.end());
+   ILIC_REQUIRE(rootColors->containerId == modelScope->id);
+   ILIC_REQUIRE((rootColors->stereotypes ==
       std::vector<std::string>{"Abstract","Enumeration"}));
-   assert((rootColors->enumValues == std::vector<std::string>{"red","blue"}));
+   ILIC_REQUIRE((rootColors->enumValues == std::vector<std::string>{"red","blue"}));
    const auto topicTree = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "enumeration" && node.label == "TopicTree"; });
-   assert(topicTree != diagram.diagram.nodes.end());
-   assert((topicTree->enumValues == std::vector<std::string>{"red","blue"}));
+   ILIC_REQUIRE(topicTree != diagram.diagram.nodes.end());
+   ILIC_REQUIRE((topicTree->enumValues == std::vector<std::string>{"red","blue"}));
    const auto rootClass = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "class" && node.label == "RootClass"; });
-   assert(rootClass != diagram.diagram.nodes.end());
-   assert(rootClass->containerId == modelScope->id);
-   assert((rootClass->stereotypes == std::vector<std::string>{"Abstract"}));
-   assert(rootClass->members.size() == 4 && rootClass->members.front().type == "TEXT" &&
-      rootClass->members.front().cardinality == "1");
-   assert((rootClass->members[1].inlineEnumValues ==
+   ILIC_REQUIRE(rootClass != diagram.diagram.nodes.end());
+   ILIC_REQUIRE(rootClass->containerId == modelScope->id);
+   ILIC_REQUIRE((rootClass->stereotypes == std::vector<std::string>{"Abstract"}));
+   ILIC_REQUIRE(rootClass->members.size() == 4);
+   ILIC_REQUIRE(rootClass->members.front().type == "TEXT");
+   ILIC_REQUIRE(rootClass->members.front().cardinality == "1");
+   ILIC_REQUIRE((rootClass->members[1].inlineEnumValues ==
       std::vector<std::string>{"open","closed","archived"}));
-   assert(rootClass->members[2].type == "TEXT" &&
-      rootClass->members[2].cardinality == "1..*");
-   assert(rootClass->members[3].type == "ENUMERATION" &&
-      rootClass->members[3].cardinality == "1..*" &&
-      rootClass->members[3].inlineEnumValues ==
-         std::vector<std::string>({"draft","final"}));
-   assert((rootClass->operations ==
+   ILIC_REQUIRE(rootClass->members[2].type == "TEXT");
+   ILIC_REQUIRE(rootClass->members[2].cardinality == "1..*");
+   ILIC_REQUIRE(rootClass->members[3].type == "ENUMERATION");
+   ILIC_REQUIRE(rootClass->members[3].cardinality == "1..*");
+   ILIC_REQUIRE(rootClass->members[3].inlineEnumValues ==
+      std::vector<std::string>({"draft","final"}));
+   ILIC_REQUIRE((rootClass->operations ==
       std::vector<std::string>{"Named()","constraint1()"}));
    const auto rootChild = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "class" && node.label == "RootChild"; });
-   assert(rootChild != diagram.diagram.nodes.end());
-   assert(rootChild->members.size() == 5);
-   assert(rootChild->members[1].inherited &&
-      rootChild->members[1].declaringType == "RootClass");
-   assert(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+   ILIC_REQUIRE(rootChild != diagram.diagram.nodes.end());
+   ILIC_REQUIRE(rootChild->members.size() == 5);
+   ILIC_REQUIRE(rootChild->members[1].inherited);
+   ILIC_REQUIRE(rootChild->members[1].declaringType == "RootClass");
+   ILIC_REQUIRE(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [&modelScope](const auto &node) {
          return node.kind == "external" && node.label == "ImportedBase" &&
             node.containerId == modelScope->id &&
             node.stereotypes ==
                std::vector<std::string>{"Abstract","External"};
       }));
-   assert(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+   ILIC_REQUIRE(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [&modelScope](const auto &node) {
          return node.kind == "function" && node.label == "RootFunction" &&
             node.containerId == modelScope->id &&
@@ -354,37 +356,39 @@ END DiagramRoot.
       [](const auto &node) {
          return node.kind == "topic" && node.label == "Data (DiagramRoot)";
       });
-   assert(topic != diagram.diagram.nodes.end());
-   assert(topic->containerId.empty());
-   assert(topic->abstract);
-   assert((topic->stereotypes == std::vector<std::string>{"Abstract"}));
+   ILIC_REQUIRE(topic != diagram.diagram.nodes.end());
+   ILIC_REQUIRE(topic->containerId.empty());
+   ILIC_REQUIRE(topic->abstract);
+   ILIC_REQUIRE((topic->stereotypes == std::vector<std::string>{"Abstract"}));
    const auto topicClass = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "class" && node.label == "TopicClass"; });
    const auto topicStruct = std::find_if(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [](const auto &node) { return node.kind == "structure" && node.label == "TopicStruct"; });
-   assert(topicClass != diagram.diagram.nodes.end() && topicClass->abstract);
-   assert(topicStruct != diagram.diagram.nodes.end() && topicStruct->abstract);
-   assert((topicClass->stereotypes == std::vector<std::string>{"Abstract"}));
-   assert((topicStruct->stereotypes ==
+   ILIC_REQUIRE(topicClass != diagram.diagram.nodes.end());
+   ILIC_REQUIRE(topicClass->abstract);
+   ILIC_REQUIRE(topicStruct != diagram.diagram.nodes.end());
+   ILIC_REQUIRE(topicStruct->abstract);
+   ILIC_REQUIRE((topicClass->stereotypes == std::vector<std::string>{"Abstract"}));
+   ILIC_REQUIRE((topicStruct->stereotypes ==
       std::vector<std::string>{"Abstract","Structure"}));
-   assert(topicClass->containerId == topic->id);
-   assert(topicStruct->containerId == topic->id);
-   assert(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+   ILIC_REQUIRE(topicClass->containerId == topic->id);
+   ILIC_REQUIRE(topicStruct->containerId == topic->id);
+   ILIC_REQUIRE(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [&topic](const auto &node) {
          return node.kind == "view" && node.label == "TopicView" &&
             node.containerId == topic->id &&
             node.stereotypes == std::vector<std::string>{"Abstract","View"};
       }));
-   assert(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
+   ILIC_REQUIRE(std::any_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),
       [&topic](const auto &node) {
          return node.kind == "function" && node.label == "TopicFunction" &&
             node.containerId == topic->id;
       }));
-   assert(std::none_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),[](const auto &node) {
+   ILIC_REQUIRE(std::none_of(diagram.diagram.nodes.begin(),diagram.diagram.nodes.end(),[](const auto &node) {
       return node.id.find("DiagramLibrary.ImportedData") != std::string::npos ||
          node.id.find("DiagramLibrary.ImportedColors") != std::string::npos;
    }));
-   assert(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
+   ILIC_REQUIRE(std::any_of(diagram.symbols.begin(),diagram.symbols.end(),[](const auto &symbol) {
       return symbol.qualifiedName == "DiagramLibrary.ImportedColors";
    }));
 
@@ -398,8 +402,8 @@ END Missing.
    ilic::CompilationRequest missingRequest;
    missingRequest.roots = {missingUri};
    const ilic::SemanticSnapshot missing = missingSession.analyze(missingRequest);
-   assert(!missing.success);
-   assert(std::find(missing.missingModels.begin(),missing.missingModels.end(),
+   ILIC_REQUIRE(!missing.success);
+   ILIC_REQUIRE(std::find(missing.missingModels.begin(),missing.missingModels.end(),
       "DoesNotExist") != missing.missingModels.end());
 
    ilic::CompilerSession invalidImportSession;
@@ -422,9 +426,9 @@ END InvalidImport.
    ilic::CompilationRequest invalidImportRequest;
    invalidImportRequest.roots = {invalidImportRootUri};
    const auto invalidImport = invalidImportSession.compileAndAnalyze(invalidImportRequest);
-   assert(!invalidImport.compilation.success);
-   assert(!invalidImport.compilation.diagnostics.empty());
-   assert(std::any_of(invalidImport.syntax.begin(),invalidImport.syntax.end(),
+   ILIC_REQUIRE(!invalidImport.compilation.success);
+   ILIC_REQUIRE(!invalidImport.compilation.diagnostics.empty());
+   ILIC_REQUIRE(std::any_of(invalidImport.syntax.begin(),invalidImport.syntax.end(),
       [&invalidImportUri](const auto &syntax) { return syntax.uri == invalidImportUri; }));
    return 0;
 }

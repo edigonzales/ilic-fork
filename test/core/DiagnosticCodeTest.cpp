@@ -1,7 +1,7 @@
 #include "DiagnosticCode.h"
 #include "Logger.h"
 
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <cctype>
 #include <filesystem>
 #include <fstream>
@@ -12,7 +12,7 @@
 
 namespace {
 
-void assert_explicit_semantic_diagnostic_ids()
+void require_explicit_semantic_diagnostic_ids()
 {
    namespace fs = std::filesystem;
    const fs::path root = ILIC_SOURCE_DIR;
@@ -29,11 +29,13 @@ void assert_explicit_semantic_diagnostic_ids()
 
    for (const auto &file : files) {
       std::ifstream input(file);
+      ILIC_REQUIRE_MSG(input.is_open(),
+         "unable to open source file while checking diagnostic IDs: " + file.string());
       std::ostringstream buffer;
       buffer << input.rdbuf();
       std::string source = buffer.str();
       if (file.filename() == "TranslationChecker.cpp") {
-         assert(source.find("translation_diagnostic_id") == std::string::npos);
+         ILIC_REQUIRE(source.find("translation_diagnostic_id") == std::string::npos);
       }
       size_t position = 0;
       while ((position = source.find("Log.error(",position)) != std::string::npos) {
@@ -46,7 +48,7 @@ void assert_explicit_semantic_diagnostic_ids()
             source[argument] == '"' ||
             source.compare(argument,std::string("string(").size(),"string(") == 0 ||
             source.compare(argument,std::string("std::string(").size(),"std::string(") == 0;
-         assert(!codeLess);
+         ILIC_REQUIRE(!codeLess);
          position = argument;
       }
    }
@@ -56,16 +58,16 @@ void assert_explicit_semantic_diagnostic_ids()
 
 int main()
 {
-   assert_explicit_semantic_diagnostic_ids();
+   require_explicit_semantic_diagnostic_ids();
 
    std::set<std::string_view> codes;
    const std::regex publicCode("^ILIC-[A-Z0-9]+(?:-[A-Z0-9]+)*$");
    for (const auto &definition : util::diagnosticDefinitions()) {
-      assert(std::regex_match(definition.code.begin(),definition.code.end(),publicCode));
-      assert(codes.insert(definition.code).second);
-      assert(util::diagnosticCode(definition.id) == definition.code);
+      ILIC_REQUIRE(std::regex_match(definition.code.begin(),definition.code.end(),publicCode));
+      ILIC_REQUIRE(codes.insert(definition.code).second);
+      ILIC_REQUIRE(util::diagnosticCode(definition.id) == definition.code);
    }
-   assert(!codes.empty());
+   ILIC_REQUIRE(!codes.empty());
 
    Log.reset();
    Log.displayErrors(false);
@@ -84,12 +86,14 @@ int main()
       range,
       {{relatedRange,"Base declaration"}}
    );
+   ILIC_REQUIRE(Log.getDiagnostics().size() == 1);
    const auto &diagnostic = Log.getDiagnostics().front();
-   assert(diagnostic.code == "ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH");
-   assert(diagnostic.range.uri == "memory:///range.ili");
-   assert(diagnostic.range.start.line == 4);
-   assert(diagnostic.range.end.character == 12);
-   assert(diagnostic.relatedInformation.front().range.uri == "memory:///base.ili");
+   ILIC_REQUIRE(diagnostic.relatedInformation.size() == 1);
+   ILIC_REQUIRE(diagnostic.code == "ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH");
+   ILIC_REQUIRE(diagnostic.range.uri == "memory:///range.ili");
+   ILIC_REQUIRE(diagnostic.range.start.line == 4);
+   ILIC_REQUIRE(diagnostic.range.end.character == 12);
+   ILIC_REQUIRE(diagnostic.relatedInformation.front().range.uri == "memory:///base.ili");
    Log.reset();
    return 0;
 }

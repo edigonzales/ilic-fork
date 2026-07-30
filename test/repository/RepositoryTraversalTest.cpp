@@ -1,6 +1,6 @@
 #include "RepositoryCrawler.h"
 
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -58,9 +58,10 @@ int main()
       backend.indexes["/B"].models.push_back(model("ModelX","/B"));
       ilic::repository::RepositoryCrawler crawler(backend);
       auto found = crawler.findModel({"/A","/B"},"ModelX","ili2_4");
-      assert(found.found && found.metadata.repository == "/A");
-      assert((backend.indexRequests == std::vector<std::string>{"/A"}));
-      assert(backend.siteRequests.empty());
+      ILIC_REQUIRE(found.found);
+      ILIC_REQUIRE(found.metadata.repository == "/A");
+      ILIC_REQUIRE((backend.indexRequests == std::vector<std::string>{"/A"}));
+      ILIC_REQUIRE(backend.siteRequests.empty());
    }
    {
       FakeBackend backend;
@@ -70,8 +71,9 @@ int main()
       backend.indexes["/P3"].models.push_back(model("Wanted","/P3"));
       ilic::repository::RepositoryCrawler crawler(backend);
       auto found = crawler.findModel({"/A","/B"},"Wanted","ili2_4");
-      assert(found.found && found.metadata.repository == "/P3");
-      assert((backend.indexRequests == std::vector<std::string>{"/A","/B","/P1","/P2","/P3"}));
+      ILIC_REQUIRE(found.found);
+      ILIC_REQUIRE(found.metadata.repository == "/P3");
+      ILIC_REQUIRE((backend.indexRequests == std::vector<std::string>{"/A","/B","/P1","/P2","/P3"}));
    }
    {
       FakeBackend backend;
@@ -81,8 +83,9 @@ int main()
       backend.indexes["/P"].models.push_back(model("Wanted","/P"));
       ilic::repository::RepositoryCrawler crawler(backend);
       auto found = crawler.findModel({"/A"},"Wanted","ili2_4");
-      assert(found.found && found.metadata.repository == "/P");
-      assert((backend.indexRequests == std::vector<std::string>{"/A","/C1","/P"}));
+      ILIC_REQUIRE(found.found);
+      ILIC_REQUIRE(found.metadata.repository == "/P");
+      ILIC_REQUIRE((backend.indexRequests == std::vector<std::string>{"/A","/C1","/P"}));
    }
    {
       FakeBackend backend;
@@ -90,8 +93,8 @@ int main()
       backend.sites["/A"].parentSites = {"/B"};
       backend.sites["/B"].parentSites = {"/A"};
       ilic::repository::RepositoryCrawler crawler(backend);
-      assert(!crawler.findModel({"/A"},"Missing","ili2_4").found);
-      assert((backend.indexRequests == std::vector<std::string>{"/A","/B"}));
+      ILIC_REQUIRE(!crawler.findModel({"/A"},"Missing","ili2_4").found);
+      ILIC_REQUIRE((backend.indexRequests == std::vector<std::string>{"/A","/B"}));
    }
    return 0;
 }

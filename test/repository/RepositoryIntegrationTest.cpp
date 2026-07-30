@@ -1,7 +1,7 @@
 #include "ilic/Repository.h"
 
 #include <algorithm>
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <filesystem>
 #include <string>
 
@@ -18,7 +18,7 @@ const ilic::Diagnostic *findDiagnostic(const ilic::RepositoryResult &result,cons
 
 int main(int argc,char **argv)
 {
-   assert(argc == 2);
+   ILIC_REQUIRE_MSG(argc == 2,"expected exactly one integration-fixture directory argument");
    const std::filesystem::path fixture = std::filesystem::absolute(argv[1]);
    ilic::RepositoryOptions options;
    options.repositories = {fixture.string()};
@@ -26,45 +26,57 @@ int main(int argc,char **argv)
    ilic::RepositoryManager manager(options);
 
    auto root = manager.resolve("Root","");
-   assert(root.success && root.models.size() == 2);
-   assert(root.models[0].metadata.name == "Base");
-   assert(root.models[1].metadata.name == "Root");
-   assert(root.models[1].metadata.version == "2.10");
+   ILIC_REQUIRE(root.success);
+   ILIC_REQUIRE(root.models.size() == 2);
+   ILIC_REQUIRE(root.models[0].metadata.name == "Base");
+   ILIC_REQUIRE(root.models[1].metadata.name == "Root");
+   ILIC_REQUIRE(root.models[1].metadata.version == "2.10");
 
    auto shared = manager.resolve(std::vector<std::string>{"SharedA","SharedB"},"ili2_4");
-   assert(shared.success && shared.models.size() == 1);
+   ILIC_REQUIRE(shared.success);
+   ILIC_REQUIRE(shared.models.size() == 1);
    auto sharedBad = manager.resolve(
       std::vector<std::string>{"SharedA","SharedBadChecksum"},"ili2_4");
-   assert(!sharedBad.success && sharedBad.models.size() == 1);
-   assert(findDiagnostic(sharedBad,"ILIC-REPO-CHECKSUM"));
+   ILIC_REQUIRE(!sharedBad.success);
+   ILIC_REQUIRE(sharedBad.models.size() == 1);
+   const auto *checksumDiagnostic = findDiagnostic(sharedBad,"ILIC-REPO-CHECKSUM");
+   ILIC_REQUIRE(checksumDiagnostic != nullptr);
 
    auto cycle = manager.resolve("CycleA","ili2_4");
-   assert(!cycle.success);
+   ILIC_REQUIRE(!cycle.success);
    const auto *cycleDiagnostic = findDiagnostic(cycle,"ILIC-REPO-CYCLE");
-   assert(cycleDiagnostic && cycleDiagnostic->message.find("CycleA -> CycleB -> CycleA")
+   ILIC_REQUIRE(cycleDiagnostic != nullptr);
+   ILIC_REQUIRE(cycleDiagnostic->message.find("CycleA -> CycleB -> CycleA")
       != std::string::npos);
 
    auto unsafe = manager.resolve("Unsafe","ili2_4");
-   assert(!unsafe.success && findDiagnostic(unsafe,"ILIC-REPO-PATH"));
+   ILIC_REQUIRE(!unsafe.success);
+   const auto *pathDiagnostic = findDiagnostic(unsafe,"ILIC-REPO-PATH");
+   ILIC_REQUIRE(pathDiagnostic != nullptr);
 
    auto browsable = manager.resolve("Browsable","ili2_4");
-   assert(browsable.success && browsable.models[0].metadata.version == "1");
+   ILIC_REQUIRE(browsable.success);
+   ILIC_REQUIRE(browsable.models.size() >= 1);
+   ILIC_REQUIRE(browsable.models[0].metadata.version == "1");
    auto language = manager.resolve("LanguageChoice","");
-   assert(language.success && language.models[0].metadata.schemaLanguage == "ili2_4");
+   ILIC_REQUIRE(language.success);
+   ILIC_REQUIRE(language.models.size() >= 1);
+   ILIC_REQUIRE(language.models[0].metadata.schemaLanguage == "ili2_4");
 
    ilic::RepositoryOptions partial;
    partial.repositories = {(fixture / "missing").string(),fixture.string()};
    partial.followSiteLinks = false;
    ilic::RepositoryManager partialManager(partial);
    auto recovered = partialManager.resolve("Base","ili2_4");
-   assert(recovered.success && findDiagnostic(recovered,"ILIC-REPO-INDEX"));
-   assert(findDiagnostic(recovered,"ILIC-REPO-INDEX")->severity
-      == ilic::DiagnosticSeverity::Warning);
+   ILIC_REQUIRE(recovered.success);
+   const auto *indexDiagnostic = findDiagnostic(recovered,"ILIC-REPO-INDEX");
+   ILIC_REQUIRE(indexDiagnostic != nullptr);
+   ILIC_REQUIRE(indexDiagnostic->severity == ilic::DiagnosticSeverity::Warning);
 
    ilic::RepositoryOptions fileOptions;
    fileOptions.repositories = {"file://" + fixture.generic_string()};
    fileOptions.followSiteLinks = false;
    ilic::RepositoryManager fileManager(fileOptions);
-   assert(fileManager.resolve("Base","ili2_4").success);
+   ILIC_REQUIRE(fileManager.resolve("Base","ili2_4").success);
    return 0;
 }

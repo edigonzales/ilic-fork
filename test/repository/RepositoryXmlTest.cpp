@@ -1,6 +1,6 @@
 #include "RepositoryXml.h"
 
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <string>
 #include <vector>
 
@@ -24,26 +24,32 @@ int main()
 </TRANSFER>)xml";
    std::vector<ilic::Diagnostic> diagnostics;
    auto index = ilic::repository::RepositoryXml::parseModelIndex(xml,"fixture",&diagnostics);
-   assert(index.models.size() == 1);
+   ILIC_REQUIRE(index.models.size() == 1);
    const auto &model = index.models.front();
-   assert(model.name == "Old" && model.schemaLanguage == "ili2_3");
-   assert(model.file == "old/Old.ili" && model.version == "2.10");
-   assert(model.precursorVersion == "2.9" && model.md5 == "ABCDEF");
-   assert(model.browseOnly && model.dependencies.size() == 1 && model.dependencies[0] == "Base");
-   assert(diagnostics.size() == 1);
-   assert(diagnostics[0].severity == ilic::DiagnosticSeverity::Warning);
+   ILIC_REQUIRE(model.name == "Old");
+   ILIC_REQUIRE(model.schemaLanguage == "ili2_3");
+   ILIC_REQUIRE(model.file == "old/Old.ili");
+   ILIC_REQUIRE(model.version == "2.10");
+   ILIC_REQUIRE(model.precursorVersion == "2.9");
+   ILIC_REQUIRE(model.md5 == "ABCDEF");
+   ILIC_REQUIRE(model.browseOnly);
+   ILIC_REQUIRE(model.dependencies.size() == 1);
+   ILIC_REQUIRE(model.dependencies[0] == "Base");
+   ILIC_REQUIRE(diagnostics.size() == 1);
+   ILIC_REQUIRE(diagnostics[0].severity == ilic::DiagnosticSeverity::Warning);
 
    const std::string siteXml = R"xml(<TRANSFER><DATASECTION><Site>
      <parentSite><value>https://parent-1</value><value>https://parent-2</value></parentSite>
      <subsidiarySite><value>https://child-1</value></subsidiarySite>
    </Site></DATASECTION></TRANSFER>)xml";
    auto site = ilic::repository::RepositoryXml::parseSite(siteXml,"fixture",&diagnostics);
-   assert((site.parentSites == std::vector<std::string>{"https://parent-1","https://parent-2"}));
-   assert((site.subsidiarySites == std::vector<std::string>{"https://child-1"}));
+   ILIC_REQUIRE((site.parentSites == std::vector<std::string>{"https://parent-1","https://parent-2"}));
+   ILIC_REQUIRE((site.subsidiarySites == std::vector<std::string>{"https://child-1"}));
 
    diagnostics.clear();
    auto invalid = ilic::repository::RepositoryXml::parseModelIndex("<broken>","fixture",&diagnostics);
-   assert(invalid.models.empty() && diagnostics.size() == 1);
-   assert(diagnostics[0].severity == ilic::DiagnosticSeverity::Error);
+   ILIC_REQUIRE(invalid.models.empty());
+   ILIC_REQUIRE(diagnostics.size() == 1);
+   ILIC_REQUIRE(diagnostics[0].severity == ilic::DiagnosticSeverity::Error);
    return 0;
 }

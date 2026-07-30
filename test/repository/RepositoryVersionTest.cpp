@@ -1,6 +1,6 @@
 #include "RepositoryVersion.h"
 
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <string>
 #include <vector>
 
@@ -26,54 +26,74 @@ int main()
    using ilic::repository::selectLatestVersion;
    {
       std::vector<ilic::ModelMetadata> models = {model("1")};
-      assert(selectLatestVersion(models,"Example","ili2_4").model->version == "1");
+      auto result = selectLatestVersion(models,"Example","ili2_4");
+      ILIC_REQUIRE(result.model != nullptr);
+      ILIC_REQUIRE(result.model->version == "1");
    }
    {
       std::vector<ilic::ModelMetadata> models = {model("1"),model("2","1"),model("3","2")};
-      assert(selectLatestVersion(models,"Example","ili2_4").model->version == "3");
+      auto result = selectLatestVersion(models,"Example","ili2_4");
+      ILIC_REQUIRE(result.model != nullptr);
+      ILIC_REQUIRE(result.model->version == "3");
    }
    {
       std::vector<ilic::ModelMetadata> models = {model("2.9"),model("2.10","2.9")};
-      assert(selectLatestVersion(models,"Example","ili2_4").model->version == "2.10");
+      auto result = selectLatestVersion(models,"Example","ili2_4");
+      ILIC_REQUIRE(result.model != nullptr);
+      ILIC_REQUIRE(result.model->version == "2.10");
    }
    {
       std::vector<ilic::ModelMetadata> models = {model("A"),model("B")};
       auto result = selectLatestVersion(models,"Example","ili2_4");
-      assert(result.model->version == "A" && result.diagnostics.size() == 1);
+      ILIC_REQUIRE(result.model != nullptr);
+      ILIC_REQUIRE(result.model->version == "A");
+      ILIC_REQUIRE(result.diagnostics.size() == 1);
    }
    {
       std::vector<ilic::ModelMetadata> models = {model("A"),model("B","A"),model("C","A")};
       auto result = selectLatestVersion(models,"Example","ili2_4");
-      assert(result.model->version == "B" && result.diagnostics.size() == 1);
+      ILIC_REQUIRE(result.model != nullptr);
+      ILIC_REQUIRE(result.model->version == "B");
+      ILIC_REQUIRE(result.diagnostics.size() == 1);
    }
    {
       std::vector<ilic::ModelMetadata> models = {model("A"),model("B","A"),model("X","UNKNOWN")};
       auto result = selectLatestVersion(models,"Example","ili2_4");
-      assert(result.model->version == "B" && result.diagnostics.size() == 1);
+      ILIC_REQUIRE(result.model != nullptr);
+      ILIC_REQUIRE(result.model->version == "B");
+      ILIC_REQUIRE(result.diagnostics.size() == 1);
    }
    {
       std::vector<ilic::ModelMetadata> models = {model("B","A")};
       auto result = selectLatestVersion(models,"Example","ili2_4");
-      assert(result.model == nullptr && result.diagnostics.size() == 1);
+      ILIC_REQUIRE(result.model == nullptr);
+      ILIC_REQUIRE(result.diagnostics.size() == 1);
    }
    {
       std::vector<ilic::ModelMetadata> models = {model("1"),model("2","1","ili2_4",true)};
-      assert(selectLatestVersion(models,"Example","ili2_4").model->version == "1");
+      auto result = selectLatestVersion(models,"Example","ili2_4");
+      ILIC_REQUIRE(result.model != nullptr);
+      ILIC_REQUIRE(result.model->version == "1");
    }
    {
       std::vector<ilic::ModelMetadata> models = {
          model("23",{},"ili2_3"),model("1",{},"ili1"),model("24",{},"ili2_4")};
-      assert(selectLatestVersion(models,"Example","").model->schemaLanguage == "ili2_4");
-      assert(selectLatestVersion(models,"Example","ili2_3").model->version == "23");
+      auto latest = selectLatestVersion(models,"Example","");
+      ILIC_REQUIRE(latest.model != nullptr);
+      ILIC_REQUIRE(latest.model->schemaLanguage == "ili2_4");
+      auto ili23 = selectLatestVersion(models,"Example","ili2_3");
+      ILIC_REQUIRE(ili23.model != nullptr);
+      ILIC_REQUIRE(ili23.model->version == "23");
    }
    {
       std::vector<ilic::ModelMetadata> models = {
          model("broken","missing","ili2_4"),model("23",{},"ili2_3")};
       auto result = selectLatestVersion(models,"Example","");
-      assert(result.model->schemaLanguage == "ili2_3");
-      assert(result.diagnostics.size() == 1);
+      ILIC_REQUIRE(result.model != nullptr);
+      ILIC_REQUIRE(result.model->schemaLanguage == "ili2_3");
+      ILIC_REQUIRE(result.diagnostics.size() == 1);
    }
-   assert((ilic::repository::supportedSchemaLanguagePreference()
+   ILIC_REQUIRE((ilic::repository::supportedSchemaLanguagePreference()
       == std::vector<std::string>{"ili2_4","ili2_3","ili1"}));
    return 0;
 }

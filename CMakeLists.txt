@@ -10,8 +10,14 @@ include(CTest)
 
 option(ILIC_ENABLE_NATIVE_REPOSITORY "Build native HTTP and filesystem repository support" ON)
 option(ILIC_STATIC_DISTRIBUTION "Build ilic as a self-contained distribution binary" OFF)
+option(ILIC_ENABLE_SANITIZERS
+    "Enable AddressSanitizer and UndefinedBehaviorSanitizer for project targets"
+    OFF
+)
 
 include(cmake/IlicStaticDistribution.cmake)
+include(cmake/IlicSanitizers.cmake)
+ilic_configure_sanitizers()
 
 file(GLOB_RECURSE ANTLR_RUNTIME_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/include/*.cpp"
@@ -179,6 +185,32 @@ if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
 endif()
 
 if(BUILD_TESTING)
+    add_library(ilic-test-support INTERFACE)
+    add_library(ilic::test-support ALIAS ilic-test-support)
+    target_include_directories(ilic-test-support
+        INTERFACE
+            "${CMAKE_CURRENT_SOURCE_DIR}/test/support"
+    )
+    target_compile_features(ilic-test-support INTERFACE cxx_std_17)
+
+    add_executable(ilic_test_harness_canary
+        test/support/TestHarnessCanary.cpp)
+    target_compile_definitions(ilic_test_harness_canary PRIVATE NDEBUG=1)
+    target_link_libraries(ilic_test_harness_canary PRIVATE ilic::test-support)
+    add_test(
+        NAME ilic_test_harness_canary
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC_TEST_HARNESS_CANARY=$<TARGET_FILE:ilic_test_harness_canary>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_test_harness_canary.cmake"
+    )
+
+    add_test(
+        NAME ilic_no_cassert_in_tests
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_no_cassert_in_tests.cmake"
+    )
+
     add_executable(ilic_docs_cpp_example docs/examples/cpp-session.cpp)
     target_link_libraries(ilic_docs_cpp_example PRIVATE ilic-core)
     add_test(NAME ilic_docs_cpp_example COMMAND ilic_docs_cpp_example)
@@ -206,65 +238,65 @@ if(BUILD_TESTING)
     endif()
 
     add_executable(ilic_capi_test test/abi/CapiTest.cpp)
-    target_link_libraries(ilic_capi_test PRIVATE ilic-capi)
+    target_link_libraries(ilic_capi_test PRIVATE ilic-capi ilic::test-support)
     add_test(NAME ilic_capi COMMAND ilic_capi_test)
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
-    target_link_libraries(ilic_core_session_test PRIVATE ilic-core)
+    target_link_libraries(ilic_core_session_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_core_session COMMAND ilic_core_session_test)
     add_executable(ilic_diagnostic_code_test test/core/DiagnosticCodeTest.cpp)
     target_include_directories(ilic_diagnostic_code_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/source/util")
     target_compile_definitions(ilic_diagnostic_code_test PRIVATE
         ILIC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(ilic_diagnostic_code_test PRIVATE ilic-core)
+    target_link_libraries(ilic_diagnostic_code_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_diagnostic_code COMMAND ilic_diagnostic_code_test)
     add_executable(ilic_diagnostic_quality_test test/core/DiagnosticQualityTest.cpp)
-    target_link_libraries(ilic_diagnostic_quality_test PRIVATE ilic-core)
+    target_link_libraries(ilic_diagnostic_quality_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_diagnostic_quality COMMAND ilic_diagnostic_quality_test)
     add_executable(ilic_syntax_snapshot_test test/core/SyntaxSnapshotTest.cpp)
-    target_link_libraries(ilic_syntax_snapshot_test PRIVATE ilic-core)
+    target_link_libraries(ilic_syntax_snapshot_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_syntax_snapshot COMMAND ilic_syntax_snapshot_test)
     add_executable(ilic_semantic_snapshot_test test/core/SemanticSnapshotTest.cpp)
-    target_link_libraries(ilic_semantic_snapshot_test PRIVATE ilic-core)
+    target_link_libraries(ilic_semantic_snapshot_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_semantic_snapshot COMMAND ilic_semantic_snapshot_test)
     add_executable(ilic_formatter_test test/core/FormatterTest.cpp)
-    target_link_libraries(ilic_formatter_test PRIVATE ilic-core)
+    target_link_libraries(ilic_formatter_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_formatter COMMAND ilic_formatter_test)
     if(TARGET ilic-repository)
         find_package(Threads REQUIRED)
         add_executable(ilic_repository_test test/repository/RepositoryTest.cpp)
-        target_link_libraries(ilic_repository_test PRIVATE ilic-repository)
+        target_link_libraries(ilic_repository_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository COMMAND ilic_repository_test
             "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture")
         add_executable(ilic_repository_uri_test test/repository/RepositoryUriTest.cpp)
         target_include_directories(ilic_repository_uri_test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
-        target_link_libraries(ilic_repository_uri_test PRIVATE ilic-repository)
+        target_link_libraries(ilic_repository_uri_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository_uri COMMAND ilic_repository_uri_test)
         add_executable(ilic_repository_xml_test test/repository/RepositoryXmlTest.cpp)
         target_include_directories(ilic_repository_xml_test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
-        target_link_libraries(ilic_repository_xml_test PRIVATE ilic-repository)
+        target_link_libraries(ilic_repository_xml_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository_xml COMMAND ilic_repository_xml_test)
         add_executable(ilic_repository_version_test test/repository/RepositoryVersionTest.cpp)
         target_include_directories(ilic_repository_version_test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
-        target_link_libraries(ilic_repository_version_test PRIVATE ilic-repository)
+        target_link_libraries(ilic_repository_version_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository_version COMMAND ilic_repository_version_test)
         add_executable(ilic_repository_cache_test test/repository/RepositoryCacheTest.cpp)
         target_include_directories(ilic_repository_cache_test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
         target_link_libraries(ilic_repository_cache_test PRIVATE
-            ilic-repository Threads::Threads)
+            ilic-repository Threads::Threads ilic::test-support)
         add_test(NAME ilic_repository_cache COMMAND ilic_repository_cache_test)
         add_executable(ilic_repository_traversal_test test/repository/RepositoryTraversalTest.cpp)
         target_include_directories(ilic_repository_traversal_test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
-        target_link_libraries(ilic_repository_traversal_test PRIVATE ilic-repository)
+        target_link_libraries(ilic_repository_traversal_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository_traversal COMMAND ilic_repository_traversal_test)
         add_executable(ilic_repository_integration_test
             test/repository/RepositoryIntegrationTest.cpp)
-        target_link_libraries(ilic_repository_integration_test PRIVATE ilic-repository)
+        target_link_libraries(ilic_repository_integration_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository_integration COMMAND ilic_repository_integration_test
             "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixtures/integration")
         add_executable(ilic_repository_cli_config_test
@@ -272,7 +304,7 @@ if(BUILD_TESTING)
         target_include_directories(ilic_repository_cli_config_test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/source/main"
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
-        target_link_libraries(ilic_repository_cli_config_test PRIVATE ilic-repository)
+        target_link_libraries(ilic_repository_cli_config_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository_cli_config COMMAND ilic_repository_cli_config_test)
         add_test(NAME ilic_repository_cli COMMAND ilic -no_info -no_warnings
             -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"

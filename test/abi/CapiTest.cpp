@@ -1,6 +1,6 @@
 #include "ilic/capi.h"
 
-#include <cassert>
+#include "ilic/test/TestHarness.h"
 #include <cstdint>
 #include <cstring>
 #include <regex>
@@ -10,9 +10,10 @@ namespace {
 
 std::string resultJson(std::uint32_t result)
 {
+   ILIC_REQUIRE(result != 0);
    std::size_t length = 0;
    const char *json = ilic_result_json(result,&length);
-   assert(json != nullptr);
+   ILIC_REQUIRE_MSG(json != nullptr,"result JSON must not be null");
    std::string value(json,length);
    ilic_result_destroy(result);
    return value;
@@ -28,10 +29,13 @@ std::int32_t put(std::uint32_t session,const char *uri,const char *source,std::u
 
 int main()
 {
-   assert(ilic_abi_version() == 1);
-   assert(std::strlen(ilic_version()) != 0);
+   ILIC_REQUIRE(ilic_abi_version() == 1);
+   const char *version = ilic_version();
+   ILIC_REQUIRE(version != nullptr);
+   ILIC_REQUIRE(std::strlen(version) != 0);
 
    const std::uint32_t session = ilic_session_create();
+   ILIC_REQUIRE(session != 0);
    const char *uri = "memory:///AbiModel.ili";
    const char *source = R"ili(INTERLIS 2.3;
 !!@ displayName = "ABI model"
@@ -41,53 +45,53 @@ MODEL AbiModel AT "https://example.invalid/ilic/tests" VERSION "1" =
   END Item;
 END AbiModel.
 )ili";
-   assert(put(session,uri,source) == 0);
+   ILIC_REQUIRE(put(session,uri,source) == 0);
 
    const std::string compileRequest =
       R"json({"schemaVersion":1,"roots":["memory:///AbiModel.ili"],"options":{"autoSearch":true}})json";
    std::string compilation = resultJson(ilic_compile(session,compileRequest.data(),compileRequest.size()));
-   assert(compilation.find("\"kind\":\"compilation\"") != std::string::npos);
-   assert(compilation.find("\"success\":true") != std::string::npos);
-   assert(compilation.find("\"displayName\"") != std::string::npos);
-   assert(std::regex_search(compilation,
+   ILIC_REQUIRE(compilation.find("\"kind\":\"compilation\"") != std::string::npos);
+   ILIC_REQUIRE(compilation.find("\"success\":true") != std::string::npos);
+   ILIC_REQUIRE(compilation.find("\"displayName\"") != std::string::npos);
+   ILIC_REQUIRE(std::regex_search(compilation,
       std::regex("ilic completed with no errors, no warnings [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}")));
 
    const std::string parseRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili"})json";
    std::string syntax = resultJson(ilic_parse(session,parseRequest.data(),parseRequest.size()));
-   assert(syntax.find("\"kind\":\"syntax\"") != std::string::npos);
-   assert(syntax.find("\"documentVersion\":1") != std::string::npos);
-   assert(syntax.find("\"modelDef\"") != std::string::npos);
+   ILIC_REQUIRE(syntax.find("\"kind\":\"syntax\"") != std::string::npos);
+   ILIC_REQUIRE(syntax.find("\"documentVersion\":1") != std::string::npos);
+   ILIC_REQUIRE(syntax.find("\"modelDef\"") != std::string::npos);
 
    std::string semantic = resultJson(ilic_analyze(session,compileRequest.data(),compileRequest.size()));
-   assert(semantic.find("\"kind\":\"semantic\"") != std::string::npos);
-   assert(semantic.find("\"qualifiedName\":\"AbiModel\"") != std::string::npos);
-   assert(semantic.find("\"title\":\"AbiModel\"") != std::string::npos);
+   ILIC_REQUIRE(semantic.find("\"kind\":\"semantic\"") != std::string::npos);
+   ILIC_REQUIRE(semantic.find("\"qualifiedName\":\"AbiModel\"") != std::string::npos);
+   ILIC_REQUIRE(semantic.find("\"title\":\"AbiModel\"") != std::string::npos);
 
    std::string combined = resultJson(
       ilic_compile_and_analyze(session,compileRequest.data(),compileRequest.size()));
-   assert(combined.find("\"kind\":\"compilation-analysis\"") != std::string::npos);
-   assert(combined.find("\"compilation\":{\"abiVersion\":1") != std::string::npos);
-   assert(combined.find("\"semantic\":{\"abiVersion\":1") != std::string::npos);
-   assert(combined.find("\"cardinality\":\"0..1\"") != std::string::npos);
-   assert(combined.find("\"declaringType\":\"\"") != std::string::npos);
-   assert(combined.find("\"inlineEnumValues\":[]") != std::string::npos);
-   assert(combined.find("\"operations\":[]") != std::string::npos);
-   assert(combined.find("\"stereotypes\":") != std::string::npos);
-   assert(combined.find("\"syntax\":[{") != std::string::npos);
-   assert(combined.find("\"transcript\":[") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"kind\":\"compilation-analysis\"") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"compilation\":{\"abiVersion\":1") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"semantic\":{\"abiVersion\":1") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"cardinality\":\"0..1\"") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"declaringType\":\"\"") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"inlineEnumValues\":[]") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"operations\":[]") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"stereotypes\":") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"syntax\":[{") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"transcript\":[") != std::string::npos);
 
    const std::string formatRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili","options":{"indentSize":2}})json";
    std::string formatting = resultJson(ilic_format(session,formatRequest.data(),formatRequest.size()));
-   assert(formatting.find("\"kind\":\"formatting\"") != std::string::npos);
-   assert(formatting.find("\"success\":true") != std::string::npos);
-   assert(formatting.find("!!@ displayName") != std::string::npos);
+   ILIC_REQUIRE(formatting.find("\"kind\":\"formatting\"") != std::string::npos);
+   ILIC_REQUIRE(formatting.find("\"success\":true") != std::string::npos);
+   ILIC_REQUIRE(formatting.find("!!@ displayName") != std::string::npos);
 
    const char invalid[] = "{";
    std::string rejected = resultJson(ilic_compile(session,invalid,sizeof(invalid) - 1));
-   assert(rejected.find("ILIC-ABI-REQUEST") != std::string::npos);
-   assert(rejected.find("\"success\":false") != std::string::npos);
+   ILIC_REQUIRE(rejected.find("ILIC-ABI-REQUEST") != std::string::npos);
+   ILIC_REQUIRE(rejected.find("\"success\":false") != std::string::npos);
 
    const char *baseUri = "memory:///abi/Base.ili";
    const char *translatedUri = "memory:///abi/Translated.ili";
@@ -102,24 +106,24 @@ TRANSLATION OF AbiBase [ "1" ] =
   CLASS TranslatedClass = TranslatedValue : TEXT * 30; END TranslatedClass;
 END AbiTranslated.
 )ili";
-   assert(put(session,baseUri,baseSource) == 0);
-   assert(put(session,translatedUri,translatedSource) == 0);
+   ILIC_REQUIRE(put(session,baseUri,baseSource) == 0);
+   ILIC_REQUIRE(put(session,translatedUri,translatedSource) == 0);
    const std::string crossFileRequest =
       R"json({"schemaVersion":1,"roots":["memory:///abi/Translated.ili","memory:///abi/Base.ili"]})json";
    const std::string crossFile =
       resultJson(ilic_compile(session,crossFileRequest.data(),crossFileRequest.size()));
-   assert(crossFile.find("\"schemaVersion\":1") != std::string::npos);
-   assert(crossFile.find("ILIC-TRANSLATION-TYPE-PROPERTY-MISMATCH")
+   ILIC_REQUIRE(crossFile.find("\"schemaVersion\":1") != std::string::npos);
+   ILIC_REQUIRE(crossFile.find("ILIC-TRANSLATION-TYPE-PROPERTY-MISMATCH")
       != std::string::npos);
-   assert(crossFile.find("\"uri\":\"memory:///abi/Translated.ili\"")
+   ILIC_REQUIRE(crossFile.find("\"uri\":\"memory:///abi/Translated.ili\"")
       != std::string::npos);
-   assert(crossFile.find("\"uri\":\"memory:///abi/Base.ili\"")
+   ILIC_REQUIRE(crossFile.find("\"uri\":\"memory:///abi/Base.ili\"")
       != std::string::npos);
-   assert(crossFile.find("\"relatedInformation\":[{\"message\":")
+   ILIC_REQUIRE(crossFile.find("\"relatedInformation\":[{\"message\":")
       != std::string::npos);
 
-   assert(ilic_session_remove_source(session,uri,std::strlen(uri)) == 0);
+   ILIC_REQUIRE(ilic_session_remove_source(session,uri,std::strlen(uri)) == 0);
    ilic_session_destroy(session);
-   assert(ilic_session_put_source(session,uri,std::strlen(uri),nullptr,0,0) == -1);
+   ILIC_REQUIRE(ilic_session_put_source(session,uri,std::strlen(uri),nullptr,0,0) == -1);
    return 0;
 }
