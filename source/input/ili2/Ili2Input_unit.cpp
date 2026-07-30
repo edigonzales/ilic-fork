@@ -35,7 +35,7 @@ antlrcpp::Any Ili2Input::visitUnitDef(parser::Ili2Parser::UnitDefContext *ctx)
    Log.incNestLevel();
 
    // init Unit
-   Unit *u = new Unit;
+   Unit *u = make_mmobject<Unit>();
    init_extendableme(u,ctx->unitname->getLine());
    set_selection_source(u,ctx->unitshort == nullptr
       ? ctx->unitname : ctx->unitshort->getStop());
@@ -109,7 +109,7 @@ antlrcpp::Any Ili2Input::visitDerivedUnit(parser::Ili2Parser::DerivedUnitContext
          }
          else {
 
-            CompoundExpr *ce = new CompoundExpr();
+            CompoundExpr *ce = make_mmobject<CompoundExpr>();
             ce->_type = "NumType";
             if (ctx->op->getText() == "*") {
                ce->Operation = CompoundExpr_OperationType::Mult;
@@ -124,7 +124,7 @@ antlrcpp::Any Ili2Input::visitDerivedUnit(parser::Ili2Parser::DerivedUnitContext
 
             /*
             Token *op = ctx->op().begin();
-            CompoundExpression *c = new CompoundExpression();
+            CompoundExpression *c = make_mmobject<CompoundExpression>();
             c->SubExpressions.push_back(e);
             c->SubExpressions.push_back(visitDecConst(d));
             c->_type = "NumType";
@@ -198,25 +198,25 @@ antlrcpp::Any Ili2Input::visitComposedUnitExpr(parser::Ili2Parser::ComposedUnitE
    Expression* e = nullptr;
 
    if (ctx->STAR() != nullptr) {
-      CompoundExpr* ce = new CompoundExpr();
+      CompoundExpr* ce = make_mmobject<CompoundExpr>();
       ce->Operation = CompoundExpr_OperationType::Mult;
       ce->SubExpressions.push_back(visitComposedUnitExpr(ctx->composedUnitExpr()));
-      UnitRef* r = new UnitRef;
+      UnitRef* r = make_mmobject<UnitRef>();
       r->Unit = find_unit(visitPath(ctx->path()), get_line(ctx));
       ce->SubExpressions.push_back(r);
       e = ce;
    }
    else if (ctx->SLASH() != nullptr) {
-      CompoundExpr* ce = new CompoundExpr();
+      CompoundExpr* ce = make_mmobject<CompoundExpr>();
       ce->Operation = CompoundExpr_OperationType::Div;
       ce->SubExpressions.push_back(visitComposedUnitExpr(ctx->composedUnitExpr()));
-      UnitRef * r = new UnitRef;
+      UnitRef * r = make_mmobject<UnitRef>();
       r->Unit = find_unit(visitPath(ctx->path()), get_line(ctx));
       ce->SubExpressions.push_back(r);
       e = ce;
    }
    else {
-      UnitRef* r = new UnitRef;
+      UnitRef* r = make_mmobject<UnitRef>();
       r->Unit = find_unit(visitPath(ctx->path()), get_line(ctx));
       e = r;
    }

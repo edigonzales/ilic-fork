@@ -59,7 +59,7 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
       );
    }
    
-   Model *m = new Model();
+   Model *m = make_mmobject<Model>();
    init_package(m,get_line(ctx));
    set_selection_source(m,ctx->modelname1);
    set_end_selection_source(m,ctx->modelname2);
@@ -159,7 +159,7 @@ antlrcpp::Any Ili2Input::visitImporting(parser::Ili2Parser::ImportingContext *ct
    */
 
    debug(ctx,"visitImportDef()");
-   Import *i = new Import();
+   Import *i = make_mmobject<Import>();
    i->ImportingP = get_package_context();
 
    if (ctx->INTERLIS() != nullptr) {
@@ -251,7 +251,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    }
 
    // init topic
-   SubModel *s = new SubModel();
+   SubModel *s = make_mmobject<SubModel>();
    init_package(s,get_line(ctx->topicname1));
    set_selection_source(s,ctx->topicname1);
    set_end_selection_source(s,ctx->topicname2);
@@ -260,7 +260,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    push_context(s);
 
    // init dataunit
-   DataUnit *d = new DataUnit();
+   DataUnit *d = make_mmobject<DataUnit>();
    init_extendableme(d,get_line(ctx->topicname1));
    d->Name = "BASKET";
    add_dataunit(d);
@@ -311,7 +311,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
          string path = visitPath(p->path());
          DataUnit *du = find_dataunit(path,get_line(ctx));
          if (du != nullptr) {
-            Dependency *dd = new Dependency();
+            Dependency *dd = make_mmobject<Dependency>();
             init_mmobject(dd,p->start->getLine());
             dd->Using = d;
             dd->Dependent = du;

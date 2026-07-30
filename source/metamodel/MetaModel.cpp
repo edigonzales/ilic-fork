@@ -2,6 +2,9 @@
 #include "DiagnosticUtil.h"
 #include "../util/Logger.h"
 
+#include <unordered_map>
+#include <vector>
+
 using namespace util;
 
 namespace metamodel {
@@ -24,6 +27,7 @@ namespace metamodel {
    static list <AxisSpec*> AllAxisSpecs;
    static Class* class_context;
    static list<MetaElement*> context;
+   static unordered_map<MMObject *,MMObjectDeleter> owned_objects;
 
    // helper functions
 
@@ -40,6 +44,32 @@ namespace metamodel {
       AllAxisSpecs.clear();
       context.clear();
       class_context = nullptr;
+      reset_mmobjects();
+   }
+
+   void register_mmobject(MMObject *object,MMObjectDeleter deleter)
+   {
+      if (object != nullptr && deleter != nullptr) owned_objects.emplace(object,deleter);
+   }
+
+   void destroy_mmobject(MMObject *object)
+   {
+      if (object == nullptr) return;
+      const auto found = owned_objects.find(object);
+      if (found == owned_objects.end()) return;
+      const MMObjectDeleter deleter = found->second;
+      owned_objects.erase(found);
+      deleter(object);
+   }
+
+   void reset_mmobjects()
+   {
+      vector<pair<MMObject *,MMObjectDeleter>> objects;
+      objects.reserve(owned_objects.size());
+      for (const auto &[object,deleter] : owned_objects)
+         objects.emplace_back(object,deleter);
+      owned_objects.clear();
+      for (const auto &[object,deleter] : objects) deleter(object);
    }
 
    // model helpers
@@ -345,262 +375,262 @@ namespace metamodel {
    static MMObject* get_instance(string classname)
    {
       if (classname == "Model") {
-         return new Model();
+         return make_mmobject<Model>();
       }
       else if (classname == "MMObject") {
-         return new MMObject();
+         return make_mmobject<MMObject>();
       }
       else if (classname == "DocText") {
-         return new DocText();
+         return make_mmobject<DocText>();
       }
       else if (classname == "MetaAttribute") {
-         return new MetaAttribute();
+         return make_mmobject<MetaAttribute>();
       }
       else if (classname == "MetaElement") {
-         return new MetaElement();
+         return make_mmobject<MetaElement>();
       }
       else if (classname == "ExtendableME") {
-         return new ExtendableME();
+         return make_mmobject<ExtendableME>();
       }
       else if (classname == "Package") {
-         return new Package();
+         return make_mmobject<Package>();
       }
       else if (classname == "Import") {
-         return new Import();
+         return make_mmobject<Import>();
       }
       else if (classname == "Ili1Format") {
-         return new Ili1Format();
+         return make_mmobject<Ili1Format>();
       }
       else if (classname == "Model") {
-         return new Model();
+         return make_mmobject<Model>();
       }
       else if (classname == "SubModel") {
-         return new SubModel();
+         return make_mmobject<SubModel>();
       }
       else if (classname == "Type") {
-         return new Type();
+         return make_mmobject<Type>();
       }
       else if (classname == "Multiplicity") {
-         return new Multiplicity();
+         return make_mmobject<Multiplicity>();
       }
       else if (classname == "Constraint") {
-         return new Constraint();
+         return make_mmobject<Constraint>();
       }
       else if (classname == "DomainType") {
-         return new DomainType();
+         return make_mmobject<DomainType>();
       }
       else if (classname == "Class") {
-         return new Class();
+         return make_mmobject<Class>();
       }
       else if (classname == "AttrOrParam") {
-         return new AttrOrParam();
+         return make_mmobject<AttrOrParam>();
       }
       else if (classname == "TypeRelatedType") {
-         return new TypeRelatedType();
+         return make_mmobject<TypeRelatedType>();
       }
       else if (classname == "MultiValue") {
-         return new MultiValue();
+         return make_mmobject<MultiValue>();
       }
       else if (classname == "ClassRelatedType") {
-         return new ClassRelatedType();
+         return make_mmobject<ClassRelatedType>();
       }
       else if (classname == "ReferenceType") {
-         return new ReferenceType();
+         return make_mmobject<ReferenceType>();
       }
       else if (classname == "Role") {
-         return new Role();
+         return make_mmobject<Role>();
       }
       else if (classname == "ExplicitAssocAccess") {
-         return new ExplicitAssocAccess();
+         return make_mmobject<ExplicitAssocAccess>();
       }
       else if (classname == "AssocAcc") {
-         return new AssocAcc();
+         return make_mmobject<AssocAcc>();
       }
       else if (classname == "TransferElement") {
-         return new TransferElement();
+         return make_mmobject<TransferElement>();
       }
       else if (classname == "Ili1TransferElement") {
-         return new Ili1TransferElement();
+         return make_mmobject<Ili1TransferElement>();
       }
       else if (classname == "DataUnit") {
-         return new DataUnit();
+         return make_mmobject<DataUnit>();
       }
       else if (classname == "Dependency") {
-         return new Dependency();
+         return make_mmobject<Dependency>();
       }
       else if (classname == "AllowedInBasket") {
-         return new AllowedInBasket();
+         return make_mmobject<AllowedInBasket>();
       }
       else if (classname == "Context") {
-         return new Context();
+         return make_mmobject<Context>();
       }
       else if (classname == "GenericDef") {
-         return new GenericDef();
+         return make_mmobject<GenericDef>();
       }
       else if (classname == "Unit") {
-         return new Unit();
+         return make_mmobject<Unit>();
       }
       else if (classname == "MetaBasketDef") {
-         return new MetaBasketDef();
+         return make_mmobject<MetaBasketDef>();
       }
       else if (classname == "MetaObjectDef") {
-         return new MetaObjectDef();
+         return make_mmobject<MetaObjectDef>();
       }
       else if (classname == "BooleanType") {
-         return new BooleanType();
+         return make_mmobject<BooleanType>();
       }
       else if (classname == "TextType") {
-         return new TextType();
+         return make_mmobject<TextType>();
       }
       else if (classname == "BlackboxType") {
-         return new BlackboxType();
+         return make_mmobject<BlackboxType>();
       }
       else if (classname == "NumType") {
-         return new NumType();
+         return make_mmobject<NumType>();
       }
       else if (classname == "CoordType") {
-         return new CoordType();
+         return make_mmobject<CoordType>();
       }
       else if (classname == "AxisSpec") {
-         return new AxisSpec();
+         return make_mmobject<AxisSpec>();
       }
       else if (classname == "NumsRefSys") {
-         return new NumsRefSys();
+         return make_mmobject<NumsRefSys>();
       }
       else if (classname == "FormattedType") {
-         return new FormattedType();
+         return make_mmobject<FormattedType>();
       }
       else if (classname == "AnyOIDType") {
-         return new AnyOIDType();
+         return make_mmobject<AnyOIDType>();
       }
       else if (classname == "FunctionDef") {
-         return new FunctionDef();
+         return make_mmobject<FunctionDef>();
       }
       else if (classname == "Argument") {
-         return new Argument();
+         return make_mmobject<Argument>();
       }
       else if (classname == "ClassRefType") {
-         return new ClassRefType();
+         return make_mmobject<ClassRefType>();
       }
       else if (classname == "ObjectType") {
-         return new ObjectType();
+         return make_mmobject<ObjectType>();
       }
       else if (classname == "AttributeRefType") {
-         return new AttributeRefType();
+         return make_mmobject<AttributeRefType>();
       }
       else if (classname == "ARefRestriction") {
-         return new ARefRestriction();
+         return make_mmobject<ARefRestriction>();
       }
       else if (classname == "EnumType") {
-         return new EnumType();
+         return make_mmobject<EnumType>();
       }
       else if (classname == "EnumNode") {
-         return new EnumNode();
+         return make_mmobject<EnumNode>();
       }
       else if (classname == "EnumTreeValueType") {
-         return new EnumTreeValueType();
+         return make_mmobject<EnumTreeValueType>();
       }
       else if (classname == "LineForm") {
-         return new LineForm();
+         return make_mmobject<LineForm>();
       }
       else if (classname == "LineType") {
-         return new LineType();
+         return make_mmobject<LineType>();
       }
       else if (classname == "LinesForm") {
-         return new LinesForm();
+         return make_mmobject<LinesForm>();
       }
       else if (classname == "View") {
-         return new View();
+         return make_mmobject<View>();
       }
       else if (classname == "Expression") {
-         return new Expression();
+         return make_mmobject<Expression>();
       }
       else if (classname == "UnaryExpr") {
-         return new UnaryExpr();
+         return make_mmobject<UnaryExpr>();
       }
       else if (classname == "CompoundExpr") {
-         return new CompoundExpr();
+         return make_mmobject<CompoundExpr>();
       }
       else if (classname == "Factor") {
-         return new Factor();
+         return make_mmobject<Factor>();
       }
       else if (classname == "PathEl") {
-         return new PathEl();
+         return make_mmobject<PathEl>();
       }
       else if (classname == "PathOrInspFactor") {
-         return new PathOrInspFactor();
+         return make_mmobject<PathOrInspFactor>();
       }
       else if (classname == "EnumAssignment") {
-         return new EnumAssignment();
+         return make_mmobject<EnumAssignment>();
       }
       else if (classname == "EnumMapping") {
-         return new EnumMapping();
+         return make_mmobject<EnumMapping>();
       }
       else if (classname == "ClassRef") {
-         return new ClassRef();
+         return make_mmobject<ClassRef>();
       }
       else if (classname == "ActualArgument") {
-         return new ActualArgument();
+         return make_mmobject<ActualArgument>();
       }
       else if (classname == "FunctionCall") {
-         return new FunctionCall();
+         return make_mmobject<FunctionCall>();
       }
       else if (classname == "RuntimeParamRef") {
-         return new RuntimeParamRef();
+         return make_mmobject<RuntimeParamRef>();
       }
       else if (classname == "Constant") {
-         return new Constant();
+         return make_mmobject<Constant>();
       }
       else if (classname == "ClassConst") {
-         return new ClassConst();
+         return make_mmobject<ClassConst>();
       }
       else if (classname == "AttributeConst") {
-         return new AttributeConst();
+         return make_mmobject<AttributeConst>();
       }
       else if (classname == "UnitRef") {
-         return new UnitRef();
+         return make_mmobject<UnitRef>();
       }
       else if (classname == "UnitFunction") {
-         return new UnitFunction();
+         return make_mmobject<UnitFunction>();
       }
       else if (classname == "Constraint") {
-         return new Constraint();
+         return make_mmobject<Constraint>();
       }
       else if (classname == "SimpleConstraint") {
-         return new SimpleConstraint();
+         return make_mmobject<SimpleConstraint>();
       }
       else if (classname == "ExistenceDef") {
-         return new ExistenceDef();
+         return make_mmobject<ExistenceDef>();
       }
       else if (classname == "ExistenceConstraint") {
-         return new ExistenceConstraint();
+         return make_mmobject<ExistenceConstraint>();
       }
       else if (classname == "UniqueConstraint") {
-         return new UniqueConstraint();
+         return make_mmobject<UniqueConstraint>();
       }
       else if (classname == "SetConstraint") {
-         return new SetConstraint();
+         return make_mmobject<SetConstraint>();
       }
       else if (classname == "Graphic") {
-         return new Graphic();
+         return make_mmobject<Graphic>();
       }
       else if (classname == "SignParamAssignment") {
-         return new SignParamAssignment();
+         return make_mmobject<SignParamAssignment>();
       }
       else if (classname == "CondSignParamAssignment") {
-         return new CondSignParamAssignment();
+         return make_mmobject<CondSignParamAssignment>();
       }
       else if (classname == "DrawingRule") {
-         return new DrawingRule();
+         return make_mmobject<DrawingRule>();
       }
       else if (classname == "DocTextTranslation") {
-         return new DocTextTranslation();
+         return make_mmobject<DocTextTranslation>();
       }
       else if (classname == "METranslation") {
-         return new METranslation();
+         return make_mmobject<METranslation>();
       }
       else if (classname == "Translation") {
-         return new Translation();
+         return make_mmobject<Translation>();
       }
       else {
          return nullptr;
@@ -623,7 +653,7 @@ namespace metamodel {
          else {
             string basename = o->getBaseClass();
             if (o != this) {
-               delete o;
+               destroy_mmobject(o);
             }
             o = get_instance(basename);
             if (o == nullptr) {
@@ -637,7 +667,7 @@ namespace metamodel {
       }
       else {
          if (o != this) {
-            delete o;
+            destroy_mmobject(o);
          }
          return true;
       }
@@ -1160,7 +1190,7 @@ Log.message(">>> clone topic");
 
       for (auto* orgNode : org->Node) {
          MMObject* cloneNode = nullptr;
-         cloneNode = new EnumNode();
+         cloneNode = make_mmobject<EnumNode>();
          EnumNode* c = static_cast<EnumNode*>(cloneNode);
          clone_init_enumnode(c, orgNode);
          clone->Node.push_back(c);
@@ -1183,12 +1213,12 @@ Log.message(">>> clone topic");
 
       clone->Order = org->Order;
 
-      clone->TopNode = new EnumNode;
+      clone->TopNode = make_mmobject<EnumNode>();
       clone_init_enumnode(clone->TopNode, org->TopNode);
 
       for (auto* orgNode : org->ETVT) {
          MMObject* cloneNode = nullptr;
-         cloneNode = new EnumTreeValueType();
+         cloneNode = make_mmobject<EnumTreeValueType>();
          EnumTreeValueType* c = static_cast<EnumTreeValueType*>(cloneNode);
 
          clone_init_enumtreevaluetype(c, orgNode);
@@ -1229,7 +1259,7 @@ Log.message(">>> clone topic");
 
       for (auto* orgNode : org->LineForm) {
          MMObject* cloneNode = nullptr;
-         cloneNode = new LineForm();
+         cloneNode = make_mmobject<LineForm>();
          LineForm* c = static_cast<LineForm*>(cloneNode);
          clone_init_lineform(c, orgNode);
          clone->LineForm.push_back(c);
@@ -1559,511 +1589,511 @@ Log.message(">>> clone topic");
       string classname = this->getClass();
 
       if (classname == "MMObject") {
-         clone = new MMObject();
+         clone = make_mmobject<MMObject>();
          MMObject* c = static_cast<MMObject*>(clone);
          MMObject* o = static_cast<MMObject*>(this);
          clone_init_mmobject(c,o);
       }
       else if (classname == "DocText") {
-         clone = new DocText();
+         clone = make_mmobject<DocText>();
          DocText* c = static_cast<DocText*>(clone);
          DocText* o = static_cast<DocText*>(this);
          clone_init_doctext(c,o);
       }
       else if (classname == "MetaAttribute") {
-         clone = new MetaAttribute();
+         clone = make_mmobject<MetaAttribute>();
          MetaAttribute* c = static_cast<MetaAttribute*>(clone);
          MetaAttribute* o = static_cast<MetaAttribute*>(this);
          clone_init_metaattribute(c,o);
       }
       else if (classname == "MetaElement") {
-         clone = new MetaElement();
+         clone = make_mmobject<MetaElement>();
          MetaElement* c = static_cast<MetaElement*>(clone);
          MetaElement* o = static_cast<MetaElement*>(this);
          clone_init_metaelement(c,o);
       }
       else if (classname == "ExtendableME") {
-         clone = new ExtendableME();
+         clone = make_mmobject<ExtendableME>();
          ExtendableME* c = static_cast<ExtendableME*>(clone);
          ExtendableME* o = static_cast<ExtendableME*>(this);
          clone_init_extendableme(c,o);
       }
       else if (classname == "Package") {
-         clone = new Package();
+         clone = make_mmobject<Package>();
          Package* c = static_cast<Package*>(clone);
          Package* o = static_cast<Package*>(this);
          clone_init_package(c,o);
       }
       else if (classname == "Import") {
-         clone = new Import();
+         clone = make_mmobject<Import>();
          Import* c = static_cast<Import*>(clone);
          Import* o = static_cast<Import*>(this);
          clone_init_import(c,o);
       }
       else if (classname == "Ili1Format") {
-         clone = new Ili1Format();
+         clone = make_mmobject<Ili1Format>();
          Ili1Format* c = static_cast<Ili1Format*>(clone);
          Ili1Format* o = static_cast<Ili1Format*>(this);
          clone_init_ili1format(c,o);
       }
       else if (classname == "Model") {
-         clone = new Model();
+         clone = make_mmobject<Model>();
          Model* c = static_cast<Model*>(clone);
          Model* o = static_cast<Model*>(this);
          clone_init_model(c,o);
       }
       else if (classname == "SubModel") {
-         clone = new SubModel();
+         clone = make_mmobject<SubModel>();
          SubModel* c = static_cast<SubModel*>(clone);
          SubModel* o = static_cast<SubModel*>(this);
          clone_init_submodel(c,o);
       }
       else if (classname == "Type") {
-         clone = new Type();
+         clone = make_mmobject<Type>();
          Type* c = static_cast<Type*>(clone);
          Type* o = static_cast<Type*>(this);
          clone_init_type(c,o);
       }
       else if (classname == "Multiplicity") {
-         clone = new Multiplicity();
+         clone = make_mmobject<Multiplicity>();
          Multiplicity* c = static_cast<Multiplicity*>(clone);
          Multiplicity* o = static_cast<Multiplicity*>(this);
          clone_init_multiplicity(c,o);
       }
       else if (classname == "Constraint") {
-         clone = new Constraint();
+         clone = make_mmobject<Constraint>();
          Constraint* c = static_cast<Constraint*>(clone);
          Constraint* o = static_cast<Constraint*>(this);
          clone_init_constraint(c,o);
       }
       else if (classname == "DomainType") {
-         clone = new DomainType();
+         clone = make_mmobject<DomainType>();
          DomainType* c = static_cast<DomainType*>(clone);
          DomainType* o = static_cast<DomainType*>(this);
          clone_init_domaintype(c,o);
       }
       else if (classname == "Class") {
-         clone = new Class();
+         clone = make_mmobject<Class>();
          Class* c = static_cast<Class*>(clone);
          Class* o = static_cast<Class*>(this);
          clone_init_class(c,o);
       }
       else if (classname == "AttrOrParam") {
-         clone = new AttrOrParam();
+         clone = make_mmobject<AttrOrParam>();
          AttrOrParam* c = static_cast<AttrOrParam*>(clone);
          AttrOrParam* o = static_cast<AttrOrParam*>(this);
          clone_init_attrorparam(c,o);
       }
       else if (classname == "TypeRelatedType") {
-         clone = new TypeRelatedType();
+         clone = make_mmobject<TypeRelatedType>();
          TypeRelatedType* c = static_cast<TypeRelatedType*>(clone);
          TypeRelatedType* o = static_cast<TypeRelatedType*>(this);
          clone_init_typerelatedtype(c,o);
       }
       else if (classname == "MultiValue") {
-         clone = new MultiValue();
+         clone = make_mmobject<MultiValue>();
          MultiValue* c = static_cast<MultiValue*>(clone);
          MultiValue* o = static_cast<MultiValue*>(this);
          clone_init_multivalue(c,o);
       }
       else if (classname == "ClassRelatedType") {
-         clone = new ClassRelatedType();
+         clone = make_mmobject<ClassRelatedType>();
          ClassRelatedType* c = static_cast<ClassRelatedType*>(clone);
          ClassRelatedType* o = static_cast<ClassRelatedType*>(this);
          clone_init_classrelatedtype(c,o);
       }
       else if (classname == "ReferenceType") {
-         clone = new ReferenceType();
+         clone = make_mmobject<ReferenceType>();
          ReferenceType* c = static_cast<ReferenceType*>(clone);
          ReferenceType* o = static_cast<ReferenceType*>(this);
          clone_init_referencetype(c,o);
       }
       else if (classname == "Role") {
-         clone = new Role();
+         clone = make_mmobject<Role>();
          Role* c = static_cast<Role*>(clone);
          Role* o = static_cast<Role*>(this);
          clone_init_role(c,o);
       }
       else if (classname == "ExplicitAssocAccess") {
-         clone = new ExplicitAssocAccess();
+         clone = make_mmobject<ExplicitAssocAccess>();
          ExplicitAssocAccess* c = static_cast<ExplicitAssocAccess*>(clone);
          ExplicitAssocAccess* o = static_cast<ExplicitAssocAccess*>(this);
          clone_init_explicitassocaccess(c,o);
       }
       else if (classname == "AssocAcc") {
-         clone = new AssocAcc();
+         clone = make_mmobject<AssocAcc>();
          AssocAcc* c = static_cast<AssocAcc*>(clone);
          AssocAcc* o = static_cast<AssocAcc*>(this);
          clone_init_assocacc(c,o);
       }
       else if (classname == "TransferElement") {
-         clone = new TransferElement();
+         clone = make_mmobject<TransferElement>();
          TransferElement* c = static_cast<TransferElement*>(clone);
          TransferElement* o = static_cast<TransferElement*>(this);
          clone_init_transferelement(c,o);
       }
       else if (classname == "Ili1TransferElement") {
-         clone = new Ili1TransferElement();
+         clone = make_mmobject<Ili1TransferElement>();
          Ili1TransferElement* c = static_cast<Ili1TransferElement*>(clone);
          Ili1TransferElement* o = static_cast<Ili1TransferElement*>(this);
          clone_init_ili1transferelement(c,o);
       }
       else if (classname == "DataUnit") {
-         clone = new DataUnit();
+         clone = make_mmobject<DataUnit>();
          DataUnit* c = static_cast<DataUnit*>(clone);
          DataUnit* o = static_cast<DataUnit*>(this);
          clone_init_dataunit(c,o);
       }
       else if (classname == "Dependency") {
-         clone = new Dependency();
+         clone = make_mmobject<Dependency>();
          Dependency* c = static_cast<Dependency*>(clone);
          Dependency* o = static_cast<Dependency*>(this);
          clone_init_dependency(c,o);
       }
       else if (classname == "AllowedInBasket") {
-         clone = new AllowedInBasket();
+         clone = make_mmobject<AllowedInBasket>();
          AllowedInBasket* c = static_cast<AllowedInBasket*>(clone);
          AllowedInBasket* o = static_cast<AllowedInBasket*>(this);
          clone_init_allowedinbasket(c,o);
       }
       else if (classname == "Context") {
-         clone = new Context();
+         clone = make_mmobject<Context>();
          Context* c = static_cast<Context*>(clone);
          Context* o = static_cast<Context*>(this);
          clone_init_context(c,o);
       }
       else if (classname == "GenericDef") {
-         clone = new GenericDef();
+         clone = make_mmobject<GenericDef>();
          GenericDef* c = static_cast<GenericDef*>(clone);
          GenericDef* o = static_cast<GenericDef*>(this);
          clone_init_genericdef(c,o);
       }
       else if (classname == "Unit") {
-         clone = new Unit();
+         clone = make_mmobject<Unit>();
          Unit* c = static_cast<Unit*>(clone);
          Unit* o = static_cast<Unit*>(this);
          clone_init_unit(c,o);
       }
       else if (classname == "MetaBasketDef") {
-         clone = new MetaBasketDef();
+         clone = make_mmobject<MetaBasketDef>();
          MetaBasketDef* c = static_cast<MetaBasketDef*>(clone);
          MetaBasketDef* o = static_cast<MetaBasketDef*>(this);
          clone_init_metabasketdef(c,o);
       }
       else if (classname == "MetaObjectDef") {
-         clone = new MetaObjectDef();
+         clone = make_mmobject<MetaObjectDef>();
          MetaObjectDef* c = static_cast<MetaObjectDef*>(clone);
          MetaObjectDef* o = static_cast<MetaObjectDef*>(this);
          clone_init_metaobjectdef(c,o);
       }
       else if (classname == "BooleanType") {
-         clone = new BooleanType();
+         clone = make_mmobject<BooleanType>();
          BooleanType* c = static_cast<BooleanType*>(clone);
          BooleanType* o = static_cast<BooleanType*>(this);
          clone_init_booleantype(c,o);
       }
       else if (classname == "TextType") {
-         clone = new TextType();
+         clone = make_mmobject<TextType>();
          TextType* c = static_cast<TextType*>(clone);
          TextType* o = static_cast<TextType*>(this);
          clone_init_texttype(c,o);
       }
       else if (classname == "BlackboxType") {
-         clone = new BlackboxType();
+         clone = make_mmobject<BlackboxType>();
          BlackboxType* c = static_cast<BlackboxType*>(clone);
          BlackboxType* o = static_cast<BlackboxType*>(this);
          clone_init_blackboxtype(c,o);
       }
       else if (classname == "NumType") {
-         clone = new NumType();
+         clone = make_mmobject<NumType>();
          NumType* c = static_cast<NumType*>(clone);
          NumType* o = static_cast<NumType*>(this);
          clone_init_numtype(c,o);
       }
       else if (classname == "CoordType") {
-         clone = new CoordType();
+         clone = make_mmobject<CoordType>();
          CoordType* c = static_cast<CoordType*>(clone);
          CoordType* o = static_cast<CoordType*>(this);
          clone_init_coordtype(c,o);
       }
       else if (classname == "AxisSpec") {
-         clone = new AxisSpec();
+         clone = make_mmobject<AxisSpec>();
          AxisSpec* c = static_cast<AxisSpec*>(clone);
          AxisSpec* o = static_cast<AxisSpec*>(this);
          clone_init_axisspec(c,o);
       }
       else if (classname == "NumsRefSys") {
-         clone = new NumsRefSys();
+         clone = make_mmobject<NumsRefSys>();
          NumsRefSys* c = static_cast<NumsRefSys*>(clone);
          NumsRefSys* o = static_cast<NumsRefSys*>(this);
          clone_init_numsrefsys(c,o);
       }
       else if (classname == "FormattedType") {
-         clone = new FormattedType();
+         clone = make_mmobject<FormattedType>();
          FormattedType* c = static_cast<FormattedType*>(clone);
          FormattedType* o = static_cast<FormattedType*>(this);
          clone_init_formattedtype(c,o);
       }
       else if (classname == "AnyOIDType") {
-         clone = new AnyOIDType();
+         clone = make_mmobject<AnyOIDType>();
          AnyOIDType* c = static_cast<AnyOIDType*>(clone);
          AnyOIDType* o = static_cast<AnyOIDType*>(this);
          clone_init_anyoidtype(c,o);
       }
       else if (classname == "FunctionDef") {
-         clone = new FunctionDef();
+         clone = make_mmobject<FunctionDef>();
          FunctionDef* c = static_cast<FunctionDef*>(clone);
          FunctionDef* o = static_cast<FunctionDef*>(this);
          clone_init_functiondef(c,o);
       }
       else if (classname == "Argument") {
-         clone = new Argument();
+         clone = make_mmobject<Argument>();
          Argument* c = static_cast<Argument*>(clone);
          Argument* o = static_cast<Argument*>(this);
          clone_init_argument(c,o);
       }
       else if (classname == "ClassRefType") {
-         clone = new ClassRefType();
+         clone = make_mmobject<ClassRefType>();
          ClassRefType* c = static_cast<ClassRefType*>(clone);
          ClassRefType* o = static_cast<ClassRefType*>(this);
          clone_init_classreftype(c,o);
       }
       else if (classname == "ObjectType") {
-         clone = new ObjectType();
+         clone = make_mmobject<ObjectType>();
          ObjectType* c = static_cast<ObjectType*>(clone);
          ObjectType* o = static_cast<ObjectType*>(this);
          clone_init_objecttype(c,o);
       }
       else if (classname == "AttributeRefType") {
-         clone = new AttributeRefType();
+         clone = make_mmobject<AttributeRefType>();
          AttributeRefType* c = static_cast<AttributeRefType*>(clone);
          AttributeRefType* o = static_cast<AttributeRefType*>(this);
          clone_init_attributereftype(c,o);
       }
       else if (classname == "ARefRestriction") {
-         clone = new ARefRestriction();
+         clone = make_mmobject<ARefRestriction>();
          ARefRestriction* c = static_cast<ARefRestriction*>(clone);
          ARefRestriction* o = static_cast<ARefRestriction*>(this);
          clone_init_arefrestriction(c,o);
       }
       else if (classname == "EnumType") {
-         clone = new EnumType();
+         clone = make_mmobject<EnumType>();
          EnumType* c = static_cast<EnumType*>(clone);
          EnumType* o = static_cast<EnumType*>(this);
          clone_init_enumtype(c,o);
       }
       else if (classname == "EnumNode") {
-         clone = new EnumNode();
+         clone = make_mmobject<EnumNode>();
          EnumNode* c = static_cast<EnumNode*>(clone);
          EnumNode* o = static_cast<EnumNode*>(this);
          clone_init_enumnode(c,o);
       }
       else if (classname == "EnumTreeValueType") {
-         clone = new EnumTreeValueType();
+         clone = make_mmobject<EnumTreeValueType>();
          EnumTreeValueType* c = static_cast<EnumTreeValueType*>(clone);
          EnumTreeValueType* o = static_cast<EnumTreeValueType*>(this);
          clone_init_enumtreevaluetype(c,o);
       }
       else if (classname == "LineForm") {
-         clone = new LineForm();
+         clone = make_mmobject<LineForm>();
          LineForm* c = static_cast<LineForm*>(clone);
          LineForm* o = static_cast<LineForm*>(this);
          clone_init_lineform(c,o);
       }
       else if (classname == "LineType") {
-         clone = new LineType();
+         clone = make_mmobject<LineType>();
          LineType* c = static_cast<LineType*>(clone);
          LineType* o = static_cast<LineType*>(this);
          clone_init_linetype(c,o);
       }
       else if (classname == "LinesForm") {
-         clone = new LinesForm();
+         clone = make_mmobject<LinesForm>();
          LinesForm* c = static_cast<LinesForm*>(clone);
          LinesForm* o = static_cast<LinesForm*>(this);
          clone_init_linesform(c,o);
       }
       else if (classname == "View") {
-         clone = new View();
+         clone = make_mmobject<View>();
          View* c = static_cast<View*>(clone);
          View* o = static_cast<View*>(this);
          clone_init_view(c,o);
       }
       else if (classname == "RenamedBaseView") {
-         clone = new RenamedBaseView();
+         clone = make_mmobject<RenamedBaseView>();
          RenamedBaseView* c = static_cast<RenamedBaseView*>(clone);
          RenamedBaseView* o = static_cast<RenamedBaseView*>(this);
          clone_init_renamedbaseview(c,o);
       }
       else if (classname == "Expression") {
-         clone = new Expression();
+         clone = make_mmobject<Expression>();
          Expression* c = static_cast<Expression*>(clone);
          Expression* o = static_cast<Expression*>(this);
          clone_init_expression(c,o);
       }
       else if (classname == "UnaryExpr") {
-         clone = new UnaryExpr();
+         clone = make_mmobject<UnaryExpr>();
          UnaryExpr* c = static_cast<UnaryExpr*>(clone);
          UnaryExpr* o = static_cast<UnaryExpr*>(this);
          clone_init_unaryexpr(c,o);
       }
       else if (classname == "CompoundExpr") {
-         clone = new CompoundExpr();
+         clone = make_mmobject<CompoundExpr>();
          CompoundExpr* c = static_cast<CompoundExpr*>(clone);
          CompoundExpr* o = static_cast<CompoundExpr*>(this);
          clone_init_compoundexpr(c,o);
       }
       else if (classname == "Factor") {
-         clone = new Factor();
+         clone = make_mmobject<Factor>();
          Factor* c = static_cast<Factor*>(clone);
          Factor* o = static_cast<Factor*>(this);
          clone_init_factor(c,o);
       }
       else if (classname == "PathEl") {
-         clone = new PathEl();
+         clone = make_mmobject<PathEl>();
          PathEl* c = static_cast<PathEl*>(clone);
          PathEl* o = static_cast<PathEl*>(this);
          clone_init_pathel(c,o);
       }
       else if (classname == "PathOrInspFactor") {
-         clone = new PathOrInspFactor();
+         clone = make_mmobject<PathOrInspFactor>();
          PathOrInspFactor* c = static_cast<PathOrInspFactor*>(clone);
          PathOrInspFactor* o = static_cast<PathOrInspFactor*>(this);
          clone_init_pathorinspfactor(c,o);
       }
       else if (classname == "EnumAssignment") {
-         clone = new EnumAssignment();
+         clone = make_mmobject<EnumAssignment>();
          EnumAssignment* c = static_cast<EnumAssignment*>(clone);
          EnumAssignment* o = static_cast<EnumAssignment*>(this);
          clone_init_enumassignment(c,o);
       }
       else if (classname == "EnumMapping") {
-         clone = new EnumMapping();
+         clone = make_mmobject<EnumMapping>();
          EnumMapping* c = static_cast<EnumMapping*>(clone);
          EnumMapping* o = static_cast<EnumMapping*>(this);
          clone_init_enummapping(c,o);
       }
       else if (classname == "ClassRef") {
-         clone = new ClassRef();
+         clone = make_mmobject<ClassRef>();
          ClassRef* c = static_cast<ClassRef*>(clone);
          ClassRef* o = static_cast<ClassRef*>(this);
          clone_init_classref(c,o);
       }
       else if (classname == "ActualArgument") {
-         clone = new ActualArgument();
+         clone = make_mmobject<ActualArgument>();
          ActualArgument* c = static_cast<ActualArgument*>(clone);
          ActualArgument* o = static_cast<ActualArgument*>(this);
          clone_init_actualargument(c,o);
       }
       else if (classname == "FunctionCall") {
-         clone = new FunctionCall();
+         clone = make_mmobject<FunctionCall>();
          FunctionCall* c = static_cast<FunctionCall*>(clone);
          FunctionCall* o = static_cast<FunctionCall*>(this);
          clone_init_functioncall(c,o);
       }
       else if (classname == "RuntimeParamRef") {
-         clone = new RuntimeParamRef();
+         clone = make_mmobject<RuntimeParamRef>();
          RuntimeParamRef* c = static_cast<RuntimeParamRef*>(clone);
          RuntimeParamRef* o = static_cast<RuntimeParamRef*>(this);
          clone_init_runtimeparamref(c,o);
       }
       else if (classname == "Constant") {
-         clone = new Constant();
+         clone = make_mmobject<Constant>();
          Constant* c = static_cast<Constant*>(clone);
          Constant* o = static_cast<Constant*>(this);
          clone_init_constant(c,o);
       }
       else if (classname == "ClassConst") {
-         clone = new ClassConst();
+         clone = make_mmobject<ClassConst>();
          ClassConst* c = static_cast<ClassConst*>(clone);
          ClassConst* o = static_cast<ClassConst*>(this);
          clone_init_classconst(c,o);
       }
       else if (classname == "AttributeConst") {
-         clone = new AttributeConst();
+         clone = make_mmobject<AttributeConst>();
          AttributeConst* c = static_cast<AttributeConst*>(clone);
          AttributeConst* o = static_cast<AttributeConst*>(this);
          clone_init_attributeconst(c,o);
       }
       else if (classname == "UnitRef") {
-         clone = new UnitRef();
+         clone = make_mmobject<UnitRef>();
          UnitRef* c = static_cast<UnitRef*>(clone);
          UnitRef* o = static_cast<UnitRef*>(this);
          clone_init_unitref(c,o);
       }
       else if (classname == "UnitFunction") {
-         clone = new UnitFunction();
+         clone = make_mmobject<UnitFunction>();
          UnitFunction* c = static_cast<UnitFunction*>(clone);
          UnitFunction* o = static_cast<UnitFunction*>(this);
          clone_init_unitfunction(c,o);
       }
       else if (classname == "SimpleConstraint") {
-         clone = new SimpleConstraint();
+         clone = make_mmobject<SimpleConstraint>();
          SimpleConstraint* c = static_cast<SimpleConstraint*>(clone);
          SimpleConstraint* o = static_cast<SimpleConstraint*>(this);
          clone_init_simpleconstraint(c,o);
       }
       else if (classname == "ExistenceDef") {
-         clone = new ExistenceDef();
+         clone = make_mmobject<ExistenceDef>();
          ExistenceDef* c = static_cast<ExistenceDef*>(clone);
          ExistenceDef* o = static_cast<ExistenceDef*>(this);
          clone_init_existencedef(c,o);
       }
       else if (classname == "ExistenceConstraint") {
-         clone = new ExistenceConstraint();
+         clone = make_mmobject<ExistenceConstraint>();
          ExistenceConstraint* c = static_cast<ExistenceConstraint*>(clone);
          ExistenceConstraint* o = static_cast<ExistenceConstraint*>(this);
          clone_init_existenceconstraint(c,o);
       }
       else if (classname == "UniqueConstraint") {
-         clone = new UniqueConstraint();
+         clone = make_mmobject<UniqueConstraint>();
          UniqueConstraint* c = static_cast<UniqueConstraint*>(clone);
          UniqueConstraint* o = static_cast<UniqueConstraint*>(this);
          clone_init_uniqueconstraint(c,o);
       }
       else if (classname == "SetConstraint") {
-         clone = new SetConstraint();
+         clone = make_mmobject<SetConstraint>();
          SetConstraint* c = static_cast<SetConstraint*>(clone);
          SetConstraint* o = static_cast<SetConstraint*>(this);
          clone_init_setconstraint(c,o);
       }
       else if (classname == "Graphic") {
-         clone = new Graphic();
+         clone = make_mmobject<Graphic>();
          Graphic* c = static_cast<Graphic*>(clone);
          Graphic* o = static_cast<Graphic*>(this);
          clone_init_graphic(c,o);
       }
       else if (classname == "SignParamAssignment") {
-         clone = new SignParamAssignment();
+         clone = make_mmobject<SignParamAssignment>();
          SignParamAssignment* c = static_cast<SignParamAssignment*>(clone);
          SignParamAssignment* o = static_cast<SignParamAssignment*>(this);
          clone_init_signparamassignment(c,o);
       }
       else if (classname == "CondSignParamAssignment") {
-         clone = new CondSignParamAssignment();
+         clone = make_mmobject<CondSignParamAssignment>();
          CondSignParamAssignment* c = static_cast<CondSignParamAssignment*>(clone);
          CondSignParamAssignment* o = static_cast<CondSignParamAssignment*>(this);
          clone_init_condsignparamassignment(c,o);
       }
       else if (classname == "DrawingRule") {
-         clone = new DrawingRule();
+         clone = make_mmobject<DrawingRule>();
          DrawingRule* c = static_cast<DrawingRule*>(clone);
          DrawingRule* o = static_cast<DrawingRule*>(this);
          clone_init_drawingrule(c,o);
       }
       else if (classname == "DocTextTranslation") {
-         clone = new DocTextTranslation();
+         clone = make_mmobject<DocTextTranslation>();
          DocTextTranslation* c = static_cast<DocTextTranslation*>(clone);
          DocTextTranslation* o = static_cast<DocTextTranslation*>(this);
          clone_init_doctexttranslation(c,o);
       }
       else if (classname == "METranslation") {
-         clone = new METranslation();
+         clone = make_mmobject<METranslation>();
          METranslation* c = static_cast<METranslation*>(clone);
          METranslation* o = static_cast<METranslation*>(this);
          clone_init_metranslation(c,o);
       }
       else if (classname == "Translation") {
-         clone = new Translation();
+         clone = make_mmobject<Translation>();
          Translation* c = static_cast<Translation*>(clone);
          Translation* o = static_cast<Translation*>(this);
          clone_init_translation(c,o);

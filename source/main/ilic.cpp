@@ -38,8 +38,16 @@ using namespace util;
 using namespace metamodel;
 string model_filter = "";
 
+static void reset_compiler_state()
+{
+   metamodel::reset();
+   metamodel::reset_input_state();
+   util::reset_ilifiles();
+}
+
 static void abort(int exitcode)
 {
+   reset_compiler_state();
    Log.internal_error("compilation aborted with status " + to_string(exitcode),exitcode);
 }
 
@@ -498,8 +506,8 @@ static void generate_ili1(string ili1_file,Model *m)
    Log.info("");
    Log.info("generating " + ili1_file + ", model=" + m->Name + " ...");
    Log.incNestLevel();
-   output::Ili1Output *ili1output = new output::Ili1Output(ili1_file);
-   ili1output->visit(m);
+   output::Ili1Output ili1output(ili1_file);
+   ili1output.visit(m);
    Log.decNestLevel();
    Log.info("done.");
 }
@@ -509,18 +517,18 @@ static void generate_ili23(string ili23_file)
    Log.info("");
    Log.info("generating " + ili23_file + " ...");
    Log.incNestLevel();
-   output::Ili2Output *ili23output = new output::Ili2Output(ili23_file,"2.3");
+   output::Ili2Output ili23output(ili23_file,"2.3");
    if (model_filter == "") {
-      ili23output->visitAllModels();
+      ili23output.visitAllModels();
    }
    else {
-      ili23output->preVisit();
+      ili23output.preVisit();
       for (auto m : get_all_models()) {
          if (m->Name == model_filter) {
-            ili23output->visit(m);
+            ili23output.visit(m);
          }
       }
-      ili23output->postVisit();
+      ili23output.postVisit();
    }
    Log.decNestLevel();
    Log.info("done.");
@@ -531,18 +539,18 @@ static void generate_ili24(string ili24_file)
    Log.info("");
    Log.info("generating " + ili24_file + " ...");
    Log.incNestLevel();
-   output::Ili2Output *ili24output = new output::Ili2Output(ili24_file, "2.4");
+   output::Ili2Output ili24output(ili24_file, "2.4");
    if (model_filter == "") {
-      ili24output->visitAllModels();
+      ili24output.visitAllModels();
    }
    else {
-      ili24output->preVisit();
+      ili24output.preVisit();
       for (auto m : get_all_models()) {
          if (m->Name == model_filter) {
-            ili24output->visit(m);
+            ili24output.visit(m);
          }
       }
-      ili24output->postVisit();
+      ili24output.postVisit();
    }
    Log.decNestLevel();
    Log.info("done.");
@@ -553,8 +561,8 @@ static void generate_imd(string imd_file,string iliversion)
    Log.info("");
    Log.info("generating " + imd_file + " ...");
    Log.incNestLevel();
-   output::ImdOutput *imdoutput = new output::ImdOutput(imd_file,iliversion);
-   imdoutput->visitAllModels();
+   output::ImdOutput imdoutput(imd_file,iliversion);
+   imdoutput.visitAllModels();
    Log.decNestLevel();
    Log.info("done.");
 }
@@ -564,8 +572,8 @@ static void generate_xsd(string xsd_file,string iliversion)
    Log.info("");
    Log.info("generating " + xsd_file + " ...");
    Log.incNestLevel();
-   output::XsdOutput *xsdoutput = new output::XsdOutput(xsd_file,iliversion,get_version());
-   xsdoutput->visitAllModels();
+   output::XsdOutput xsdoutput(xsd_file,iliversion,get_version());
+   xsdoutput.visitAllModels();
    Log.decNestLevel();
    Log.info("done.");
 }
@@ -575,8 +583,8 @@ static void generate_gml(string gml_file)
    Log.info("");
    Log.info("generating " + gml_file + " ...");
    Log.incNestLevel();
-   output::GmlOutput *gmloutput = new output::GmlOutput(gml_file,iliversion,get_version());
-   gmloutput->visitAllModels();
+   output::GmlOutput gmloutput(gml_file,iliversion,get_version());
+   gmloutput.visitAllModels();
    Log.decNestLevel();
    Log.info("done.");
 }
@@ -591,6 +599,10 @@ int main(int argc, char* argv[])
       }
       return compile_json();
    }
+
+   struct CleanupGuard {
+      ~CleanupGuard() { reset_compiler_state(); }
+   } cleanupGuard;
 
    StringMap arguments = parse_arguments(argc,argv);
    check_arguments(arguments);

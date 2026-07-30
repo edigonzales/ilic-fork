@@ -56,7 +56,7 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
    debug(ctx,">>> visitFunctionDef(" + name + ")");
    Log.incNestLevel();
 
-   FunctionDef *f = new FunctionDef;
+   FunctionDef *f = make_mmobject<FunctionDef>();
    init_metaelement(f,ctx->start->getLine());
    set_selection_source(f,ctx->functioname);
 
@@ -77,7 +77,7 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
    push_context(f);
 
    for (auto pctx : ctx->functionDefParam()) {
-      Argument *a = new Argument();
+      Argument *a = make_mmobject<Argument>();
       init_metaelement(a,ctx->start->getLine());
       set_selection_source(a,pctx->NAME()->getSymbol());
       a->Name = pctx->NAME()->getText();
@@ -136,7 +136,7 @@ antlrcpp::Any Ili2Input::visitFunctionCall(parser::Ili2Parser::FunctionCallConte
    debug(ctx,">>> visitFunctionCall(" + name + ")");
    Log.incNestLevel();
 
-   FunctionCall *c = new FunctionCall();
+   FunctionCall *c = make_mmobject<FunctionCall>();
    init_factor(c,get_line(ctx));
    
    c->Function = find_function(name,get_line(ctx));
@@ -205,7 +205,7 @@ antlrcpp::Any Ili2Input::visitFunctionCallArgument(parser::Ili2Parser::FunctionC
 
    debug(ctx,"visitFunctionCallArgument()");
 
-   ActualArgument *a = new ActualArgument();
+   ActualArgument *a = make_mmobject<ActualArgument>();
    init_mmobject(a,ctx->start->getLine());
 
    if (ctx->expression() != nullptr) {
@@ -242,7 +242,7 @@ antlrcpp::Any Ili2Input::visitArgumentType(parser::Ili2Parser::ArgumentTypeConte
    else if (ctx->OBJECT() != nullptr) {
       if (ctx->restrictedRef() != nullptr) {
          RestrictedRef *r = visitRestrictedRef(ctx->restrictedRef());
-         ObjectType *o = new ObjectType;
+         ObjectType *o = make_mmobject<ObjectType>();
          o->Multiple = false;
          o->_baseclass = r->_baseclass;
          t = o;
@@ -255,7 +255,7 @@ antlrcpp::Any Ili2Input::visitArgumentType(parser::Ili2Parser::ArgumentTypeConte
    else if (ctx->OBJECTS() != nullptr) {
       if (ctx->restrictedRef() != nullptr) {
          RestrictedRef* r = visitRestrictedRef(ctx->restrictedRef());
-         ObjectType* o = new ObjectType;
+         ObjectType* o = make_mmobject<ObjectType>();
          o->Multiple = true;
          o->_baseclass = r->_baseclass;
          t = o;
@@ -266,12 +266,12 @@ antlrcpp::Any Ili2Input::visitArgumentType(parser::Ili2Parser::ArgumentTypeConte
       }
    }
    else if (ctx->ENUMVAL() != nullptr) {
-      EnumTreeValueType *tt = new EnumTreeValueType();
+      EnumTreeValueType *tt = make_mmobject<EnumTreeValueType>();
       // tt->ET = find_enumtreevalue(); to do !!!
       t = tt;
    }
    else if (ctx->ENUMTREEVAL() != nullptr) {
-      EnumTreeValueType *tt = new EnumTreeValueType();
+      EnumTreeValueType *tt = make_mmobject<EnumTreeValueType>();
       // tt->ET = find_enumtreevalue(); to do !!!
       t = tt;
    }

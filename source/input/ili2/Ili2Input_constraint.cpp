@@ -87,7 +87,7 @@ antlrcpp::Any Ili2Input::visitMandatoryConstraint(parser::Ili2Parser::MandatoryC
    debug(ctx,">>> visitMandatoryConstraint()");
    Log.incNestLevel();
    
-   SimpleConstraint *c = new SimpleConstraint();
+   SimpleConstraint *c = make_mmobject<SimpleConstraint>();
    init_constraint(c,get_line(ctx));
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
@@ -125,7 +125,7 @@ antlrcpp::Any Ili2Input::visitPlausibilityConstraint(parser::Ili2Parser::Plausib
 
    debug(ctx,"visitPlausibilityConstraint()");
 
-   SimpleConstraint *c = new SimpleConstraint();
+   SimpleConstraint *c = make_mmobject<SimpleConstraint>();
    init_constraint(c,get_line(ctx));
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
@@ -181,7 +181,7 @@ antlrcpp::Any Ili2Input::visitExistenceConstraint(parser::Ili2Parser::ExistenceC
    debug(ctx,">>> visitExistenceConstraint()");
    Log.incNestLevel();
 
-   ExistenceConstraint *c = new ExistenceConstraint();
+   ExistenceConstraint *c = make_mmobject<ExistenceConstraint>();
    init_constraint(c,get_line(ctx));
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
@@ -194,7 +194,7 @@ antlrcpp::Any Ili2Input::visitExistenceConstraint(parser::Ili2Parser::ExistenceC
       c->Attr = attribute.as<PathOrInspFactor *>();
    }
    for (size_t i = 0; i < viewables.size() && i + 1 < attributes.size(); ++i) {
-      ExistenceDef *definition = new ExistenceDef();
+      ExistenceDef *definition = make_mmobject<ExistenceDef>();
       init_factor(definition,get_line(viewables[i]));
       definition->Viewable = find_class_or_view(visitPath(viewables[i]),get_line(viewables[i]));
       if (definition->Viewable != nullptr) {
@@ -235,7 +235,7 @@ antlrcpp::Any Ili2Input::visitUniquenessConstraint(parser::Ili2Parser::Uniquenes
 
    debug(ctx,"visitUniquenessConstraint()");
    
-   UniqueConstraint *c = new UniqueConstraint();
+   UniqueConstraint *c = make_mmobject<UniqueConstraint>();
    init_constraint(c,get_line(ctx));
    c->PerBasket = ctx->BASKET() != nullptr;
    if (ctx->name != nullptr) {
@@ -267,7 +267,7 @@ antlrcpp::Any Ili2Input::visitUniquenessConstraint(parser::Ili2Parser::Uniquenes
       attributename=NAME (COMMA attributename=NAME)*
       */
       c->Kind = UniqueConstraint::LocalU;
-      PathOrInspFactor * pf = new PathOrInspFactor;
+      PathOrInspFactor * pf = make_mmobject<PathOrInspFactor>();
       pf->_path = ctx->localUniqueness()->localUniqueEl()->getText();
       c->UniqueDef.push_back(pf);
    }
@@ -384,7 +384,7 @@ antlrcpp::Any Ili2Input::visitSetConstraint(parser::Ili2Parser::SetConstraintCon
    debug(ctx,">>> visitSetConstraint()");
    Log.incNestLevel();
    
-   SetConstraint *c = new SetConstraint();
+   SetConstraint *c = make_mmobject<SetConstraint>();
    init_constraint(c,get_line(ctx));
    c->PerBasket = ctx->BASKET() != nullptr;
    if (ctx->name != nullptr) {

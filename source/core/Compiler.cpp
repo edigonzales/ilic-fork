@@ -166,6 +166,25 @@ void appendInputFileTranscript(std::vector<std::string> &transcript,
       (file->getAutoSearch() ? "auto search" : "command line"));
 }
 
+void resetCompilerState()
+{
+   metamodel::reset();
+   metamodel::reset_input_state();
+   util::reset_ilifiles();
+}
+
+class CompilerStateCleanup final {
+public:
+   explicit CompilerStateCleanup(bool enabled) : enabled_(enabled) {}
+   ~CompilerStateCleanup()
+   {
+      if (enabled_) resetCompilerState();
+   }
+
+private:
+   bool enabled_;
+};
+
 bool compileFile(
    util::IliFile *file,
    std::list<util::IliFile *> &compiledFiles,
@@ -229,7 +248,7 @@ SyntaxSnapshot CompilerSession::parse(const std::string &uri)
 CompilationResult CompilerSession::compile(const CompilationRequest &request)
 {
    std::lock_guard<std::mutex> lock(compilerMutex);
-   return compileUnlocked(request);
+   return compileUnlocked(request,false);
 }
 
 SemanticSnapshot CompilerSession::analyze(const CompilationRequest &request)
@@ -247,18 +266,21 @@ CompilationAnalysisResult CompilerSession::compileAndAnalyze(const CompilationRe
 CompilationAnalysisResult CompilerSession::compileAndAnalyzeUnlocked(
    const CompilationRequest &request)
 {
+   CompilerStateCleanup cleanup(true);
    CompilationAnalysisResult result;
-   result.compilation = compileUnlocked(request);
+   result.compilation = compileUnlocked(request,true);
    result.semantic = buildSemanticSnapshot(sources_,request,result.compilation,
       lastCompilationSourceUris_,&result.syntax);
    return result;
 }
 
-CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &request)
+CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &request,
+   bool retainMetamodel)
 {
    ++compileInvocationCount_;
    lastCompilationSourceUris_.clear();
    ActiveSourceManagerScope sourceScope(&sources_);
+   CompilerStateCleanup cleanup(!retainMetamodel);
    CompilationResult result;
    std::vector<std::string> transcript{
       "inf: ilic " + std::string(version()),
@@ -288,9 +310,7 @@ CompilationResult CompilerSession::compileUnlocked(const CompilationRequest &req
    Log.setAbortWithException(true);
    Log.setCategory("imports");
    if (request.options.warningsAsErrors) Log.warningsAsErrors();
-   util::reset_ilifiles();
-   metamodel::reset();
-   metamodel::reset_input_state();
+   resetCompilerState();
    util::set_autosearch(request.options.autoSearch);
    util::set_ilidirs(joinDirectories(request.options.modelDirectories));
 

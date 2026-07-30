@@ -50,9 +50,10 @@ void input::parseIli2(string ilifile)
       antlr4::CommonTokenStream tokens(&ili2lexer);
 
       Log.debug("creating ili2 parser ...");
+      parser::IliParserErrorListener errorListener;
       parser::Ili2Parser ili2parser(&tokens);
       ili2parser.removeErrorListeners();
-      ili2parser.addErrorListener(new parser::IliParserErrorListener());
+      ili2parser.addErrorListener(&errorListener);
       parser::Ili2Parser::Interlis2DefContext *ili2d = ili2parser.interlis2Def();
 
       if (Log.getErrorCount() != errors) {
@@ -165,7 +166,7 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBask
    */
 
    debug(ctx,">>> visitMetaDataBasketDef()");
-   MetaBasketDef *basket = new MetaBasketDef();
+   MetaBasketDef *basket = make_mmobject<MetaBasketDef>();
    init_extendableme(basket,get_line(ctx));
    set_selection_source(basket,ctx->basketname);
    basket->Name = ctx->basketname->getText();
@@ -216,7 +217,7 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBask
          expectClass = false;
       }
       else if (expectObject) {
-         MetaObjectDef *object = new MetaObjectDef();
+         MetaObjectDef *object = make_mmobject<MetaObjectDef>();
          init_mmobject(object,get_line(terminal));
          object->Name = text;
          object->Class = objectClass;
@@ -244,7 +245,7 @@ antlrcpp::Any Ili2Input::visitRunTimeParameterDef(parser::Ili2Parser::RunTimePar
    debug(ctx,">>> visitRunTimeParameterDef()");
 
    for (auto p : ctx->runTimeParameter()) {
-      AttrOrParam *a = new AttrOrParam;
+      AttrOrParam *a = make_mmobject<AttrOrParam>();
       init_mmobject(a,get_line(p->runtimeparametername));
       set_selection_source(a,p->runtimeparametername);
       a->Name = p->runtimeparametername->getText();

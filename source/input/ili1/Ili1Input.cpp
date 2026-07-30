@@ -57,9 +57,10 @@ void input::parseIli1(string input)
    antlr4::CommonTokenStream tokens(&ili1lexer);
 
    Log.debug("creating ili1 parser ...");
+   parser::IliParserErrorListener errorListener;
    parser::Ili1Parser ili1parser(&tokens);
    ili1parser.removeErrorListeners();
-   ili1parser.addErrorListener(new parser::IliParserErrorListener());
+   ili1parser.addErrorListener(&errorListener);
    parser::Ili1Parser::Interlis1DefContext *ili1d = ili1parser.interlis1Def();
    
    if (Log.getErrorCount() != errors) {
@@ -185,7 +186,7 @@ antlrcpp::Any Ili1Input::visitFormatEncoding(Ili1Parser::FormatEncodingContext *
    debug(ctx,">>> visitFormatEncoding()");
    Log.incNestLevel();
    
-   Ili1Format *f = new Ili1Format();
+   Ili1Format *f = make_mmobject<Ili1Format>();
    
    if (ctx->FREE() != nullptr) {
       init_mmobject(f,ctx->FREE()->getSymbol()->getLine());

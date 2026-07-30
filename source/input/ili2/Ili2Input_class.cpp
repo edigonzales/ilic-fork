@@ -117,7 +117,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    Log.incNestLevel();
 
    // init Class
-   Class *c = new Class();
+   Class *c = make_mmobject<Class>();
    c->Kind = Class::ClassVal;
    init_type(c,get_line(ctx->classname1));
    set_selection_source(c,ctx->classname1);
@@ -244,7 +244,7 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
    }
 
    // init Class
-   Class *c = new Class();
+   Class *c = make_mmobject<Class>();
    c->Kind = Class::Structure;
    init_type(c,ctx->structurename1->getLine());
    set_selection_source(c,ctx->structurename1);
@@ -479,7 +479,7 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    }
 
    // init AttrOrParam
-   AttrOrParam *a = new AttrOrParam();
+   AttrOrParam *a = make_mmobject<AttrOrParam>();
    init_extendableme(a, ctx->attributname->getLine());
    set_selection_source(a,ctx->attributname);
 
@@ -658,7 +658,7 @@ antlrcpp::Any Ili2Input::visitParameterDef(parser::Ili2Parser::ParameterDefConte
    Log.incNestLevel();
 
    // init AttrOrParam
-   AttrOrParam *a = new AttrOrParam();
+   AttrOrParam *a = make_mmobject<AttrOrParam>();
    init_extendableme(a, ctx->parameterName->getLine());
    set_selection_source(a,ctx->parameterName);
 
@@ -743,7 +743,7 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
       Type *tt = find_type(visitPath(ctx->path()),get_line(ctx));
       if (tt != nullptr) {
          if (tt->getClass() == "Class") {
-            MultiValue *mv = new MultiValue;
+            MultiValue *mv = make_mmobject<MultiValue>();
             init_type(mv,get_line(ctx));
             mv->Multiplicity.Min = 0;
             mv->Multiplicity.Max = 1;
@@ -767,7 +767,7 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
    }
    else if (ctx->restrictedRef() != nullptr) {
       RestrictedRef* r = visitRestrictedRef(ctx->restrictedRef());
-      MultiValue* mv = new MultiValue;
+      MultiValue* mv = make_mmobject<MultiValue>();
       init_type(mv, get_line(ctx));
       mv->Multiplicity.Min = 0;
       mv->Multiplicity.Max = 1;
@@ -824,7 +824,7 @@ antlrcpp::Any Ili2Input::visitReferenceAttr(parser::Ili2Parser::ReferenceAttrCon
    debug(ctx,">>> visitReferenceAttr()");
    Log.incNestLevel();
       
-   ReferenceType *t = new ReferenceType();
+   ReferenceType *t = make_mmobject<ReferenceType>();
    init_domaintype(t,ctx->start->getLine());
    
    if (ctx->EXTERNAL() != nullptr) {

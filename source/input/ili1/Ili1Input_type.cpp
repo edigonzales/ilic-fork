@@ -198,14 +198,14 @@ antlrcpp::Any Ili1Input::visitCoord2(parser::Ili1Parser::Coord2Context *ctx)
    debug(ctx,">>> visitCoord2()");
    Log.incNestLevel();
    
-   CoordType *t = new CoordType();
+   CoordType *t = make_mmobject<CoordType>();
    init_domaintype(t,ctx->start->getLine());
 
    t->NullAxis = 2;
    t->PiHalfAxis = 1;
 
    // C1
-   NumType *n = new NumType;
+   NumType *n = make_mmobject<NumType>();
    init_domaintype(n,get_line(ctx->emin));
    n->Min = ctx->emin->getText();
    n->Max = ctx->emax->getText();
@@ -214,14 +214,14 @@ antlrcpp::Any Ili1Input::visitCoord2(parser::Ili1Parser::Coord2Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   AxisSpec *as = new AxisSpec();
+   AxisSpec *as = make_mmobject<AxisSpec>();
    init_mmobject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
    add_axisspec(as);
 
    // C2
-   n = new NumType;
+   n = make_mmobject<NumType>();
    init_domaintype(n,get_line(ctx->emin));
    n->Min = ctx->nmin->getText();
    n->Max = ctx->nmax->getText();
@@ -230,7 +230,7 @@ antlrcpp::Any Ili1Input::visitCoord2(parser::Ili1Parser::Coord2Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   as = new AxisSpec();
+   as = make_mmobject<AxisSpec>();
    init_mmobject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
@@ -255,14 +255,14 @@ antlrcpp::Any Ili1Input::visitCoord3(parser::Ili1Parser::Coord3Context *ctx)
    debug(ctx,">>> visitCoord3()");
    Log.incNestLevel();
    
-   CoordType *t = new CoordType();
+   CoordType *t = make_mmobject<CoordType>();
    init_domaintype(t,ctx->start->getLine());
 
    t->NullAxis = 2;
    t->PiHalfAxis = 1;
 
    // C1
-   NumType *n = new NumType;
+   NumType *n = make_mmobject<NumType>();
    init_domaintype(n,get_line(ctx->emin));
    n->Min = ctx->emin->getText();
    n->Max = ctx->emax->getText();
@@ -271,14 +271,14 @@ antlrcpp::Any Ili1Input::visitCoord3(parser::Ili1Parser::Coord3Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   AxisSpec *as = new AxisSpec();
+   AxisSpec *as = make_mmobject<AxisSpec>();
    init_mmobject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
    add_axisspec(as);
 
    // C2
-   n = new NumType;
+   n = make_mmobject<NumType>();
    init_domaintype(n,get_line(ctx->emin));
    n->Min = ctx->nmin->getText();
    n->Max = ctx->nmax->getText();
@@ -287,14 +287,14 @@ antlrcpp::Any Ili1Input::visitCoord3(parser::Ili1Parser::Coord3Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   as = new AxisSpec();
+   as = make_mmobject<AxisSpec>();
    init_mmobject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
    add_axisspec(as);
 
    // C3
-   n = new NumType;
+   n = make_mmobject<NumType>();
    init_domaintype(n,get_line(ctx->emin));
    n->Min = ctx->hmin->getText();
    n->Max = ctx->hmax->getText();
@@ -303,7 +303,7 @@ antlrcpp::Any Ili1Input::visitCoord3(parser::Ili1Parser::Coord3Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   as = new AxisSpec();
+   as = make_mmobject<AxisSpec>();
    init_mmobject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
@@ -340,7 +340,7 @@ antlrcpp::Any Ili1Input::visitNumericRange(parser::Ili1Parser::NumericRangeConte
 
    debug(ctx,">>> visitNumericRange()");
    
-   NumType *t = new NumType();
+   NumType *t = make_mmobject<NumType>();
    init_domaintype(t,ctx->start->getLine());
    
    t->Min = ctx->min->getText();
@@ -372,7 +372,7 @@ antlrcpp::Any Ili1Input::visitDim1Type(parser::Ili1Parser::Dim1TypeContext *ctx)
 
    debug(ctx,">>> visitDim1Context()");
 
-   NumType *t = new NumType();
+   NumType *t = make_mmobject<NumType>();
    init_domaintype(t,ctx->start->getLine());
    
    t->Min = ctx->min->getText();
@@ -405,7 +405,7 @@ antlrcpp::Any Ili1Input::visitDim2Type(parser::Ili1Parser::Dim2TypeContext *ctx)
    
    debug(ctx,">>> visitDim2Type()");
 
-   NumType *t = new NumType();
+   NumType *t = make_mmobject<NumType>();
    init_domaintype(t,ctx->start->getLine());
    
    t->Min = ctx->min->getText();
@@ -438,7 +438,7 @@ antlrcpp::Any Ili1Input::visitAngleType(parser::Ili1Parser::AngleTypeContext *ct
    
    debug(ctx,">>> visitAngleType()");
 
-   NumType *t = new NumType();
+   NumType *t = make_mmobject<NumType>();
    init_domaintype(t,get_line(ctx));
    
    t->Min = ctx->min->getText();
@@ -475,7 +475,7 @@ antlrcpp::Any Ili1Input::visitTextType(parser::Ili1Parser::TextTypeContext *ctx)
 
    debug(ctx,">>> visitTextType()");
    
-   TextType *t = new TextType();
+   TextType *t = make_mmobject<TextType>();
    init_domaintype(t,ctx->start->getLine());
 
    t->Kind = TextType::Text;
@@ -519,13 +519,13 @@ antlrcpp::Any Ili1Input::visitEnumerationType(parser::Ili1Parser::EnumerationTyp
    debug(ctx,">>> visitEnumerationType()");
    Log.incNestLevel();
 
-   EnumType *t = new EnumType;
+   EnumType *t = make_mmobject<EnumType>();
    
    init_domaintype(t,ctx->start->getLine());
    t->Order = EnumType::Unordered;
    
    // TopNode
-   EnumNode* tn = new EnumNode;
+   EnumNode* tn = make_mmobject<EnumNode>();
    tn->Name = "TOP";
    tn->EnumType = t;
    tn->Final = false;
@@ -553,7 +553,7 @@ antlrcpp::Any Ili1Input::visitEnumElement(parser::Ili1Parser::EnumElementContext
    : enumelement=NAME enumerationType?
    */
 
-   EnumNode *n = new EnumNode();
+   EnumNode *n = make_mmobject<EnumNode>();
    n->Name = ctx->enumelement->getText();
 
    debug(ctx,">>> visitEnumElement(" + n->Name + ")");
@@ -640,7 +640,7 @@ antlrcpp::Any Ili1Input::visitLineType(parser::Ili1Parser::LineTypeContext *ctx)
 
    debug(ctx,">>> visitLineType()");
    
-   LineType *t = new LineType();
+   LineType *t = make_mmobject<LineType>();
    init_domaintype(t,ctx->start->getLine());
    t->Kind = LineType::Polyline;
 
@@ -670,7 +670,7 @@ antlrcpp::Any Ili1Input::visitForm(parser::Ili1Parser::FormContext *ctx)
    list<LineForm *> lf;
    
    for (auto *t : ctx->lineForm()) {
-      LineForm *f = new LineForm;
+      LineForm *f = make_mmobject<LineForm>();
       f->Name = t->getText();
       lf.push_back(f);
    }
@@ -691,7 +691,7 @@ antlrcpp::Any Ili1Input::visitAreaType(parser::Ili1Parser::AreaTypeContext *ctx)
 
    debug(ctx,">>> visitAreaType()");
 
-   LineType *t = new LineType();
+   LineType *t = make_mmobject<LineType>();
    init_domaintype(t,ctx->start->getLine());
    if (ctx->SURFACE() != nullptr) {
       t->Kind = LineType::Surface;
@@ -802,7 +802,7 @@ antlrcpp::Any Ili1Input::visitLineAttributes(parser::Ili1Parser::LineAttributesC
    
    Log.incNestLevel();
 
-   Class *c = new Class();
+   Class *c = make_mmobject<Class>();
 
    // Class Attributes
    c->Name = name;

@@ -59,7 +59,7 @@ int main()
    for (int index = 0; index < 8; ++index) writers.emplace_back([&,index] {
       const std::string content(10000,static_cast<char>('A' + index));
       const auto result = cache.store(uri,content);
-      ILIC_REQUIRE(result.success);
+      ILIC_REQUIRE_MSG(result.success,result.error);
    });
    for (auto &writer : writers) writer.join();
    cached = cache.lookup(uri,std::chrono::hours(1));

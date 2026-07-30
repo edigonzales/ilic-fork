@@ -69,7 +69,7 @@ public:
 
 private:
    friend struct CompilerSessionTestAccess;
-   CompilationResult compileUnlocked(const CompilationRequest &request);
+   CompilationResult compileUnlocked(const CompilationRequest &request,bool retainMetamodel);
    CompilationAnalysisResult compileAndAnalyzeUnlocked(const CompilationRequest &request);
    SourceManager sources_;
    std::uint64_t compileInvocationCount_ = 0;

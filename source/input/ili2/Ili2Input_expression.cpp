@@ -126,7 +126,7 @@ antlrcpp::Any Ili2Input::visitTerm1(parser::Ili2Parser::Term1Context *ctx)
       e = visitTerm2(ctx->term2().front());
    }
    else {
-      CompoundExpr *ce = new CompoundExpr();
+      CompoundExpr *ce = make_mmobject<CompoundExpr>();
       init_expression(ce,get_line(ctx));
       if (ctx->operator1().front()->OR() != nullptr) {
          ce->Operation = CompoundExpr_OperationType::Or;
@@ -179,7 +179,7 @@ antlrcpp::Any Ili2Input::visitTerm2(parser::Ili2Parser::Term2Context *ctx)
       e = visitTerm3(ctx->term3().front());
    }
    else {
-      CompoundExpr *ce = new CompoundExpr();
+      CompoundExpr *ce = make_mmobject<CompoundExpr>();
       init_expression(ce,get_line(ctx));
       if (ctx->operator2().front()->AND() != nullptr) {
          ce->Operation = CompoundExpr_OperationType::And;
@@ -316,7 +316,7 @@ antlrcpp::Any Ili2Input::visitTerm3(parser::Ili2Parser::Term3Context *ctx)
          enum {Not, Defined, None} Operation;
          Expression *SubExpression = nullptr;
       */
-      UnaryExpr *u = new UnaryExpr();
+      UnaryExpr *u = make_mmobject<UnaryExpr>();
       init_expression(u,get_line(ctx));
       u->Operation = UnaryExpr::None;
       u->SubExpression = visitTerm(ctx->t1);
@@ -340,7 +340,7 @@ antlrcpp::Any Ili2Input::visitTerm3(parser::Ili2Parser::Term3Context *ctx)
          virtual string getClass() { return "CompoundExpr"; }
       };
       */
-      CompoundExpr *c = new CompoundExpr();
+      CompoundExpr *c = make_mmobject<CompoundExpr>();
       init_expression(c,get_line(ctx));
       c->Operation = static_cast<CompoundExpr_OperationType>(visitRelation(ctx->relation()));
       Expression *e1 = visitTerm(ctx->t1);
@@ -397,7 +397,7 @@ antlrcpp::Any Ili2Input::visitTerm(parser::Ili2Parser::TermContext *ctx)
          Expression *SubExpression;
       };
       */
-      UnaryExpr *u = new UnaryExpr();
+      UnaryExpr *u = make_mmobject<UnaryExpr>();
       init_expression(u,get_line(ctx));
       if (ctx->NOT() != nullptr) {
          u->Operation = UnaryExpr::Not;
@@ -418,7 +418,7 @@ antlrcpp::Any Ili2Input::visitTerm(parser::Ili2Parser::TermContext *ctx)
       /* struct Factor : public Expression { // ABSTRACT
       public:
       */
-      UnaryExpr *u = new UnaryExpr();
+      UnaryExpr *u = make_mmobject<UnaryExpr>();
       init_expression(u,get_line(ctx));
       u->Operation = UnaryExpr::Defined;
       Factor *f = visitFactor(ctx->factor());
@@ -537,7 +537,7 @@ antlrcpp::Any Ili2Input::visitFactor(parser::Ili2Parser::FactorContext *ctx)
       f = fc;
    }
    else if (ctx->PARAMETER() != nullptr) {
-      RuntimeParamRef *r = new RuntimeParamRef;
+      RuntimeParamRef *r = make_mmobject<RuntimeParamRef>();
       init_factor(r,get_line(ctx->parampath));
       r->RuntimeParam = nullptr;
       string name = ctx->parampath->getText();
@@ -589,7 +589,7 @@ antlrcpp::Any Ili2Input::visitConstant(parser::Ili2Parser::ConstantContext *ctx)
    Factor *c = nullptr;
    
    if (ctx->UNDEFINED() != nullptr) {
-      c = new Constant();
+      c = make_mmobject<Constant>();
       init_factor(c,get_line(ctx));
       static_cast<Constant *>(c)->Kind = Constant::Undefined;
       c->_type = "UNDEFINED";
@@ -638,7 +638,7 @@ antlrcpp::Any Ili2Input::visitDecConst(parser::Ili2Parser::DecConstContext *ctx)
    debug(ctx,">>> visitDecConst()");
    Log.incNestLevel();
    
-   Constant *c = new Constant();
+   Constant *c = make_mmobject<Constant>();
    init_factor(c,get_line(ctx));
    c->Kind = Constant::Numeric;
    c->_type = "NumType";
@@ -695,7 +695,7 @@ antlrcpp::Any Ili2Input::visitTextConst(parser::Ili2Parser::TextConstContext *ct
    debug(ctx,">>> visitTextConst()");
    Log.incNestLevel();
 
-   Constant *c = new Constant();
+   Constant *c = make_mmobject<Constant>();
    init_factor(c,get_line(ctx));
    c->Kind = Constant::Text;
    c->_type = "TextType";
@@ -718,7 +718,7 @@ antlrcpp::Any Ili2Input::visitEnumConst(parser::Ili2Parser::EnumConstContext *ct
    debug(ctx,">>> visitEnumConst()");
    Log.incNestLevel();
 
-   Constant *c = new Constant();
+   Constant *c = make_mmobject<Constant>();
    init_factor(c,get_line(ctx));
    c->Kind = Constant::Enumeration;
    c->_type = "EnumType";
@@ -753,7 +753,7 @@ antlrcpp::Any Ili2Input::visitClassConst(parser::Ili2Parser::ClassConstContext *
    debug(ctx,">>> visitClassConst()");
    Log.incNestLevel();
 
-   ClassConst *c = new ClassConst();
+   ClassConst *c = make_mmobject<ClassConst>();
    init_factor(c,get_line(ctx));
    c->_type = "ClassRefType";
    c->Class = find_class(visitPath(ctx->path()),get_line(ctx));
@@ -774,7 +774,7 @@ antlrcpp::Any Ili2Input::visitAttributePathConst(parser::Ili2Parser::AttributePa
    debug(ctx,">>> visitAttributePathConst()");
    Log.incNestLevel();
 
-   AttributeConst *c = new AttributeConst();
+   AttributeConst *c = make_mmobject<AttributeConst>();
    init_factor(c,get_line(ctx));
    c->_type = "AttributeRefType";
    if (ctx->path() != nullptr) {
@@ -806,7 +806,7 @@ antlrcpp::Any Ili2Input::visitFormattedConst(parser::Ili2Parser::FormattedConstC
    debug(ctx,">>> visitFormattedConst()");
    Log.incNestLevel();
 
-   Constant *c = new Constant();
+   Constant *c = make_mmobject<Constant>();
    init_factor(c,get_line(ctx));
    c->Kind = Constant::Text;
    c->_type = "TextType";

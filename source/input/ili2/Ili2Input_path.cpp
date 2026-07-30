@@ -78,7 +78,7 @@ antlrcpp::Any Ili2Input::visitRestrictedRef(parser::Ili2Parser::RestrictedRefCon
    debug(ctx,">>> visitRestrictedRef()");
    Log.incNestLevel();
    
-   RestrictedRef *r = new RestrictedRef();
+   RestrictedRef *r = make_mmobject<RestrictedRef>();
    init_mmobject(r,ctx->start->getLine());
    
    if (ctx->typeref != nullptr) {
@@ -304,7 +304,7 @@ MetaElement *resolve_through_view_bases(View *view,Package *scope,string name,Cl
 
 PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResolutionState &state)
 {
-   PathEl *element = new PathEl();
+   PathEl *element = make_mmobject<PathEl>();
    init_mmobject(element,ctx->start->getLine());
 
    if (ctx->THIS() != nullptr) {
@@ -467,7 +467,7 @@ antlrcpp::Any Ili2Input::visitObjectOrAttributePath(parser::Ili2Parser::ObjectOr
    debug(ctx, ">>> visitObjectOrAttributePath()");
    Log.incNestLevel();
    
-   PathOrInspFactor *f = new PathOrInspFactor();
+   PathOrInspFactor *f = make_mmobject<PathOrInspFactor>();
    init_factor(f,ctx->start->getLine());
 
    PathResolutionState state;

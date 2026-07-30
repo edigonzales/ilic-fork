@@ -73,7 +73,7 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
       Log.warning(name2 + " does not match " + name1,ctx->graphicname2->getLine());
    }
    
-   Graphic *g = new Graphic();
+   Graphic *g = make_mmobject<Graphic>();
    init_graphic(g,get_line(ctx));
    set_selection_source(g,ctx->graphicname1);
    set_end_selection_source(g,ctx->graphicname2);
@@ -124,7 +124,7 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
          */
 
          if (g->Where->getClass() != "CompoundExpression") {
-            CompoundExpr *e = new CompoundExpr();
+            CompoundExpr *e = make_mmobject<CompoundExpr>();
             e->Operation = CompoundExpr_OperationType::And;
             e->SubExpressions.push_back(g->Where);
             Expression* ee = visitSelection(s);
@@ -175,7 +175,7 @@ antlrcpp::Any Ili2Input::visitDrawingRule(parser::Ili2Parser::DrawingRuleContext
    debug(ctx,">>> visitDrawingRule(" + name + ")");
    Log.incNestLevel();
 
-   DrawingRule *r = new DrawingRule;
+   DrawingRule *r = make_mmobject<DrawingRule>();
    init_extendableme(r,get_line(ctx));
    r->Name = name;
 
@@ -217,7 +217,7 @@ antlrcpp::Any Ili2Input::visitCondSignParamAssignment(parser::Ili2Parser::CondSi
    debug(ctx,">>> visitCondSingAssignment()");
    Log.incNestLevel();
 
-   CondSignParamAssignment *a = new CondSignParamAssignment;
+   CondSignParamAssignment *a = make_mmobject<CondSignParamAssignment>();
    init_mmobject(a,get_line(ctx));
 
    if (ctx->expression() != nullptr) {
@@ -257,7 +257,7 @@ antlrcpp::Any Ili2Input::visitSignParamAssignment(parser::Ili2Parser::SignParamA
    string name = ctx->signparametername->getText();
    debug(ctx,">>> visitSignParamAssignment(" + name + ")");
 
-   SignParamAssignment *a = new SignParamAssignment;
+   SignParamAssignment *a = make_mmobject<SignParamAssignment>();
    init_mmobject(a,get_line(ctx));
    // to do !!!
 

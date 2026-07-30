@@ -103,7 +103,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    }
 
    // init Class
-   Class *c = new Class();
+   Class *c = make_mmobject<Class>();
    c->Kind = Class::Association;
    init_type(c,get_line(ctx));
    set_selection_source(c,ctx->associationname1);
@@ -333,7 +333,7 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
          "there is already an attribute with name " + name,get_line(ctx));
    }
 
-   Role *r = new Role;
+   Role *r = make_mmobject<Role>();
    init_domaintype(r,ctx->start->getLine());
    set_selection_source(r,ctx->rolename);
 
@@ -394,7 +394,7 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
          continue;
       }
       for (auto t : rrr->_classrestriction) {
-         ExplicitAssocAccess *a = new ExplicitAssocAccess();
+         ExplicitAssocAccess *a = make_mmobject<ExplicitAssocAccess>();
          a->AssocAccOf = t;
          // Role* OriginRole; to do !!!
          // Role* TargetRole; to do !!!

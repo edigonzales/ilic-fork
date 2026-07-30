@@ -5,6 +5,8 @@
 #include <string>
 #include <list>
 #include <vector>
+#include <type_traits>
+#include <utility>
 #include "../../include/ilic/Diagnostic.h"
 
 using namespace std;
@@ -63,6 +65,28 @@ namespace metamodel {
       MMObject* clone();
       bool isSubClassOf(string classname);
    };
+
+   using MMObjectDeleter = void (*)(MMObject *);
+
+   void register_mmobject(MMObject *object,MMObjectDeleter deleter);
+   void destroy_mmobject(MMObject *object);
+   void reset_mmobjects();
+
+   template <typename T>
+   void delete_mmobject(MMObject *object)
+   {
+      delete static_cast<T *>(object);
+   }
+
+   template <typename T,typename... Args>
+   T *make_mmobject(Args &&...args)
+   {
+      static_assert(std::is_base_of_v<MMObject,T>,
+         "make_mmobject requires an MMObject-derived type");
+      T *object = new T(std::forward<Args>(args)...);
+      register_mmobject(object,&delete_mmobject<T>);
+      return object;
+   }
 
    // topic ModelData
 

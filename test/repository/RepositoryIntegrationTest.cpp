@@ -1,6 +1,7 @@
 #include "ilic/Repository.h"
 
 #include <algorithm>
+#include <cctype>
 #include "ilic/test/TestHarness.h"
 #include <filesystem>
 #include <string>
@@ -12,6 +13,16 @@ const ilic::Diagnostic *findDiagnostic(const ilic::RepositoryResult &result,cons
    const auto found = std::find_if(result.diagnostics.begin(),result.diagnostics.end(),
       [&](const ilic::Diagnostic &diagnostic) { return diagnostic.code == code; });
    return found == result.diagnostics.end() ? nullptr : &*found;
+}
+
+std::string fileUri(const std::filesystem::path &path)
+{
+   const std::string generic = path.generic_string();
+#ifdef _WIN32
+   if (generic.size() >= 2 && std::isalpha(static_cast<unsigned char>(generic[0]))
+       && generic[1] == ':') return "file:///" + generic;
+#endif
+   return "file://" + generic;
 }
 
 }
@@ -74,9 +85,12 @@ int main(int argc,char **argv)
    ILIC_REQUIRE(indexDiagnostic->severity == ilic::DiagnosticSeverity::Warning);
 
    ilic::RepositoryOptions fileOptions;
-   fileOptions.repositories = {"file://" + fixture.generic_string()};
+   fileOptions.repositories = {fileUri(fixture)};
    fileOptions.followSiteLinks = false;
    ilic::RepositoryManager fileManager(fileOptions);
-   ILIC_REQUIRE(fileManager.resolve("Base","ili2_4").success);
+   const auto fileResult = fileManager.resolve("Base","ili2_4");
+   const std::string fileError = fileResult.diagnostics.empty()
+      ? "repository resolution failed" : fileResult.diagnostics.front().message;
+   ILIC_REQUIRE_MSG(fileResult.success,fileError);
    return 0;
 }

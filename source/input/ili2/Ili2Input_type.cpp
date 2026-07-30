@@ -128,7 +128,7 @@ antlrcpp::Any Ili2Input::visitDomainType(parser::Ili2Parser::DomainTypeContext *
    if (!domainExpressions.empty()) {
       push_context(t);
       for (size_t index = 0; index < domainExpressions.size(); ++index) {
-         SimpleConstraint *constraint = new SimpleConstraint();
+         SimpleConstraint *constraint = make_mmobject<SimpleConstraint>();
          init_constraint(constraint,get_line(domainExpressions[index]));
          constraint->Kind = SimpleConstraint::MandC;
          constraint->toDomain = t;
@@ -158,7 +158,7 @@ antlrcpp::Any Ili2Input::visitContextDef(parser::Ili2Parser::ContextDefContext *
 
 antlrcpp::Any Ili2Input::visitContextBlock(parser::Ili2Parser::ContextBlockContext *ctx)
 {
-   Context *context = new Context();
+   Context *context = make_mmobject<Context>();
    init_metaelement(context,get_line(ctx->name));
    set_selection_source(context,ctx->name);
    context->Name = ctx->name->getText();
@@ -183,7 +183,7 @@ antlrcpp::Any Ili2Input::visitContextDecl(parser::Ili2Parser::ContextDeclContext
       return static_cast<GenericDef *>(nullptr);
    }
 
-   GenericDef *definition = new GenericDef();
+   GenericDef *definition = make_mmobject<GenericDef>();
    init_mmobject(definition,get_line(ctx));
    definition->Context = context;
 
@@ -362,7 +362,7 @@ antlrcpp::Any Ili2Input::visitTextType(parser::Ili2Parser::TextTypeContext *ctx)
 
    debug(ctx,">>> visitTextType()");
 
-   TextType *t = new TextType;
+   TextType *t = make_mmobject<TextType>();
    init_domaintype(t,ctx->start->getLine());
 
    // MetaElement
@@ -417,7 +417,7 @@ antlrcpp::Any Ili2Input::visitEnumerationType(parser::Ili2Parser::EnumerationTyp
    debug(ctx,">>> visitEnumerationType()");
    Log.incNestLevel();
 
-   EnumType *t = new EnumType;
+   EnumType *t = make_mmobject<EnumType>();
    
    init_domaintype(t,ctx->start->getLine());
 
@@ -433,7 +433,7 @@ antlrcpp::Any Ili2Input::visitEnumerationType(parser::Ili2Parser::EnumerationTyp
    }
    
    // TopNode
-   EnumNode* tn = new EnumNode;
+   EnumNode* tn = make_mmobject<EnumNode>();
    tn->Name = "TOP";
    tn->EnumType = t;
    t->TopNode = tn;
@@ -488,7 +488,7 @@ antlrcpp::Any Ili2Input::visitEnumElement(parser::Ili2Parser::EnumElementContext
       list <EnumNode *> Node;
    */
 
-   EnumNode *n = new EnumNode();
+   EnumNode *n = make_mmobject<EnumNode>();
    init_extendableme(n,ctx->start->getLine());
    n->Name = "";
    for (auto nn : ctx->NAME()) {
@@ -536,7 +536,7 @@ antlrcpp::Any Ili2Input::visitBooleanType(parser::Ili2Parser::BooleanTypeContext
    */
 
    debug(ctx,">>> visitBooleanType()");
-   Type *t = new BooleanType;
+   Type *t = make_mmobject<BooleanType>();
    init_type(t,get_line(ctx));
    debug(ctx,"<<< visitBooleanType() " + t->Name);
 
@@ -580,7 +580,7 @@ antlrcpp::Any Ili2Input::visitEnumTreeValueType(parser::Ili2Parser::EnumTreeValu
    debug(ctx,">>> visitEnumTreeValueType()");
    Log.incNestLevel();
 
-   EnumTreeValueType *t = new EnumTreeValueType();
+   EnumTreeValueType *t = make_mmobject<EnumTreeValueType>();
    init_domaintype(t,ctx->start->getLine());
 
    t->ET = static_cast<EnumType *>(find_type(visitPath(ctx->path()),get_line(ctx)));
@@ -607,7 +607,7 @@ antlrcpp::Any Ili2Input::visitAttributePathType(parser::Ili2Parser::AttributePat
    */
 
    debug(ctx,">>> visitAttributePathType()");
-   AttributeRefType *t = new AttributeRefType();
+   AttributeRefType *t = make_mmobject<AttributeRefType>();
    init_domaintype(t,ctx->start->getLine());
    if (ctx->attributePath() != nullptr) {
       PathOrInspFactor *restriction = visitAttributePath(ctx->attributePath());
@@ -687,7 +687,7 @@ antlrcpp::Any Ili2Input::visitNumericType(parser::Ili2Parser::NumericTypeContext
    debug(ctx,">>> visitNumericType()");
    Log.incNestLevel();
 
-   NumType *t = new NumType;
+   NumType *t = make_mmobject<NumType>();
    init_type(t,ctx->start->getLine());
    
    // MetaElement
@@ -762,7 +762,7 @@ antlrcpp::Any Ili2Input::visitFormattedType(parser::Ili2Parser::FormattedTypeCon
    debug(ctx,">>> visitFormattedType()");
    Log.incNestLevel();
 
-   FormattedType *t = new FormattedType();
+   FormattedType *t = make_mmobject<FormattedType>();
    init_domaintype(t,get_line(ctx));
 
    t->Name = "TYPE";
@@ -863,7 +863,7 @@ antlrcpp::Any Ili2Input::visitCoordinateType(parser::Ili2Parser::CoordinateTypeC
    debug(ctx,">>> visitCoordinateType()");
    Log.incNestLevel();
 
-   CoordType *t = new CoordType();
+   CoordType *t = make_mmobject<CoordType>();
    init_domaintype(t,ctx->start->getLine());
 
    // ASSOCIATION PackageElements
@@ -886,7 +886,7 @@ antlrcpp::Any Ili2Input::visitCoordinateType(parser::Ili2Parser::CoordinateTypeC
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   AxisSpec *as = new AxisSpec();
+   AxisSpec *as = make_mmobject<AxisSpec>();
    init_mmobject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
@@ -901,7 +901,7 @@ antlrcpp::Any Ili2Input::visitCoordinateType(parser::Ili2Parser::CoordinateTypeC
       n->_other_type = t;
       t->Axis.push_back(n);
 
-      AxisSpec *as = new AxisSpec();
+      AxisSpec *as = make_mmobject<AxisSpec>();
       init_mmobject(as,n->_line);
       as->CoordType = t;
       as->Axis = n;
@@ -918,7 +918,7 @@ antlrcpp::Any Ili2Input::visitCoordinateType(parser::Ili2Parser::CoordinateTypeC
       n->_other_type = t;
       t->Axis.push_back(n);
 
-      AxisSpec *as = new AxisSpec();
+      AxisSpec *as = make_mmobject<AxisSpec>();
       init_mmobject(as,n->_line);
       as->CoordType = t;
       as->Axis = n;
@@ -959,7 +959,7 @@ antlrcpp::Any Ili2Input::visitBagOrListType(parser::Ili2Parser::BagOrListTypeCon
    debug(ctx, ">>> visitBagOrListType()");
    Log.incNestLevel();
 
-   MultiValue* m = new MultiValue();
+   MultiValue* m = make_mmobject<MultiValue>();
    init_domaintype(m, ctx->start->getLine());
 
    if (ctx->LIST() != nullptr) {
@@ -1052,7 +1052,7 @@ antlrcpp::Any Ili2Input::visitLineType(parser::Ili2Parser::LineTypeContext *ctx)
 
    debug(ctx,">>> visitLineType()");
    
-   LineType *t = new LineType();
+   LineType *t = make_mmobject<LineType>();
    init_domaintype(t,ctx->start->getLine());
    
    if (ctx->directed != nullptr) {
@@ -1152,12 +1152,12 @@ antlrcpp::Any Ili2Input::visitLineForm(parser::Ili2Parser::LineFormContext *ctx)
    for (parser::Ili2Parser::LineFormTypeContext *t : ctx->lineFormType()) {
       string lineform = visitLineFormType(t);
 		if (lineform == "STRAIGHTS") {
-         LineForm *f = new LineForm();
+         LineForm *f = make_mmobject<LineForm>();
          f->Name = lineform;
          lf.push_back(f);
 		}
 		else if (lineform == "ARCS") {
-         LineForm *f = new LineForm();
+         LineForm *f = make_mmobject<LineForm>();
          f->Name = lineform;
          lf.push_back(f);
 	   }
@@ -1238,7 +1238,7 @@ antlrcpp::Any Ili2Input::visitLineFormTypeDecl(parser::Ili2Parser::LineFormTypeD
    debug(ctx,">>> visitLineFormTypeDecl()");
    Log.incNestLevel();
    
-   LineForm *f = new LineForm();
+   LineForm *f = make_mmobject<LineForm>();
    init_lineform(f,get_line(ctx));
    
    f->Name = ctx->lineformname->getText();
@@ -1264,7 +1264,7 @@ antlrcpp::Any Ili2Input::visitOIDType(parser::Ili2Parser::OIDTypeContext* ctx)
    Log.incNestLevel();
 
    if (ctx->ANY() != nullptr) {
-      t = new AnyOIDType();
+      t = make_mmobject<AnyOIDType>();
       init_domaintype(t, ctx->ANY()->getSymbol()->getLine());
    }
    else if (ctx->numericType() != nullptr) {
@@ -1294,7 +1294,7 @@ antlrcpp::Any Ili2Input::visitBlackboxType(parser::Ili2Parser::BlackboxTypeConte
    debug(ctx,">>> visitBlackboxType()");
    Log.incNestLevel();
 
-   BlackboxType *t = new BlackboxType();
+   BlackboxType *t = make_mmobject<BlackboxType>();
    init_domaintype(t,ctx->start->getLine());
 
    // MetaElement
@@ -1326,7 +1326,7 @@ antlrcpp::Any Ili2Input::visitClassRefType(parser::Ili2Parser::ClassRefTypeConte
    debug(ctx,">>> visitClassRefType()");
    Log.incNestLevel();
    
-   ClassRefType *r = new ClassRefType;
+   ClassRefType *r = make_mmobject<ClassRefType>();
    init_type(r,get_line(ctx));
    
    Class* c = nullptr;
@@ -1359,7 +1359,7 @@ antlrcpp::Any Ili2Input::visitRefSys(parser::Ili2Parser::RefSysContext *ctx)
    */
 
    debug(ctx,">>> visitRefSys()");
-   NumsRefSys *result = new NumsRefSys();
+   NumsRefSys *result = make_mmobject<NumsRefSys>();
    init_mmobject(result,get_line(ctx));
    if (ctx->coord != nullptr) {
       result->RefSys = dynamic_cast<MetaElement *>(find_type(visitPath(ctx->coord),get_line(ctx->coord)));

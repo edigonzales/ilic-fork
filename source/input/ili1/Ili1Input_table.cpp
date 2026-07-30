@@ -33,7 +33,7 @@ antlrcpp::Any Ili1Input::visitTableDef(Ili1Parser::TableDefContext *ctx)
       );
    }
 
-   Class *c = new Class();
+   Class *c = make_mmobject<Class>();
 
    // Class Attributes
    c->Name = name1;
@@ -81,7 +81,7 @@ antlrcpp::Any Ili1Input::visitAttribute(Ili1Parser::AttributeContext *ctx)
    debug(ctx,">>> visitAttribute(" + name + ")");
    Log.incNestLevel();
 
-   AttrOrParam *a = new AttrOrParam();
+   AttrOrParam *a = make_mmobject<AttrOrParam>();
    init_extendableme(a,ctx->attributename->getLine());
    a->Name = name;
    
@@ -96,7 +96,7 @@ antlrcpp::Any Ili1Input::visitAttribute(Ili1Parser::AttributeContext *ctx)
    }
    else {
       // reference attribute
-      ReferenceType *rt = new ReferenceType();
+      ReferenceType *rt = make_mmobject<ReferenceType>();
       init_domaintype(rt,ctx->start->getLine());
       dt = static_cast<DomainType*>(rt);
       rt->External = false;
@@ -146,13 +146,13 @@ antlrcpp::Any Ili1Input::visitIdentifications(Ili1Parser::IdentificationsContext
          enum {GlobalU, LocalU} Kind;
          list<PathOrInspFactor *> UniqueDef;
          */
-         UniqueConstraint *c = new UniqueConstraint;
+         UniqueConstraint *c = make_mmobject<UniqueConstraint>();
          init_constraint(c,get_line(ctx));
          for (auto a : attr_names) {
-            PathEl *pl = new PathEl;
+            PathEl *pl = make_mmobject<PathEl>();
             pl->Kind = PathEl::Attribute;
             pl->Ref = find_attribute(get_class_context(),a);
-            PathOrInspFactor * pf = new PathOrInspFactor;
+            PathOrInspFactor * pf = make_mmobject<PathOrInspFactor>();
             pf->PathEls.push_back(pl);
             pf->_path = a;
             c->UniqueDef.push_back(pf);

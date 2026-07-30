@@ -1,6 +1,7 @@
 #include "stdio.h"
 #include <iostream>
 #include <filesystem>
+#include <unordered_set>
 
 // antlr4
 #include "Exceptions.h"
@@ -28,11 +29,16 @@ namespace util {
 
    void reset_ilifiles()
    {
+      unordered_set<IliFile *> files;
+      for (IliFile *file : all_ilifiles) files.insert(file);
+      for (IliFile *file : all_ilifiles_full) files.insert(file);
+      for (const auto &[model,file] : all_ilimodels) files.insert(file);
       all_ilifiles.clear();
       all_ilifiles_full.clear();
       all_ilimodels.clear();
       ilidirs.clear();
       auto_search = true;
+      for (IliFile *file : files) delete file;
    }
 
    // constructor

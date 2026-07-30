@@ -22,7 +22,7 @@ Type *clone_expression_type(Factor *factor,int line)
             source = attribute->Type;
          }
          else if (auto role = dynamic_cast<Role *>(path->PathEls.back()->Ref)) {
-            ObjectType *object = new ObjectType();
+            ObjectType *object = make_mmobject<ObjectType>();
             init_type(object,line);
             object->_baseclass = role->_baseclass;
             return object;
@@ -44,20 +44,20 @@ Type *clone_expression_type(Factor *factor,int line)
 
    Type *type = nullptr;
    if (auto constant = dynamic_cast<Constant *>(factor)) {
-      if (constant->Kind == Constant::Numeric) type = new NumType();
-      else if (constant->Kind == Constant::Text) type = new TextType();
-      else if (constant->Kind == Constant::Enumeration) type = new EnumType();
+      if (constant->Kind == Constant::Numeric) type = make_mmobject<NumType>();
+      else if (constant->Kind == Constant::Text) type = make_mmobject<TextType>();
+      else if (constant->Kind == Constant::Enumeration) type = make_mmobject<EnumType>();
    }
    else if (auto classConstant = dynamic_cast<ClassConst *>(factor)) {
-      ClassRefType *reference = new ClassRefType();
+      ClassRefType *reference = make_mmobject<ClassRefType>();
       reference->_baseclass = classConstant->Class;
       type = reference;
    }
    else if (dynamic_cast<AttributeConst *>(factor) != nullptr) {
-      type = new AttributeRefType();
+      type = make_mmobject<AttributeRefType>();
    }
    if (type == nullptr) {
-      type = new TextType();
+      type = make_mmobject<TextType>();
    }
    init_type(type,line);
    return type;
@@ -113,7 +113,7 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
          get_line(ctx->viewname2));
    }
 
-   View* v = new View;
+   View* v = make_mmobject<View>();
    v->Name = name1;
    v->Kind = Class::ViewVal;
    init_class(v,get_line(ctx));
@@ -298,7 +298,7 @@ antlrcpp::Any Ili2Input::visitViewDef(parser::Ili2Parser::ViewDefContext *ctx)
       v->Where = visitSelection(ctx->selection().front());
    }
    else if (ctx->selection().size() > 1) {
-      CompoundExpr *e = new CompoundExpr();
+      CompoundExpr *e = make_mmobject<CompoundExpr>();
       e->Operation = CompoundExpr_OperationType::And;
       for (auto sctx : ctx->selection()) {
          e->SubExpressions.push_back(visitSelection(sctx));
@@ -352,12 +352,12 @@ antlrcpp::Any Ili2Input::visitRenamedViewableRef(parser::Ili2Parser::RenamedView
       name = referencedViewable->Name;
    }
 
-   ObjectType *o = new ObjectType;
+   ObjectType *o = make_mmobject<ObjectType>();
    o->ElementInPackage = nullptr;
    o->Name = "TYPE";
    o->_baseclass = referencedViewable;
 
-   AttrOrParam *a = new AttrOrParam;
+   AttrOrParam *a = make_mmobject<AttrOrParam>();
    antlr4::Token *aliasToken = ctx->basename == nullptr
       ? ctx->path()->getStop() : ctx->basename;
    init_extendableme(a,get_line(aliasToken));
@@ -488,10 +488,10 @@ antlrcpp::Any Ili2Input::visitViewAttribute(parser::Ili2Parser::ViewAttributeCon
                AttrOrParam *aac = static_cast<AttrOrParam *>(aa->clone());
                set_selection_source(aac,ctx->basename);
                aac->_visible = true; // to do !!!
-               PathEl *pe = new PathEl;
+               PathEl *pe = make_mmobject<PathEl>();
                pe->Kind = PathEl::Attribute;
                pe->Ref = aa;
-               PathOrInspFactor *pi = new PathOrInspFactor;
+               PathOrInspFactor *pi = make_mmobject<PathOrInspFactor>();
                pi->PathEls.push_back(pe);
                aac->Derivates.push_back(pi);
                get_class_context()->ClassAttribute.push_back(aac);
@@ -508,7 +508,7 @@ antlrcpp::Any Ili2Input::visitViewAttribute(parser::Ili2Parser::ViewAttributeCon
       map<string,bool> properties = get_properties(ctx->properties(),vector({ABSTRACT,FINAL,TRANSIENT,EXTENDED}));
       Factor *f = visitFactor(ctx->factor());
       
-      AttrOrParam *a = new AttrOrParam;
+      AttrOrParam *a = make_mmobject<AttrOrParam>();
       init_extendableme(a,get_line(ctx->attributename));
       set_selection_source(a,ctx->attributename);
       a->Name = name;

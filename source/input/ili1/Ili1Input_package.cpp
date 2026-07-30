@@ -51,7 +51,7 @@ antlrcpp::Any Ili1Input::visitModelDef(Ili1Parser::ModelDefContext *ctx)
       );
    }
 
-   Model *m = new Model();
+   Model *m = make_mmobject<Model>();
    init_package(m,ctx->modelname1->getLine());
    set_selection_source(m,ctx->modelname1);
    set_end_selection_source(m,ctx->modelname2);
@@ -124,7 +124,7 @@ antlrcpp::Any Ili1Input::visitTopicDef(Ili1Parser::TopicDefContext *ctx)
       );
    }
 
-   SubModel *s = new SubModel();
+   SubModel *s = make_mmobject<SubModel>();
 
    // SubModel Attributes
    s->Name = name1;

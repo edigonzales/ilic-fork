@@ -89,6 +89,8 @@ namespace metamodel {
       PendingMetaAttributes.clear();
       PendingDocumentation.clear();
       CurrentSourceText.clear();
+      AnyClass = Class();
+      AnyStructure = Class();
       UniversalClassesInitialized = false;
       ili23 = true;
       ili24 = true;
@@ -310,7 +312,7 @@ namespace metamodel {
       auto metadata = PendingMetaAttributes.find(line);
       if (metadata != PendingMetaAttributes.end()) {
          for (const auto &entry : metadata->second) {
-            MetaAttribute *attribute = new MetaAttribute();
+            MetaAttribute *attribute = make_mmobject<MetaAttribute>();
             init_mmobject(attribute,entry.Line);
             attribute->_source.start.character = static_cast<size_t>(entry.Column);
             attribute->_source.end = attribute->_source.start;
@@ -325,7 +327,7 @@ namespace metamodel {
       auto documentation = PendingDocumentation.find(line);
       if (documentation != PendingDocumentation.end() &&
           !documentation->second.empty()) {
-         auto *doc = new DocText();
+         auto *doc = make_mmobject<DocText>();
          init_mmobject(doc,line);
          doc->Text = documentation->second;
          e->Documentation.push_back(doc);

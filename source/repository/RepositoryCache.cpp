@@ -100,21 +100,18 @@ CacheStoreResult writeAtomically(const std::filesystem::path &target,
    bool published = false;
    DWORD publishError = ERROR_SUCCESS;
    for (int attempt = 0; attempt < 32 && !published; ++attempt) {
-      if (std::filesystem::exists(target)) {
-         published = ReplaceFileW(target.c_str(),temporary.c_str(),nullptr,
-            REPLACEFILE_WRITE_THROUGH,nullptr,nullptr) != 0;
-      }
-      else {
-         published = MoveFileExW(temporary.c_str(),target.c_str(),MOVEFILE_WRITE_THROUGH) != 0;
-      }
+      published = MoveFileExW(temporary.c_str(),target.c_str(),
+         MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
       if (published) break;
       publishError = GetLastError();
-      // Another process can publish between exists() and MoveFileExW(), or
-      // briefly hold the file while ReplaceFileW() completes.
+      // A reader or another writer can briefly hold the target while the
+      // replacement is committed. Retrying the single atomic operation avoids
+      // an exists()/publish TOCTOU race.
       if (publishError != ERROR_ALREADY_EXISTS && publishError != ERROR_FILE_EXISTS
-         && publishError != ERROR_SHARING_VIOLATION && publishError != ERROR_ACCESS_DENIED)
+         && publishError != ERROR_SHARING_VIOLATION && publishError != ERROR_ACCESS_DENIED
+         && publishError != ERROR_LOCK_VIOLATION)
          break;
-      SwitchToThread();
+      Sleep(1);
    }
    if (!published) result.error = "unable to publish cache file " + target.string()
       + ": Windows error " + std::to_string(publishError);
