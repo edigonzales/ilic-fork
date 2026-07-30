@@ -12,9 +12,10 @@
 
 Der Compiler prüft Syntax, Namensauflösung, Imports, Typen, Klassen,
 Assoziationen, Rollen, Sichten, Objektpfade, Constraints, generische Domains,
-Kontexte sowie `TRANSLATION OF`. Die externe
-[Compiler-Conformance-Suite](conformance.md) deckt 571 aus den ili2c-JUnit-Tests
-importierte reine Compilerfälle ab.
+Kontexte sowie `TRANSLATION OF`. Die [externe Compiler-Conformance-Suite](conformance.md)
+identifiziert gemeinsame `ili2c`-JUnit-Fälle und misst `ilic` gegen ein versioniertes
+Referenzset. Das vollständige Testinventar, die Fixtures, die Referenzprüfung und
+die Reports liegen im Schwesterprojekt.
 
 Ein einzelner CLI-Aufruf darf keine unterschiedlichen INTERLIS-Versionen
 mischen. Die C++-/C-/WASM-APIs akzeptieren virtuelle UTF-8-Quellen; eine Datei
@@ -111,8 +112,11 @@ aktiv durch eine Cancel-API gesetzt.
 
 ## Bewusste Grenzen
 
-- Die erreichte Conformance-Parität betrifft den eingefrorenen 571-Fälle-Korpus,
-  nicht identische Fehlermeldungstexte oder sämtliche ili2c-Ausgabefunktionen.
+- Die externe Suite bewertet aktuell 620 ausführbare Referenzset-Fälle aus einem
+  Inventar von 1049 Fällen. Das Referenzset ist noch nicht manuell freigegeben
+  (`reviewed: false`); offene `REFERENCE_MISMATCH`-Fälle bleiben deshalb sichtbar.
+  Identische Fehlermeldungstexte oder sämtliche `ili2c`-Ausgabefunktionen sind nicht
+  automatisch Bestandteil der Compile-Conformance.
 - Das WASM-Modul enthält kein HTTP-, Dateisystem- oder Cache-Backend.
 - `@ilic/compiler-wasm` und `@ilic/tools` sind für versionierte npm-Snapshots
   vorbereitet. Ihre tatsächliche Verfügbarkeit beginnt nach dem einmaligen

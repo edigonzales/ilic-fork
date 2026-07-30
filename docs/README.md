@@ -51,7 +51,7 @@ node docs/examples/wasm-session.mjs
 | Versionierte Syntax-/Semantik-Snapshots     | [Language-Tooling-Snapshots](language-tooling-snapshots.md)          |
 | WebAssembly, Node, Browser, Worker und LSP  | [WASM](wasm.md)                                                      |
 | npm-Snapshots, OIDC und Bootstrap           | [npm-Publikation](npm-publikation.md)                                |
-| 571 ili2c-Referenzfälle und ihre Bedeutung  | [Compiler-Conformance](conformance.md)                               |
+| Externe Compiler-Conformance-Suite             | [Compiler-Conformance](conformance.md)                               |
 | Vollständige, ausführbare Programme         | [Beispiele](examples/README.md)                                      |
 
 ## Architektur

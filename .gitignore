@@ -4,6 +4,7 @@
 .DS_Store
 
 # CMake build output
+build/
 build/macos/
 build/wasm/
 build/npm/

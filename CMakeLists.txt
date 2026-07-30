@@ -14,7 +14,6 @@ option(ILIC_ENABLE_SANITIZERS
     "Enable AddressSanitizer and UndefinedBehaviorSanitizer for project targets"
     OFF
 )
-
 include(cmake/IlicStaticDistribution.cmake)
 include(cmake/IlicSanitizers.cmake)
 ilic_configure_sanitizers()
@@ -107,16 +106,16 @@ target_include_directories(ilic-core
 )
 target_link_libraries(ilic-core PUBLIC antlr4-runtime)
 
-add_library(ilic-capi STATIC
-    source/abi/Capi.cpp
-    source/abi/Json.cpp
-)
+add_library(ilic-json STATIC source/abi/Json.cpp)
+target_include_directories(ilic-json PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/source/abi")
+
+add_library(ilic-capi STATIC source/abi/Capi.cpp)
 add_library(ilic::capi ALIAS ilic-capi)
 target_include_directories(ilic-capi
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
-target_link_libraries(ilic-capi PUBLIC ilic-core)
+target_link_libraries(ilic-capi PUBLIC ilic-core ilic-json)
 
 add_executable(ilic source/main/ilic.cpp)
 target_link_libraries(ilic PRIVATE ilic-capi)
@@ -710,6 +709,7 @@ if(BUILD_TESTING)
             "-DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/translation-roundtrip.ili"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_translation_roundtrip.cmake"
     )
+
 endif()
 
 add_custom_target(check-parser-regeneration

@@ -1,141 +1,76 @@
 # Compiler-Conformance
 
-[Dokumentationsindex](README.md) · [Funktionsumfang](funktionsumfang.md) · [Build](build-und-installation.md)
+[Dokumentationsindex](README.md) · [Funktionsumfang](funktionsumfang.md)
 
-Die unabhängige Suite
-[interlis-compiler-conformance](https://codeberg.org/edigonzales/interlis-compiler-conformance)
-misst `ilic` gegen die bestehende ili2c-Testbasis. Sie ist ein separates
-Repository, damit Compilerimplementierung, importierte Erwartungen und
-Messartefakte nicht gegenseitig angepasst werden können.
+Die unabhängige Suite liegt im Schwesterprojekt
+[`interlis-compiler-conformance`](https://codeberg.org/edigonzales/interlis-compiler-conformance).
+Dieses Compiler-Repository enthält keine Conformance-Fixtures, keinen Manifest-Importer
+und keinen Conformance-Runner mehr.
 
-## Warum diese Suite existiert
+## Grundmodell
 
-Ein Compiler kann syntaktisch viele Modelle akzeptieren und trotzdem
-semantische Regeln übersehen. Einzelne handgeschriebene Regressionstests zeigen
-nur bekannte Fehler. Die ili2c-JUnit-Suite enthält über Jahre gewachsene
-Positiv- und Negativfälle für INTERLIS 2.3 und 2.4.
+Das Schwesterprojekt versioniert ein gemeinsames Referenzset. `ili2c` und `ilic`
+werden unabhängig daran gemessen. Das Referenzset enthält mindestens die erwartete
+Compilerentscheidung `true` oder `false`; geprüfte semantische Diagnoseerwartungen
+können später ergänzt werden. Der aktuelle Datensatz umfasst 1049 Inventarfälle
+und 620 ausführbare Referenzset-Fälle. Solange die fachliche Prüfung noch nicht
+abgeschlossen ist, trägt das Set seine Herkunft (`ili2c`) und `reviewed: false`
+sichtbar in `reference/reference-set.json`.
 
-Die Conformance-Suite beantwortet reproduzierbar:
+`reviewed: false` bedeutet, dass die Erwartungen noch nicht für jeden Fall manuell
+bestätigt sind. Ein aktueller `ili2c`-Lauf kann daher `REFERENCE_MISMATCH` melden.
+Das sind offene Fragen zum Referenzset und keine automatisch akzeptierten oder
+als XFAIL klassierten `ilic`-Fehler. Die historischen Inventarwerte
+`needs-adjudication` steuern den Lauf nicht.
 
-- Akzeptiert `ilic` ein Modell, das gemäß Test und Referenz ungültig ist?
-- Lehnt `ilic` ein gültiges Modell ab?
-- Stürzt der Kandidat ab oder läuft in ein Timeout?
-- Stimmt eine ausdrücklich strikte Diagnostic-Erwartung?
-- Hat eine Korrektur einen zuvor konformen Fall regressiert?
+Die wichtigsten Ergebnisgruppen sind:
 
-## Datenfluss
+- `CONFORMANT`: Compilerentscheidung entspricht dem Referenzset.
+- `ACCEPTS_INVALID`: Referenz erwartet Ablehnung, Compiler akzeptiert.
+- `REJECTS_VALID`: Referenz erwartet Annahme, Compiler lehnt ab.
+- `DIAGNOSTIC_MISMATCH`: Entscheidung stimmt, aber eine geprüfte Diagnosesemantik weicht ab.
+- `REFERENCE_MISMATCH`: `ili2c` selbst weicht vom noch offenen Referenzset ab.
+- `INFRASTRUCTURE_ERROR`: Timeout, Absturz, fehlendes Programm oder Adapterfehler.
 
-```mermaid
-flowchart LR
-    JUnit["gepinntes ili2c-JUnit"] --> Importer["JavaParser-AST-Importer"]
-    Importer --> JSON["kanonischer JSON-Fall"]
-    JSON --> Reference["ili2c 5.6.8 Referenz"]
-    JSON --> Candidate["natives ilic"]
-    Reference --> Compare["Vergleich"]
-    Candidate --> Compare
-    Compare --> Report["JSON / Markdown / HTML / Baseline"]
-```
+Reine Unterschiede im Meldungstext werden nicht automatisch als semantische Abweichung
+gewertet. Ohne geprüfte Diagnoseerwartung zählt nur die Annahme-/Ablehnungsentscheidung.
 
-Der Importer übernimmt Testklasse, Testmethode, Eingabedateien,
-Modellverzeichnisse, Auto-Search-Konfiguration, erwarteten Erfolg oder
-Misserfolg und auslesbare Diagnostic-Erwartungen. Die Erwartung wird nicht an
-das aktuelle Kandidatenverhalten angepasst.
+## Expected Deviations, XFAIL und XPASS
 
-Zuerst bestätigt das veröffentlichte ili2c 5.6.8 den kanonischen Fall. Weicht
-die Referenz von der importierten Erwartung ab, wird `ilic` in diesem Fall nicht
-als falsch bewertet. Erst danach erfolgt der Kandidatenvergleich.
+Die sechs bekannten aktuellen `ilic`-Abweichungen stehen im Schwesterprojekt in
+`reference/expected-deviations.json`. Dort wird kein einzelner `XFAIL`-Status
+gespeichert. Das Gate berechnet ihn beim Lauf:
 
-## Korpus und aktueller Stand
+- `XFAIL`: Die dokumentierte Abweichung tritt weiterhin auf; die Pipeline bleibt grün.
+- `XPASS`: Die Abweichung ist unerwartet verschwunden; die Pipeline wird rot, bis
+  der Eintrag geprüft und entfernt wurde.
 
-Der eingefrorene Full-Korpus enthält 571 unterstützte reine Compilerfälle. Der
-Korpus hat den SHA-256-Wert:
+## Reproduzierbarer Lauf
 
-```text
-5baa41c6172e169e7dd35b1241a9dc9ba6e60ab90f4918e864c90c988cc51a57
-```
-
-Der aktuelle Stand von `ilic` erreicht in diesem Korpus:
-
-| Resultat | Anzahl |
-| --- | ---: |
-| konform | 571 |
-| Kandidat akzeptiert ungültiges Modell | 0 |
-| Kandidat verwirft gültiges Modell | 0 |
-| Infrastrukturfehler | 0 |
-
-Alle 251 enthaltenen `TRANSLATION OF`-Fälle sind konform.
-
-## Was 571/571 bedeutet – und was nicht
-
-Es bedeutet, dass der gemessene Compiler bei denselben gepinnten Eingaben das
-erwartete Erfolgs- oder Fehlerresultat wie die bestätigte Referenz liefert.
-
-Es beweist nicht:
-
-- vollständige Abdeckung aller INTERLIS-Konstrukte;
-- identische Diagnostic-Texte, Codes, Zeilen oder Spalten;
-- Gleichheit der CLI-Optionen;
-- Gleichheit der ILI-, IMD-, XSD- oder GML-Generatorausgaben;
-- identisches Repository- und Cacheverhalten;
-- einen fertigen LSP;
-- zukünftige Konformität mit anderen ili2c- oder Korpusversionen.
-
-Darum bleiben lokale CTests, Formatter-Korpus, Repository-Tests, ABI-Tests und
-WASM-Smoke-Tests zusätzlich notwendig.
-
-## Statuswerte
-
-| Status | Bedeutung |
-| --- | --- |
-| `CONFORMANT` | Erwartung, Referenz und Kandidat stimmen überein. |
-| `CANDIDATE_ACCEPTS_INVALID` | Referenz lehnt ab, Kandidat akzeptiert. |
-| `CANDIDATE_REJECTS_VALID` | Referenz akzeptiert, Kandidat lehnt ab. |
-| `REFERENCE_MISMATCH` | Referenz und importierte Erwartung weichen ab; Kandidat wird nicht bewertet. |
-| `CANDIDATE_DIAGNOSTIC_MISMATCH` | Erfolg/Misserfolg stimmt, aber eine strikte Diagnostic-Erwartung nicht. |
-| `INFRASTRUCTURE_ERROR` | Absturz, Timeout, fehlendes Binary oder Adapterfehler. |
-| `IMPORT_UNSUPPORTED` | Test konnte nicht verlustfrei als kanonischer Fall dargestellt werden. |
-| `SKIPPED` | Fall wurde durch Filter oder Ausführungsregeln übersprungen. |
-
-## Vollständigen Lauf reproduzieren
-
-Voraussetzungen:
-
-- Java 21 oder neuer;
-- Git;
-- das native `ilic`-Binary und sein Checkout;
-- ili2c 5.6.8;
-- der gepinnte ili2c-Quellcheckout mit den JUnit-Fixtures.
+Im Schwesterprojekt werden `ili2c`, ein `ilic`-Checkout und das Referenzset festgelegt:
 
 ```sh
-export ILIC_REPO=/pfad/zu/ilic
-export ILIC_EXECUTABLE=/pfad/zu/ilic/build/macos/ilic
-export ILI2C_JAR=/pfad/zu/ili2c-5.6.8/ili2c.jar
-export ILI2C_SOURCE_REPO=/pfad/zu/gepinntem/ili2c
-
 cd /pfad/zu/interlis-compiler-conformance
-./gradlew ciConformance
-./gradlew generateConformanceBaseline
+export ILI2C_JAR=/pfad/zu/ili2c.jar
+export ILIC_EXECUTABLE=/pfad/zu/ilic/build/ilic
+export ILIC_REPO=/pfad/zu/ilic
+
+./gradlew ciConformance --no-configuration-cache
 ```
 
-Ohne `ILI2C_SOURCE_REPO` bereitet `./gradlew prepareIli2cSource` den exakt
-gepinnten Checkout unter `.work/upstream/ili2c` vor.
+Der Lauf erzeugt unter `reports/latest/` `results.json`, `summary.json`,
+`summary.md`, `report.html`, `gate.json` und `gate.md`. Die Pipeline blockiert bei
+neuen Abweichungen, Infrastrukturfehlern und unerwarteten Verbesserungen einer
+ausdrücklich erwarteten Abweichung. Bekannte aktuelle Abweichungen bleiben im
+Report sichtbar und werden über `baselines/ilic/current.json` nachvollziehbar gehalten.
 
-Einzelne Schritte:
+## Compiler-CI
 
-```sh
-./gradlew importIli2cTests
-./gradlew validateGeneratedCases
-./gradlew verifyReference
-./gradlew runConformance
-./gradlew generateConformanceReport
-```
+Die normale Compiler-CI führt die Unit-, Integrations- und Regressionstests von `ilic`
+aus. Der Conformance-Lauf wird zentral aus dem Schwesterprojekt gegen den jeweiligen
+`ilic`-Commit gestartet. So bleibt der Compiler frei von einer zweiten Test-Suite und
+die Vergleichslogik befindet sich an einer einzigen Stelle.
 
-Reports enthalten eine maschinenlesbare Zusammenfassung, vollständige
-Rohresultate, eine Markdown-Übersicht und einen eigenständigen HTML-Report.
-Persistente Baselines werden nach Kandidaten-Commit abgelegt.
-
-## Java-Abgrenzung
-
-Java wird hier benötigt, weil die Suite Java-JUnit-Quellen analysiert und ili2c
-als Java-Referenz startet. Das sagt nichts über die Laufzeitarchitektur von
-`ilic` aus: Native CLI, C++-Core, C-ABI und WASM benötigen kein Java.
+Wenn ein neuer `ilic`-Commit geprüft werden soll, wird die Suite mit diesem
+Commit ausgeführt. Der Compiler selbst muss dafür keine Conformance-Dateien oder
+Runner übernehmen.

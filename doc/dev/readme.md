@@ -45,5 +45,4 @@ beschrieben.
 + [general api](./general_api.md)
 + [input module api](./input_api.md)
 + [output module api](./output_api.md)
-+ [semantic conformance and translation validation](./conformance.md)
 + [native C ABI, JSON protocol and WebAssembly embedding](./embedding.md)
