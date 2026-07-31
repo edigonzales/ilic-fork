@@ -1,0 +1,18 @@
+{
+  "$schema": "https://interlis.ch/schema/compiler-conformance/baseline-1.0.schema.json",
+  "schemaVersion": "1.0",
+  "compiler": "ilic",
+  "knownFailures": [
+    {"testId":"ili10.InterlisConversion23Test.iliconversion_CheckConversionOfIli1ToIli2","reason":"ilic rejects reference-accepted model","actualOutcome":"rejected"},
+    {"testId":"ili10.InterlisConversion23Test.iliconversion_Ili2StructForili1Line","reason":"ilic rejects reference-accepted model","actualOutcome":"rejected"},
+    {"testId":"ili10.InterlisFmt10Test.ilifmt_AllIli1Datatypes","reason":"ilic rejects reference-accepted model","actualOutcome":"rejected"},
+    {"testId":"ili10.References10Test.references_DetectRecursiveRefAttr_Fail","reason":"ilic accepts reference-rejected model","actualOutcome":"accepted"},
+    {"testId":"ili10.Schema10Test.datatypes_GenerateIli1Datatypes","reason":"ilic rejects reference-accepted model","actualOutcome":"rejected"},
+    {"testId":"ili10.Schema10Test.decimal_GenerateIli1DecWithScaling","reason":"ilic rejects reference-accepted model","actualOutcome":"rejected"},
+    {"testId":"ili10.Surface10Test.surface_AcceptIli1Surface","reason":"ilic rejects reference-accepted model","actualOutcome":"rejected"},
+    {"testId":"ili10.Translation10Test.attrTypeFail","reason":"ilic accepts reference-rejected model","actualOutcome":"accepted"},
+    {"testId":"ili23.Attribute10Test.attributeExplFail","reason":"ilic accepts reference-rejected model","actualOutcome":"accepted"},
+    {"testId":"ili23.Association23Test.association_RolenameConflict_Fail","reason":"ilic internal error on reference-rejected model","actualOutcome":"internal-error"},
+    {"testId":"ili23.MainRule23Test.mainRules_IllegalIliVersion","reason":"ilic internal error on reference-rejected model","actualOutcome":"internal-error"}
+  ]
+}
