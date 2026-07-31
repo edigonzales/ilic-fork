@@ -83,6 +83,14 @@ if (formatted.success) editor.replaceDocument(formatted.text);
 Compilation und Formatierung sind synchrone Aufrufe, nachdem das WASM-Modul
 asynchron geladen wurde. Für einen UI-Thread empfiehlt sich deshalb ein Worker.
 
+`session.editorSnapshot(uri)` ruft den nativen `_ilic_editor_snapshot`-Export
+auf. Syntax- und Editor-Snapshots stammen aus dem C++-/ANTLR-Kern; der Wrapper
+enthält keinen INTERLIS-Textparser und keine Source-Schattenkopie. Die Laufzeit
+liefert zusätzlich `recovered` und `complete`. Bei alten WASM-Artefakten ist
+der native Capability-Schalter `compiler.capabilities.nativeEditorSnapshot`
+`false`; ohne explizite Kompatibilitätsoption wird der Mischbetrieb mit einem
+verständlichen Fehler abgelehnt.
+
 ## Repository-Workspace kompilieren
 
 Das WASM-Modul führt selbst keine HTTP-Requests aus und kennt weder Node-Dateien
@@ -181,7 +189,8 @@ await call("disposeSession", sessionId);
 ```
 
 Unterstützte Methoden sind `createSession`, `disposeSession`, `putSource`,
-`removeSource`, `parse`, `analyze`, `compile` und `format`. Session-IDs sind UUIDs.
+`removeSource`, `parse`, `editorSnapshot`, `analyze`, `compile`,
+`compileAndAnalyze` und `format`. Session-IDs sind UUIDs.
 `worker.js`, `ilic.mjs` und `ilic.wasm` müssen im Deployment so kopiert werden,
 dass der relative Import und die WASM-Lokalisierung des Workers erhalten
 bleiben. Der konkrete Asset-Pfad ist eine Entscheidung des verwendeten Bundlers.

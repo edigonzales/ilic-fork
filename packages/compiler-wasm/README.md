@@ -51,9 +51,12 @@ UTF-16-Spalten.
 `session.editorSnapshot(uri)` erzeugt additiv zur bestehenden
 `SyntaxSnapshot`-API einen versionierten, fehlertoleranten `EditorSnapshot`.
 Er enthält nur die für interaktive Editorfunktionen benötigten
-Deklarationen, Scopes, Referenzen, Imports und Cursor-Kontexte. Strings und
-Kommentare werden beim linearen Editor-Scan unterdrückt; Quellbereiche
-enthalten weiterhin UTF-16-Positionen und UTF-8-Byteoffsets.
+Deklarationen, Scopes, Referenzen, Imports und Cursor-Kontexte. Die Daten
+werden im nativen C++-Parser aus demselben Lexer-/Parserlauf wie der
+`SyntaxSnapshot` erzeugt; der JavaScript-Wrapper enthält keinen zweiten
+Tokenizer oder Textparser. Quellbereiche enthalten UTF-16-Positionen und
+UTF-8-Byteoffsets. `recovered` und `complete` kennzeichnen den Zustand bei
+unvollständigem Editortext.
 
 ```js
 const snapshot = session.editorSnapshot(uri);
@@ -62,7 +65,19 @@ console.log(snapshot.declarations);
 console.log(snapshot.references);
 ```
 
-Der kompakte Scan ist kein Ersatz für `compile`, `analyze` oder
+Ein älteres WASM-Modul ohne `_ilic_editor_snapshot` wird standardmässig mit
+einem klaren Versionsfehler abgelehnt. Für eine bewusste Übergangsphase kann
+die reine `SyntaxSnapshot`-Projektion explizit aktiviert werden:
+
+```js
+const compiler = await createCompiler({
+  compatibility: { allowLegacyEditorProjection: true }
+});
+```
+Der Capability-Schalter `compiler.capabilities.nativeEditorSnapshot` zeigt an,
+ob der native Export verfügbar ist.
+
+Der kompakte Snapshot ist kein Ersatz für `compile`, `analyze` oder
 `compileAndAnalyze`. Ein Host sollte ihn in einem eigenen Worker ausführen,
 veraltete Dokumentversionen verwerfen und vollständige Compilerdiagnosen
 weiterhin bei Save oder einem expliziten Compile erzeugen.

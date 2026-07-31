@@ -80,7 +80,7 @@ Value diagnostics(const std::vector<ilic::Diagnostic> &diagnostics)
       }
       Value::Array notes;
       for (const auto &note : diagnostic.notes) notes.emplace_back(note);
-      values.push_back(Value::Object{
+      Value::Object item{
          {"severity",severity(diagnostic.severity)},
          {"code",diagnostic.code},
          {"message",diagnostic.message},
@@ -88,7 +88,9 @@ Value diagnostics(const std::vector<ilic::Diagnostic> &diagnostics)
          {"relatedInformation",std::move(related)},
          {"notes",std::move(notes)},
          {"treatedAsError",diagnostic.treatedAsError}
-      });
+      };
+      if (!diagnostic.source.empty()) item["source"] = diagnostic.source;
+      values.push_back(std::move(item));
    }
    return values;
 }
@@ -131,6 +133,17 @@ Value errorResult(const char *kind,const std::string &message,
       result["contexts"] = Value::Array{};
       result["imports"] = Value::Array{};
       result["importReferences"] = Value::Array{};
+   }
+   else if (value == "editor") {
+      result["recovered"] = false;
+      result["complete"] = false;
+      result["uri"] = uri;
+      result["documentVersion"] = static_cast<double>(documentVersion);
+      result["iliVersion"] = "unknown";
+      result["declarations"] = Value::Array{};
+      result["references"] = Value::Array{};
+      result["imports"] = Value::Array{};
+      result["contexts"] = Value::Array{};
    }
    else if (value == "semantic") {
       result["cancelled"] = false;
@@ -254,6 +267,72 @@ Value syntaxResult(const ilic::SyntaxSnapshot &result)
       {"nodes",std::move(nodes)},{"contexts",std::move(contexts)},
       {"imports",std::move(imports)},{"importReferences",std::move(importReferences)},
       {"diagnostics",diagnostics(result.diagnostics)}};
+}
+
+const char *editorSymbolKind(ilic::EditorSymbolKind kind)
+{
+   switch (kind) {
+      case ilic::EditorSymbolKind::Model: return "model";
+      case ilic::EditorSymbolKind::Topic: return "topic";
+      case ilic::EditorSymbolKind::Class: return "class";
+      case ilic::EditorSymbolKind::Structure: return "structure";
+      case ilic::EditorSymbolKind::Association: return "association";
+      case ilic::EditorSymbolKind::View: return "view";
+      case ilic::EditorSymbolKind::Graphic: return "graphic";
+      case ilic::EditorSymbolKind::Domain: return "domain";
+      case ilic::EditorSymbolKind::Unit: return "unit";
+      case ilic::EditorSymbolKind::Attribute: return "attribute";
+   }
+   return "attribute";
+}
+
+const char *editorReferenceKind(ilic::EditorReferenceKind kind)
+{
+   switch (kind) {
+      case ilic::EditorReferenceKind::Extends: return "extends";
+      case ilic::EditorReferenceKind::Type: return "type";
+      case ilic::EditorReferenceKind::Collection: return "collection";
+      case ilic::EditorReferenceKind::Reference: return "reference";
+      case ilic::EditorReferenceKind::Unit: return "unit";
+   }
+   return "type";
+}
+
+Value editorResult(const ilic::EditorSnapshot &result)
+{
+   Value::Array declarations;
+   for (const auto &declaration : result.declarations) {
+      declarations.push_back(Value::Object{
+         {"id",declaration.id}, {"name",declaration.name},
+         {"qualifiedName",declaration.qualifiedName},
+         {"kind",editorSymbolKind(declaration.kind)},
+         {"containerId",declaration.hasContainer ? Value(declaration.containerId) : Value(nullptr)},
+         {"range",range(declaration.range)},
+         {"selectionRange",range(declaration.selectionRange)},
+         {"endRange",range(declaration.endRange)}});
+   }
+   Value::Array references;
+   for (const auto &reference : result.references) {
+      references.push_back(Value::Object{
+         {"text",reference.text}, {"kind",editorReferenceKind(reference.kind)},
+         {"sourceId",reference.hasSource ? Value(reference.sourceId) : Value(nullptr)},
+         {"range",range(reference.range)}});
+   }
+   Value::Array imports;
+   for (const auto &reference : result.imports)
+      imports.push_back(Value::Object{{"model",reference.model},
+         {"unqualified",reference.unqualified},{"range",range(reference.range)}});
+   Value::Array contexts;
+   for (const auto &context : result.contexts)
+      contexts.push_back(Value::Object{{"kind",context.kind},{"range",range(context.range)}});
+   return Value::Object{
+      {"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
+      {"kind","editor"},{"success",result.success},{"recovered",result.recovered},
+      {"complete",result.complete},{"uri",result.uri},
+      {"documentVersion",static_cast<double>(result.documentVersion)},
+      {"iliVersion",result.iliVersion},{"declarations",std::move(declarations)},
+      {"references",std::move(references)},{"imports",std::move(imports)},
+      {"contexts",std::move(contexts)},{"diagnostics",diagnostics(result.diagnostics)}};
 }
 
 Value semanticResult(const ilic::SemanticSnapshot &result)
@@ -483,6 +562,36 @@ std::uint32_t ilic_parse(std::uint32_t session,const char *requestJson,std::size
    catch (...) {
       const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
       return store(errorResult("syntax","unknown C++ exception",uri,
+         source == nullptr ? 0 : source->version));
+   }
+}
+
+std::uint32_t ilic_editor_snapshot(std::uint32_t session,const char *requestJson,
+   std::size_t requestLength)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return store(errorResult("editor","invalid session handle"));
+   if (requestJson == nullptr) return store(errorResult("editor","request JSON is null"));
+   std::string uri;
+   try {
+      Value json = ilic::json::parse(std::string(requestJson,requestLength));
+      if (!json.isObject()) throw std::runtime_error("editor request must be an object");
+      if (!json.get("schemaVersion").isNumber() ||
+         static_cast<int>(json.get("schemaVersion").number()) != 1)
+         throw std::runtime_error("unsupported schemaVersion");
+      if (!json.get("uri").isString() || json.get("uri").string().empty())
+         throw std::runtime_error("uri must be a non-empty string");
+      uri = json.get("uri").string();
+      return store(editorResult(value->editorSnapshot(uri)));
+   }
+   catch (const std::exception &error) {
+      const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
+      return store(errorResult("editor",error.what(),uri,
+         source == nullptr ? 0 : source->version));
+   }
+   catch (...) {
+      const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
+      return store(errorResult("editor","unknown C++ exception",uri,
          source == nullptr ? 0 : source->version));
    }
 }

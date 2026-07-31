@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cmath>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -218,8 +219,13 @@ std::string stringify(const Value &value)
    if (value.isNull()) return "null";
    if (value.isBool()) return value.boolean() ? "true" : "false";
    if (value.isNumber()) {
+      const double number = value.number();
+      if (std::isfinite(number) && std::floor(number) == number
+         && number >= static_cast<double>(std::numeric_limits<long long>::min())
+         && number <= static_cast<double>(std::numeric_limits<long long>::max()))
+         return std::to_string(static_cast<long long>(number));
       std::ostringstream result;
-      result << std::setprecision(15) << value.number();
+      result << std::setprecision(15) << number;
       return result.str();
    }
    if (value.isString()) return escaped(value.string());

@@ -3,6 +3,7 @@
 #include "SourceManager.h"
 #include "Diagnostic.h"
 #include "Syntax.h"
+#include "Editor.h"
 
 #include <string>
 #include <cstdint>
@@ -70,6 +71,7 @@ public:
    SourceManager &sources();
    const SourceManager &sources() const;
    SyntaxSnapshot parse(const std::string &uri);
+   EditorSnapshot editorSnapshot(const std::string &uri);
    SemanticSnapshot analyze(const CompilationRequest &request);
    CompilationAnalysisResult compileAndAnalyze(const CompilationRequest &request);
    CompilationResult compile(const CompilationRequest &request);

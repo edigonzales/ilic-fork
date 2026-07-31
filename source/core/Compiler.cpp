@@ -2,6 +2,7 @@
 #include "../../include/ilic/Semantic.h"
 
 #include "CompilerContext.h"
+#include "SnapshotPipeline.h"
 #include "../input/ili1/Ili1Input.h"
 #include "../input/ili2/Ili2Input.h"
 #include "../input/ili2/InterlisModel.h"
@@ -250,6 +251,12 @@ SyntaxSnapshot CompilerSession::parse(const std::string &uri)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
    return parseSyntax(impl_->sources,uri);
+}
+
+EditorSnapshot CompilerSession::editorSnapshot(const std::string &uri)
+{
+   std::lock_guard<std::mutex> lock(impl_->mutex);
+   return detail::SnapshotPipeline(impl_->sources).editor(uri);
 }
 
 SemanticSnapshot CompilerSession::analyze(const CompilationRequest &request)

@@ -36,6 +36,12 @@ Editor-Kontexte, Imports und Syntaxdiagnostik. Alle Ranges enthalten URI,
 UTF-16-Positionen und UTF-8-Byteoffsets; der Snapshot trägt die registrierte
 Dokumentversion.
 
+`session.editorSnapshot(uri)` liefert synchron den kompakten nativen
+Editor-Snapshot. Er enthält Deklarationen, Referenzen, Imports, Container-
+Kontexte sowie `success`, `recovered` und `complete`. Syntax- und
+Editor-Snapshot entstehen aus demselben Lexer-/Parserlauf; der JS-Wrapper
+führt keine eigene Textanalyse aus.
+
 `session.analyze(request)` kompiliert denselben virtuellen Workspace und
 liefert zusätzlich einen serialisierbaren Semantic Snapshot: stabile Symbole,
 Definition-/Typ-/Vererbungsreferenzen, Modellabhängigkeiten sowie gemeinsame
@@ -153,12 +159,17 @@ ilic_session_destroy(session);
 
 Das vollständige Beispiel ist [`examples/c-api.c`](examples/c-api.c).
 
+Für den Editorpfad wird derselbe Request-JSON-Vertrag mit
+`ilic_editor_snapshot(session, request_json, request_length)` verwendet; das
+Resultat hat `kind: "editor"` und enthält `recovered` sowie `complete`.
+
 ### Ownership
 
 1. `ilic_session_create` erzeugt einen Session-Handle.
 2. `ilic_session_put_source` kopiert URI und Source; die Caller-Buffer dürfen
    unmittelbar danach freigegeben werden.
-3. `ilic_parse`, `ilic_analyze`, `ilic_compile` oder `ilic_format` erzeugt einen Result-Handle.
+3. `ilic_parse`, `ilic_editor_snapshot`, `ilic_analyze`, `ilic_compile` oder
+   `ilic_format` erzeugt einen Result-Handle.
 4. `ilic_result_json` liefert einen nicht nullterminierungsabhängigen Pointer
    plus Länge. Er bleibt bis `ilic_result_destroy` gültig.
 5. Jeder Result- und Session-Handle muss genau einmal zerstört werden.

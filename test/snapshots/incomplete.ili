@@ -1,0 +1,5 @@
+INTERLIS 2.3;
+MODEL Snapshot AT "https://example.invalid" VERSION "1" =
+  TOPIC Data =
+    CLASS Item =
+      name : TEXT;

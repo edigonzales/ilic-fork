@@ -62,7 +62,7 @@ export interface SyntaxSnapshot {
   success: boolean;
   uri: string;
   documentVersion: number;
-  iliVersion: "1.0" | "2.3" | "2.4";
+  iliVersion: "1.0" | "2.3" | "2.4" | "unknown";
   tokens: SyntaxToken[];
   nodes: SyntaxNode[];
   contexts: SyntaxContext[];
@@ -95,14 +95,21 @@ export interface EditorSnapshot {
   compilerVersion: string;
   kind: "editor";
   success: boolean;
+  /** P3 runtime results always include this; optional for legacy fixtures. */
+  recovered?: boolean;
+  /** P3 runtime results always include this; optional for legacy fixtures. */
+  complete?: boolean;
   uri: string;
   documentVersion: number;
-  iliVersion: "1.0" | "2.3" | "2.4";
+  iliVersion: "1.0" | "2.3" | "2.4" | "unknown";
   declarations: EditorDeclaration[];
   references: EditorReference[];
   imports: SyntaxImportReference[];
   contexts: SyntaxContext[];
   diagnostics: Diagnostic[];
+}
+export interface CompilerCapabilities {
+  nativeEditorSnapshot: boolean;
 }
 export interface SemanticSymbol {
   id: string; name: string; qualifiedName: string; kind: string;
@@ -215,6 +222,7 @@ export interface EmscriptenIlicModule {
   _ilic_session_remove_source(session: number, uri: number, uriLength: number): number;
   _ilic_compile(session: number, request: number, requestLength: number): number;
   _ilic_parse(session: number, request: number, requestLength: number): number;
+  _ilic_editor_snapshot?(session: number, request: number, requestLength: number): number;
   _ilic_analyze(session: number, request: number, requestLength: number): number;
   _ilic_compile_and_analyze(session: number, request: number, requestLength: number): number;
   _ilic_format(session: number, request: number, requestLength: number): number;
@@ -222,7 +230,7 @@ export interface EmscriptenIlicModule {
   _ilic_result_destroy(result: number): void;
 }
 export class CompilerSession {
-  constructor(module: EmscriptenIlicModule);
+  constructor(module: EmscriptenIlicModule, options?: { allowLegacyEditorProjection?: boolean });
   putSource(uri: string, source: string | Uint8Array, version?: number): void;
   putWorkspace(workspace: ResolvedWorkspace): void;
   removeSource(uri: string): boolean;
@@ -235,12 +243,14 @@ export class CompilerSession {
   dispose(): void;
 }
 export class Compiler {
-  constructor(module: EmscriptenIlicModule);
+  constructor(module: EmscriptenIlicModule, options?: { allowLegacyEditorProjection?: boolean });
   readonly module: EmscriptenIlicModule;
   readonly abiVersion: number;
+  readonly capabilities: CompilerCapabilities;
   createSession(): CompilerSession;
 }
 export function createCompiler(options?: {
   moduleFactory?: (options?: Record<string, unknown>) => Promise<EmscriptenIlicModule> | EmscriptenIlicModule;
   moduleOptions?: Record<string, unknown>;
+  compatibility?: { allowLegacyEditorProjection?: boolean };
 }): Promise<Compiler>;

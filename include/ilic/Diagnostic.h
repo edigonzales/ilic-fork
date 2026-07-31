@@ -36,6 +36,7 @@ struct Diagnostic {
    std::vector<RelatedInformation> relatedInformation;
    std::vector<std::string> notes;
    bool treatedAsError = false;
+   std::string source;
 };
 
 enum class LogLevel { Trace, Debug, Information, Warning, Error };

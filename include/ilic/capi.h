@@ -31,6 +31,8 @@ ILIC_CAPI_EXPORT uint32_t ilic_compile(uint32_t session,
    const char *request_json,size_t request_length);
 ILIC_CAPI_EXPORT uint32_t ilic_parse(uint32_t session,
    const char *request_json,size_t request_length);
+ILIC_CAPI_EXPORT uint32_t ilic_editor_snapshot(uint32_t session,
+   const char *request_json,size_t request_length);
 ILIC_CAPI_EXPORT uint32_t ilic_analyze(uint32_t session,
    const char *request_json,size_t request_length);
 ILIC_CAPI_EXPORT uint32_t ilic_compile_and_analyze(uint32_t session,

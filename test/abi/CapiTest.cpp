@@ -63,6 +63,15 @@ END AbiModel.
    ILIC_REQUIRE(syntax.find("\"documentVersion\":1") != std::string::npos);
    ILIC_REQUIRE(syntax.find("\"modelDef\"") != std::string::npos);
 
+   const std::string editorRequest =
+      R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili"})json";
+   std::string editor = resultJson(ilic_editor_snapshot(
+      session,editorRequest.data(),editorRequest.size()));
+   ILIC_REQUIRE(editor.find("\"kind\":\"editor\"") != std::string::npos);
+   ILIC_REQUIRE(editor.find("\"recovered\":false") != std::string::npos);
+   ILIC_REQUIRE(editor.find("\"complete\":true") != std::string::npos);
+   ILIC_REQUIRE(editor.find("\"qualifiedName\":\"AbiModel.Item\"") != std::string::npos);
+
    std::string semantic = resultJson(ilic_analyze(session,compileRequest.data(),compileRequest.size()));
    ILIC_REQUIRE(semantic.find("\"kind\":\"semantic\"") != std::string::npos);
    ILIC_REQUIRE(semantic.find("\"qualifiedName\":\"AbiModel\"") != std::string::npos);

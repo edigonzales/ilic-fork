@@ -334,7 +334,7 @@ test("keeps editor diagnostics limited to structurally safe findings", async () 
   const session = compiler.createSession();
   const uri = "file:///editor-diagnostics.ili";
   session.putSource(uri, `INTERLIS 2.4;
-MODEL Diagnostics =
+MODEL Diagnostics AT "https://example.com" VERSION "1" =
   CLASS Item =
   END Wrong;
   CLASS Duplicate =
@@ -370,10 +370,13 @@ MODEL Performance (en) AT "https://example.com" VERSION "1" =
     CLASS C =
 ${attributes}
     END C;
-  END T;
+    END T;
 END Performance.
 `;
     session.putSource(uri, source, 1);
+    // Warm the native/WASM parser and allocator before measuring the
+    // steady-state editor latency budget.
+    session.editorSnapshot(uri);
     const started = performance.now();
     const snapshot = session.editorSnapshot(uri);
     const elapsed = performance.now() - started;

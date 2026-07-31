@@ -2,8 +2,8 @@
 
 [Dokumentationsindex](README.md) · [Native APIs](native-api.md) · [WASM](wasm.md)
 
-`ilic` 0.10 stellt zusätzlich zur rückwärtskompatiblen Compile-/Format-API
-versionierte Projektionen für Editoren bereit. Sie sind die stabile Grenze zum
+`ilic` stellt zusätzlich zur rückwärtskompatiblen Compile-/Format-API
+versionierte Snapshots für Editoren bereit. Sie sind die stabile Grenze zum
 separaten Repository `interlis-language-tools`; UI-, LSP- und Monaco-Code gehört
 nicht in den Compiler.
 
@@ -19,6 +19,15 @@ und liefert:
 
 Ungespeicherte Texte bleiben damit die primäre Quelle. Es werden keine
 temporären `.ili`- oder Logdateien erzeugt.
+
+## EditorSnapshot
+
+`CompilerSession.editorSnapshot(uri)` ist der native, synchrone Editorpfad.
+Syntax- und Editor-Snapshot verwenden denselben ANTLR-Lexer, Parser und
+`SourceRangeMapper`; der WASM-/JavaScript-Wrapper reicht nur den C-ABI-Request
+weiter. `recovered` erlaubt Teilresultate nach Syntaxfehlern, während
+`complete` nur bei einem vollständigen, nicht wiederhergestellten Parse gesetzt
+wird. `iliVersion` kann bei unvollständigem Text zusätzlich `unknown` sein.
 
 ## SemanticSnapshot
 

@@ -44,6 +44,8 @@ set(ILIC_CORE_SOURCES
     source/core/CompilationSourceStore.cpp
     source/core/Formatter.cpp
     source/core/SourceManager.cpp
+    source/core/SourceRangeMapper.cpp
+    source/core/SnapshotPipeline.cpp
     source/core/Syntax.cpp
     source/core/Semantic.cpp
 
@@ -153,7 +155,7 @@ if(EMSCRIPTEN)
         "-sWASM_BIGINT=1"
         "-sASSERTIONS=1"
         "-fexceptions"
-        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_parse','_ilic_analyze','_ilic_compile','_ilic_compile_and_analyze','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
+        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_parse','_ilic_editor_snapshot','_ilic_analyze','_ilic_compile','_ilic_compile_and_analyze','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
     )
     set_target_properties(ilic-wasm PROPERTIES OUTPUT_NAME "ilic" SUFFIX ".mjs")
 endif()
@@ -228,6 +230,24 @@ if(BUILD_TESTING)
     set_tests_properties(ilic_no_mutable_compiler_globals PROPERTIES
         LABELS "architecture"
     )
+    add_test(
+        NAME ilic_native_editor_architecture
+        COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-native-editor-architecture.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    set_tests_properties(ilic_native_editor_architecture PROPERTIES LABELS "architecture")
+    add_test(
+        NAME ilic_native_editor_architecture_negative_canary
+        COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-native-editor-architecture.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}" --negative-canary
+    )
+    set_tests_properties(ilic_native_editor_architecture_negative_canary PROPERTIES LABELS "architecture")
+    add_test(
+        NAME ilic_no_javascript_parser
+        COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-native-editor-architecture.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    set_tests_properties(ilic_no_javascript_parser PROPERTIES LABELS "architecture")
 
     add_executable(ilic_docs_cpp_example docs/examples/cpp-session.cpp)
     target_link_libraries(ilic_docs_cpp_example PRIVATE ilic-core)
@@ -237,6 +257,9 @@ if(BUILD_TESTING)
     set_target_properties(ilic_docs_c_example PROPERTIES LINKER_LANGUAGE CXX)
     target_link_libraries(ilic_docs_c_example PRIVATE ilic-capi)
     add_test(NAME ilic_docs_c_example COMMAND ilic_docs_c_example)
+
+    add_executable(ilic_snapshot_json_driver test/abi/SnapshotJsonDriver.cpp)
+    target_link_libraries(ilic_snapshot_json_driver PRIVATE ilic-capi)
 
     if(UNIX)
         add_test(NAME ilic_docs_cli_examples
@@ -286,6 +309,9 @@ if(BUILD_TESTING)
     add_executable(ilic_syntax_snapshot_test test/core/SyntaxSnapshotTest.cpp)
     target_link_libraries(ilic_syntax_snapshot_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_syntax_snapshot COMMAND ilic_syntax_snapshot_test)
+    add_executable(ilic_editor_snapshot_test test/core/EditorSnapshotTest.cpp)
+    target_link_libraries(ilic_editor_snapshot_test PRIVATE ilic-core ilic::test-support)
+    add_test(NAME ilic_editor_snapshot COMMAND ilic_editor_snapshot_test)
     add_executable(ilic_semantic_snapshot_test test/core/SemanticSnapshotTest.cpp)
     target_link_libraries(ilic_semantic_snapshot_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_semantic_snapshot COMMAND ilic_semantic_snapshot_test)
