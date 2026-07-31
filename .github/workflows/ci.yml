@@ -65,6 +65,71 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/check-windows-runtime-deps.ps1 -Binary build/ci/Release/ilic.exe
+  conformance:
+    name: Compiler Conformance (ilic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out ilic
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Download conformance suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          suite_commit=88576ffc4cd491dd72d2375eb897ea9f3f55d2c3
+          archive="$RUNNER_TEMP/interlis-conformance-suite.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://codeberg.org/edigonzales/interlis-compiler-testsuite/archive/${suite_commit}.tar.gz" \
+            --output "$archive"
+          mkdir -p conformance-suite
+          tar --extract --gzip --strip-components=1 --file="$archive" --directory=conformance-suite
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Linux dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libcurl4-openssl-dev ninja-build
+      - name: Cache conformance fixtures
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/interlis-conformance
+          key: interlis-conformance-fixtures-4ea207f388ef7d91b03d968cc1636f4de84e36ea
+      - name: Build ilic for conformance tests
+        run: |
+          cmake -S . -B build/conformance-ilic -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DILIC_ENABLE_NATIVE_REPOSITORY=OFF \
+            -DILIC_STATIC_DISTRIBUTION=OFF \
+            -DBUILD_TESTING=OFF
+          cmake --build build/conformance-ilic --target ilic --parallel
+      - name: Run conformance suite
+        id: conformance
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          java conformance-suite/InterlisConformance.java run \
+            --suite conformance-suite/suite/test-cases.json \
+            --compiler ilic=build/conformance-ilic/ilic \
+            --baseline ilic=conformance/known-failures.json \
+            --out build/conformance
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Upload conformance reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ilic-conformance
+          path: build/conformance/
+          if-no-files-found: warn
+      - name: Enforce conformance result
+        if: always()
+        shell: bash
+        run: exit "${{ steps.conformance.outputs.exit_code || '2' }}"
   native-debug-linux:
     name: Native Debug (Linux x86_64)
     runs-on: ubuntu-latest
