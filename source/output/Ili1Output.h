@@ -8,7 +8,7 @@ namespace output {
    class Ili1Output : public metamodel::MetaModelTreeVisitor {
    public:
 
-      Ili1Output(string ilifile);
+      Ili1Output(metamodel::MetaModelStore &store,util::Logger &logger,string ilifile);
 
       void preVisitModel(metamodel::Model *m) override;
       void postVisitModel(metamodel::Model *m) override;
@@ -36,6 +36,8 @@ namespace output {
    private:
       util::TextWriter ili1;
       string ili_file;
+      bool domainheader_written = false;
+      bool visitClassFlag = false;
 
       string get_enum_nodes(list <metamodel::EnumNode*> ln);
       string get_type(metamodel::DomainType* t, bool domainflag);

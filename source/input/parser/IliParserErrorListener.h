@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ANTLRErrorListener.h"
+#include "../../util/Logger.h"
 
 using namespace antlr4;
 
@@ -8,6 +9,8 @@ namespace parser {
 
    class IliParserErrorListener : public antlr4::ANTLRErrorListener {
    public:
+
+      explicit IliParserErrorListener(util::Logger &logger) : logger_(logger) {}
 
       void syntaxError(
          Recognizer *recognizer, Token *offendingSymbol, size_t line,
@@ -28,6 +31,9 @@ namespace parser {
          Parser *recognizer, const dfa::DFA &dfa, size_t startIndex, size_t stopIndex,
          size_t prediction, atn::ATNConfigSet *configs
       );
+
+   private:
+      util::Logger &logger_;
 
    };
 

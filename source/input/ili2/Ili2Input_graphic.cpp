@@ -2,7 +2,7 @@
 
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
@@ -67,21 +67,21 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
    string name1 = ctx->graphicname1->getText();
    string name2 = ctx->graphicname2->getText();
    
-   debug(ctx,">>> visitGrahicDef(" + name1 + ")");
+   builder_.debug(ctx,">>> visitGrahicDef(" + name1 + ")");
    
    if (name1 != name2) {
-      Log.warning(name2 + " does not match " + name1,ctx->graphicname2->getLine());
+      logger_.warning(name2 + " does not match " + name1,ctx->graphicname2->getLine());
    }
    
-   Graphic *g = make_mmobject<Graphic>();
-   init_graphic(g,get_line(ctx));
-   set_selection_source(g,ctx->graphicname1);
-   set_end_selection_source(g,ctx->graphicname2);
+   Graphic *g = builder_.store().make<Graphic>();
+   builder_.initGraphic(g,builder_.line(ctx));
+   builder_.setSelectionSource(g,ctx->graphicname1);
+   builder_.setEndSelectionSource(g,ctx->graphicname2);
    g->Name = name1;
-   add_graphic(g);
-   push_context(g);
+   builder_.addGraphic(g);
+   builder_.pushContext(*g);
    
-   map<string,bool> properties = get_properties(ctx->properties(),vector({ABSTRACT,FINAL}));
+   map<string,bool> properties = get_properties(logger_,ctx->properties(),vector({ABSTRACT,FINAL}));
    if (properties[ABSTRACT]) {
       g->Abstract = true;
    }
@@ -91,8 +91,8 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
    
    g->Base = nullptr;
    if (ctx->EXTENDS() != nullptr) {
-      set_reference_source(g,"inheritance",ctx->expath);
-      Graphic *s = find_graphic(ctx->expath->getText(),get_line(ctx->expath));
+      builder_.setReferenceSource(g,"inheritance",ctx->expath);
+      Graphic *s = builder_.findGraphic(ctx->expath->getText(),builder_.line(ctx->expath));
       g->Super = s;
       if (s != nullptr) {
          g->Base = s->Base;
@@ -100,14 +100,14 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
    }
    
    if (ctx->BASED() != nullptr) {
-      set_reference_source(g,"dependency",ctx->bpath);
+      builder_.setReferenceSource(g,"dependency",ctx->bpath);
       if (g->Base != nullptr) {
-         Log.error(DiagnosticId::GraphicBaseAlreadyDefined,
+         logger_.error(DiagnosticId::GraphicBaseAlreadyDefined,
             "graphic definition is already based on " + get_path(g->Base),
-            get_line(ctx->BASED()));
+            builder_.line(ctx->BASED()));
       }
       else {
-         g->Base = find_class_or_view(ctx->bpath->getText(),get_line(ctx->bpath));
+         g->Base = builder_.findClassOrView(ctx->bpath->getText(),builder_.line(ctx->bpath));
       }
    }
    
@@ -124,7 +124,7 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
          */
 
          if (g->Where->getClass() != "CompoundExpression") {
-            CompoundExpr *e = make_mmobject<CompoundExpr>();
+            CompoundExpr *e = builder_.store().make<CompoundExpr>();
             e->Operation = CompoundExpr_OperationType::And;
             e->SubExpressions.push_back(g->Where);
             Expression* ee = visitSelection(s);
@@ -145,7 +145,7 @@ antlrcpp::Any Ili2Input::visitGraphicDef(parser::Ili2Parser::GraphicDefContext *
       g->DrawingRule.push_back(dr);
    }
    
-   pop_context();
+   builder_.popContext();
    
    return g;
 
@@ -172,14 +172,14 @@ antlrcpp::Any Ili2Input::visitDrawingRule(parser::Ili2Parser::DrawingRuleContext
    
    string name = ctx->drawingrulename->getText();
    
-   debug(ctx,">>> visitDrawingRule(" + name + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitDrawingRule(" + name + ")");
+   logger_.incNestLevel();
 
-   DrawingRule *r = make_mmobject<DrawingRule>();
-   init_extendableme(r,get_line(ctx));
+   DrawingRule *r = builder_.store().make<DrawingRule>();
+   builder_.initExtendable(r,builder_.line(ctx));
    r->Name = name;
 
-   map<string,bool> properties = get_properties(ctx->properties(),vector({ABSTRACT,EXTENDED,FINAL}));
+   map<string,bool> properties = get_properties(logger_,ctx->properties(),vector({ABSTRACT,EXTENDED,FINAL}));
    if (properties[ABSTRACT]) {
       r->Abstract = true;
    }
@@ -194,8 +194,8 @@ antlrcpp::Any Ili2Input::visitDrawingRule(parser::Ili2Parser::DrawingRuleContext
       r->Rule.push_back(visitCondSignParamAssignment(actx));
    }
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitDrawingRule(" + name + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitDrawingRule(" + name + ")");
    return r;
 
 }
@@ -214,11 +214,11 @@ antlrcpp::Any Ili2Input::visitCondSignParamAssignment(parser::Ili2Parser::CondSi
       list<SignParamAssignment *> Assignments; // LIST
    */
    
-   debug(ctx,">>> visitCondSingAssignment()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitCondSingAssignment()");
+   logger_.incNestLevel();
 
-   CondSignParamAssignment *a = make_mmobject<CondSignParamAssignment>();
-   init_mmobject(a,get_line(ctx));
+   CondSignParamAssignment *a = builder_.store().make<CondSignParamAssignment>();
+   builder_.initObject(a,builder_.line(ctx));
 
    if (ctx->expression() != nullptr) {
       a->Where = visitExpression(ctx->expression());
@@ -228,8 +228,8 @@ antlrcpp::Any Ili2Input::visitCondSignParamAssignment(parser::Ili2Parser::CondSi
       a->Assignments.push_back(visitSignParamAssignment(actx));
    }
 
-   Log.decNestLevel();
-   debug(ctx,">>> visitCondSingAssignment()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,">>> visitCondSingAssignment()");
 
    return a;
 
@@ -255,13 +255,13 @@ antlrcpp::Any Ili2Input::visitSignParamAssignment(parser::Ili2Parser::SignParamA
    */
 
    string name = ctx->signparametername->getText();
-   debug(ctx,">>> visitSignParamAssignment(" + name + ")");
+   builder_.debug(ctx,">>> visitSignParamAssignment(" + name + ")");
 
-   SignParamAssignment *a = make_mmobject<SignParamAssignment>();
-   init_mmobject(a,get_line(ctx));
+   SignParamAssignment *a = builder_.store().make<SignParamAssignment>();
+   builder_.initObject(a,builder_.line(ctx));
    // to do !!!
 
-   debug(ctx,"<<< visitSignParamAssignment(" + name + ")");
+   builder_.debug(ctx,"<<< visitSignParamAssignment(" + name + ")");
 
    return a;
 

@@ -5,13 +5,14 @@
 #include <string>
 #include <list>
 #include <vector>
-#include <type_traits>
-#include <utility>
+#include <map>
 #include "../../include/ilic/Diagnostic.h"
 
 using namespace std;
 
 namespace metamodel {
+
+   class MetaModelStore;
 
    // forward declarations to support
    // recursive classes / structures
@@ -62,31 +63,10 @@ namespace metamodel {
       virtual string getClass() { return "MMObject"; };
       virtual string getBaseClass() { return ""; };
       virtual bool isAbstract() { return true; };
-      MMObject* clone();
+      virtual ~MMObject() = default;
+      MMObject* clone(MetaModelStore &destination) const;
       bool isSubClassOf(string classname);
    };
-
-   using MMObjectDeleter = void (*)(MMObject *);
-
-   void register_mmobject(MMObject *object,MMObjectDeleter deleter);
-   void destroy_mmobject(MMObject *object);
-   void reset_mmobjects();
-
-   template <typename T>
-   void delete_mmobject(MMObject *object)
-   {
-      delete static_cast<T *>(object);
-   }
-
-   template <typename T,typename... Args>
-   T *make_mmobject(Args &&...args)
-   {
-      static_assert(std::is_base_of_v<MMObject,T>,
-         "make_mmobject requires an MMObject-derived type");
-      T *object = new T(std::forward<Args>(args)...);
-      register_mmobject(object,&delete_mmobject<T>);
-      return object;
-   }
 
    // topic ModelData
 
@@ -1110,38 +1090,8 @@ namespace metamodel {
       virtual string getBaseClass() { return "MMObject"; };
    };
 
-   // global Variables
-   extern Model *INTERLIS;
-
-   // initialization
-   void init(string version);
-   void reset();
-
-   // model helpers
-   void add_dataunit(DataUnit* u);
-   list <DataUnit*> get_all_dataunits();
-   void add_model(Model *model);
-   list <Model *> get_all_models();
-   void add_import(Import *import);
-   list <Import *> get_all_imports();
-   list<string> get_all_unqualified_imports(string modelname);
-   void add_dependency(Dependency *d);
-   bool depends_on(Package *p);
-   list <Dependency *> get_all_dependencies();
-   void add_axisspec(AxisSpec *s);
-   list <AxisSpec *> get_all_axisspecs();
-
    // path helpers
    string get_path(MMObject *o);
    string get_parent_path(MetaElement *e);
-
-   // context helpers
-   void push_context(MetaElement *p);
-   MetaElement* get_context();
-   Class* get_class_context();
-   Package* get_package_context();
-   SubModel* get_topic_context();
-   Model* get_model_context();
-   void pop_context();
 
 };

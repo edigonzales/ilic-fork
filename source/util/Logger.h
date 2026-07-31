@@ -22,12 +22,59 @@ namespace util {
 
    class CompilerAbort : public runtime_error {
    public:
-      CompilerAbort(string message,int code) : runtime_error(std::move(message)), code(code) {}
-      int code;
+      CompilerAbort(string message,int code) : runtime_error(std::move(message)), code_(code) {}
+      int code() const noexcept { return code_; }
+   private:
+      int code_;
    };
 
    class Logger {
       public:
+
+         class SourceScope final {
+         public:
+            SourceScope(Logger &logger,string source);
+            ~SourceScope() noexcept;
+            SourceScope(const SourceScope &) = delete;
+            SourceScope &operator=(const SourceScope &) = delete;
+            SourceScope(SourceScope &&other) noexcept;
+            SourceScope &operator=(SourceScope &&) = delete;
+         private:
+            Logger *logger_;
+            string previous_;
+         };
+
+         class CategoryScope final {
+         public:
+            CategoryScope(Logger &logger,string category);
+            ~CategoryScope() noexcept;
+            CategoryScope(const CategoryScope &) = delete;
+            CategoryScope &operator=(const CategoryScope &) = delete;
+            CategoryScope(CategoryScope &&other) noexcept;
+            CategoryScope &operator=(CategoryScope &&) = delete;
+         private:
+            Logger *logger_;
+            string previous_;
+         };
+
+         class IndentScope final {
+         public:
+            explicit IndentScope(Logger &logger);
+            ~IndentScope() noexcept;
+            IndentScope(const IndentScope &) = delete;
+            IndentScope &operator=(const IndentScope &) = delete;
+            IndentScope(IndentScope &&other) noexcept;
+            IndentScope &operator=(IndentScope &&) = delete;
+         private:
+            Logger *logger_;
+         };
+
+         Logger() = default;
+         ~Logger() = default;
+         Logger(const Logger &) = delete;
+         Logger &operator=(const Logger &) = delete;
+         Logger(Logger &&) = delete;
+         Logger &operator=(Logger &&) = delete;
 
          // general
          void openFile(string log_file);
@@ -44,6 +91,11 @@ namespace util {
          void reset();
          void setCurrentSource(string uri);
          void setCategory(string category);
+         SourceScope sourceScope(string uri) { return SourceScope(*this,std::move(uri)); }
+         CategoryScope categoryScope(string category) { return CategoryScope(*this,std::move(category)); }
+         IndentScope indentScope() { return IndentScope(*this); }
+         // Kept as a source-compatible no-op. Core errors always become
+         // CompilerAbort; process termination belongs exclusively to the CLI.
          void setAbortWithException(bool state);
          const string &getCurrentSource() const;
          void setLogSink(ilic::LogSink sink);
@@ -111,14 +163,11 @@ namespace util {
          bool warnings_as_errors = false;
          string current_source;
          string current_category = "compiler";
-         bool abort_with_exception = false;
          vector<ilic::Diagnostic> diagnostics;
          vector<ilic::LogEvent> events;
          ilic::LogSink log_sink;
          ilic::DiagnosticSink diagnostic_sink;
          void recordDiagnostic(ilic::Diagnostic diagnostic);
-   };
-
 };
 
-extern util::Logger Log;
+};

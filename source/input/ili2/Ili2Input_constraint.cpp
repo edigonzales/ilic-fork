@@ -2,7 +2,7 @@
 
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
@@ -32,8 +32,8 @@ antlrcpp::Any Ili2Input::visitConstraintDef(parser::Ili2Parser::ConstraintDefCon
       virtual bool isAbstract() { return true; }
    */
    
-   debug(ctx,">>> visitConstraintDef()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitConstraintDef()");
+   logger_.incNestLevel();
 
    Constraint *c = nullptr;
    
@@ -58,8 +58,8 @@ antlrcpp::Any Ili2Input::visitConstraintDef(parser::Ili2Parser::ConstraintDefCon
       c = cc;
    }
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitConstraintDef()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitConstraintDef()");
 
    return c;
 
@@ -84,24 +84,24 @@ antlrcpp::Any Ili2Input::visitMandatoryConstraint(parser::Ili2Parser::MandatoryC
       Expression *LogicalExpression;
    */
 
-   debug(ctx,">>> visitMandatoryConstraint()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitMandatoryConstraint()");
+   logger_.incNestLevel();
    
-   SimpleConstraint *c = make_mmobject<SimpleConstraint>();
-   init_constraint(c,get_line(ctx));
+   SimpleConstraint *c = builder_.store().make<SimpleConstraint>();
+   builder_.initConstraint(c,builder_.line(ctx));
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
-      set_selection_source(c,ctx->name);
+      builder_.setSelectionSource(c,ctx->name);
    }
    c->Kind = SimpleConstraint::MandC;
    c->LogicalExpression = visitExpression(ctx->expression());
    if (c->LogicalExpression != nullptr && !is_boolean_expression(c->LogicalExpression)) {
-      Log.error(DiagnosticId::ExpressionBooleanRequired,
+      logger_.error(DiagnosticId::ExpressionBooleanRequired,
          "expression must return a boolean value",ctx->expression()->start->getLine());
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitMandatoryConstraint()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitMandatoryConstraint()");
 
    return c;
 
@@ -123,18 +123,18 @@ antlrcpp::Any Ili2Input::visitPlausibilityConstraint(parser::Ili2Parser::Plausib
       Expression *LogicalExpression;
    */
 
-   debug(ctx,"visitPlausibilityConstraint()");
+   builder_.debug(ctx,"visitPlausibilityConstraint()");
 
-   SimpleConstraint *c = make_mmobject<SimpleConstraint>();
-   init_constraint(c,get_line(ctx));
+   SimpleConstraint *c = builder_.store().make<SimpleConstraint>();
+   builder_.initConstraint(c,builder_.line(ctx));
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
-      set_selection_source(c,ctx->name);
+      builder_.setSelectionSource(c,ctx->name);
    }
    c->Kind = SimpleConstraint::MandC;
    c->LogicalExpression = visitExpression(ctx->expression());
    if (!is_boolean_expression(c->LogicalExpression)) {
-      Log.error(DiagnosticId::ExpressionBooleanRequired,
+      logger_.error(DiagnosticId::ExpressionBooleanRequired,
          "expression must return a boolean value",ctx->expression()->start->getLine());
    }
    if (ctx->LESSEQUAL() != nullptr) {
@@ -178,14 +178,14 @@ antlrcpp::Any Ili2Input::visitExistenceConstraint(parser::Ili2Parser::ExistenceC
       list<ExistenceDef *> ExistsIn;
    */
 
-   debug(ctx,">>> visitExistenceConstraint()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitExistenceConstraint()");
+   logger_.incNestLevel();
 
-   ExistenceConstraint *c = make_mmobject<ExistenceConstraint>();
-   init_constraint(c,get_line(ctx));
+   ExistenceConstraint *c = builder_.store().make<ExistenceConstraint>();
+   builder_.initConstraint(c,builder_.line(ctx));
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
-      set_selection_source(c,ctx->name);
+      builder_.setSelectionSource(c,ctx->name);
    }
    auto attributes = ctx->attributePath();
    auto viewables = ctx->path();
@@ -194,14 +194,14 @@ antlrcpp::Any Ili2Input::visitExistenceConstraint(parser::Ili2Parser::ExistenceC
       c->Attr = attribute.as<PathOrInspFactor *>();
    }
    for (size_t i = 0; i < viewables.size() && i + 1 < attributes.size(); ++i) {
-      ExistenceDef *definition = make_mmobject<ExistenceDef>();
-      init_factor(definition,get_line(viewables[i]));
-      definition->Viewable = find_class_or_view(visitPath(viewables[i]),get_line(viewables[i]));
+      ExistenceDef *definition = builder_.store().make<ExistenceDef>();
+      builder_.initFactor(definition,builder_.line(viewables[i]));
+      definition->Viewable = builder_.findClassOrView(visitPath(viewables[i]),builder_.line(viewables[i]));
       if (definition->Viewable != nullptr) {
-         push_context(definition->Viewable);
+         builder_.pushContext(*definition->Viewable);
          antlrcpp::Any requiredFactor = visitAttributePath(attributes[i + 1]);
          PathOrInspFactor *required = requiredFactor.as<PathOrInspFactor *>();
-         pop_context();
+         builder_.popContext();
          if (required != nullptr) {
             definition->PathEls = required->PathEls;
             definition->_path = required->_path;
@@ -210,8 +210,8 @@ antlrcpp::Any Ili2Input::visitExistenceConstraint(parser::Ili2Parser::ExistenceC
       c->ExistsIn.push_back(definition);
    }
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitExistenceConstraint()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitExistenceConstraint()");
 
    return c;
 
@@ -233,14 +233,14 @@ antlrcpp::Any Ili2Input::visitUniquenessConstraint(parser::Ili2Parser::Uniquenes
       list<PathOrInspFactor *> UniqueDef;
    */
 
-   debug(ctx,"visitUniquenessConstraint()");
+   builder_.debug(ctx,"visitUniquenessConstraint()");
    
-   UniqueConstraint *c = make_mmobject<UniqueConstraint>();
-   init_constraint(c,get_line(ctx));
+   UniqueConstraint *c = builder_.store().make<UniqueConstraint>();
+   builder_.initConstraint(c,builder_.line(ctx));
    c->PerBasket = ctx->BASKET() != nullptr;
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
-      set_selection_source(c,ctx->name);
+      builder_.setSelectionSource(c,ctx->name);
    }
    
    if (ctx->WHERE() != nullptr) {
@@ -267,7 +267,7 @@ antlrcpp::Any Ili2Input::visitUniquenessConstraint(parser::Ili2Parser::Uniquenes
       attributename=NAME (COMMA attributename=NAME)*
       */
       c->Kind = UniqueConstraint::LocalU;
-      PathOrInspFactor * pf = make_mmobject<PathOrInspFactor>();
+      PathOrInspFactor * pf = builder_.store().make<PathOrInspFactor>();
       pf->_path = ctx->localUniqueness()->localUniqueEl()->getText();
       c->UniqueDef.push_back(pf);
    }
@@ -294,14 +294,14 @@ antlrcpp::Any Ili2Input::visitGlobalUniqueness(parser::Ili2Parser::GlobalUniquen
       string _path = "";
    */
 
-   debug(ctx,">>> visitGlobalUniqueness()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitGlobalUniqueness()");
+   logger_.incNestLevel();
    
    list<PathOrInspFactor *> result;
    // to do !!!
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitGlobalUniqueness()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitGlobalUniqueness()");
    
    return result;
 
@@ -314,7 +314,7 @@ antlrcpp::Any Ili2Input::visitUniqueEl(parser::Ili2Parser::UniqueElContext *ctx)
    : objectOrAttributePath (COMMA objectOrAttributePath)*
    */
 
-   debug(ctx,"visitUniqueEl()");
+   builder_.debug(ctx,"visitUniqueEl()");
    
    string path = "";
    for (auto p : ctx->objectOrAttributePath()) {
@@ -347,14 +347,14 @@ antlrcpp::Any Ili2Input::visitLocalUniqueness(parser::Ili2Parser::LocalUniquenes
       string _path = "";
    */
 
-   debug(ctx,">>> visitLocalUniqueness()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitLocalUniqueness()");
+   logger_.incNestLevel();
    
    list<PathOrInspFactor *> result;
    // to do !!!
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitLocalUniqueness()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitLocalUniqueness()");
    
    return result;
 
@@ -381,15 +381,15 @@ antlrcpp::Any Ili2Input::visitSetConstraint(parser::Ili2Parser::SetConstraintCon
       Expression *Constraint = nullptr;
    */
 
-   debug(ctx,">>> visitSetConstraint()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitSetConstraint()");
+   logger_.incNestLevel();
    
-   SetConstraint *c = make_mmobject<SetConstraint>();
-   init_constraint(c,get_line(ctx));
+   SetConstraint *c = builder_.store().make<SetConstraint>();
+   builder_.initConstraint(c,builder_.line(ctx));
    c->PerBasket = ctx->BASKET() != nullptr;
    if (ctx->name != nullptr) {
       c->Name = ctx->name->getText();
-      set_selection_source(c,ctx->name);
+      builder_.setSelectionSource(c,ctx->name);
    }
    auto expressions = ctx->expression();
    if (ctx->logical != nullptr) {
@@ -399,8 +399,8 @@ antlrcpp::Any Ili2Input::visitSetConstraint(parser::Ili2Parser::SetConstraintCon
       c->Constraint = visitExpression(expressions.back());
    }
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitSetConstraint()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitSetConstraint()");
          
    return c;
 
@@ -415,21 +415,21 @@ antlrcpp::Any Ili2Input::visitConstraintsDef(parser::Ili2Parser::ConstraintsDefC
      END SEMI
    */
 
-   debug(ctx,">>> visitConstraintsDef()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitConstraintsDef()");
+   logger_.incNestLevel();
    
-   Class *c = find_class(visit(ctx->path()),get_line(ctx));
+   Class *c = builder_.findClass(visit(ctx->path()),builder_.line(ctx));
    if (c != nullptr) {
-      push_context(c);
+      builder_.pushContext(*c);
       for (auto cctx : ctx->constraintDef()) { // ???, to do !!!
          Constraint *cc = visitConstraintDef(cctx);
          c->Constraint.push_back(cc);
       }
-      pop_context();
+      builder_.popContext();
    }
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitConstraintsDef()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitConstraintsDef()");
    
    return nullptr;
 

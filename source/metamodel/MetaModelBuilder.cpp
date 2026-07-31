@@ -1,4 +1,4 @@
-#include "MetaModelInput.h"
+#include "MetaModelBuilder.h"
 #include "DiagnosticUtil.h"
 #include "../../include/ilic/SourceManager.h"
 #include "../util/StringUtil.h"
@@ -9,36 +9,196 @@
 #include <cctype>
 
 using namespace util;
-using namespace metamodel;
 
 namespace metamodel {
 
-   // golbal variables
+   MetaModelBuilder::MetaModelBuilder(MetaModelStore &store,util::Logger &logger)
+      : store_(store), logger_(logger)
+   {
+   }
 
-   bool ili23 = true;
-   bool ili24 = true;
-   string iliversion;
+   void MetaModelBuilder::reset()
+   {
+      context_.clear();
+      currentSourceUri_.clear();
+      currentSourceText_.clear();
+      pendingMetaAttributes_.clear();
+      pendingDocumentation_.clear();
+      languageVersion_ = IliLanguageVersion::Ili23;
+   }
 
-   static list <Package*> AllPackages;
-   static list <Type*> AllTypes;
-   static list <Unit*> AllUnits;
-   static list <Import*> AllImports;
-   static list <FunctionDef*> AllFunctions;
-   static list <LineForm*> AllLineForms;
-   static list <Graphic*> AllGraphics;
-   static Class AnyClass;
-   static Class AnyStructure;
-   static bool UniversalClassesInitialized = false;
-   static string CurrentSourceText;
-   struct PendingMetaAttribute {
-      string Name;
-      string Value;
-      string RawText;
-      int Line = -1;
-      int Column = 0;
-   };
-   static map<int,list<PendingMetaAttribute>> PendingMetaAttributes;
-   static map<int,string> PendingDocumentation;
+   MMObject *MetaModelBuilder::current() const noexcept
+   {
+      return context_.empty() ? nullptr : context_.back();
+   }
+
+   Class *MetaModelBuilder::currentClass() const noexcept
+   {
+      for (auto it = context_.rbegin(); it != context_.rend(); ++it) {
+         if (auto *value = dynamic_cast<Class *>(*it)) return value;
+      }
+      return nullptr;
+   }
+
+   Package *MetaModelBuilder::currentPackage() const noexcept
+   {
+      for (auto it = context_.rbegin(); it != context_.rend(); ++it) {
+         if (auto *value = dynamic_cast<Package *>(*it)) return value;
+      }
+      return nullptr;
+   }
+
+   SubModel *MetaModelBuilder::currentTopic() const noexcept
+   {
+      for (auto it = context_.rbegin(); it != context_.rend(); ++it) {
+         if (auto *value = dynamic_cast<SubModel *>(*it)) return value;
+      }
+      return nullptr;
+   }
+
+   Model *MetaModelBuilder::currentModel() const noexcept
+   {
+      for (auto it = context_.rbegin(); it != context_.rend(); ++it) {
+         if (auto *value = dynamic_cast<Model *>(*it)) return value;
+      }
+      return nullptr;
+   }
+
+   void MetaModelBuilder::pushContext(MetaElement &element)
+   {
+      context_.push_back(&element);
+   }
+
+   void MetaModelBuilder::popContext(MetaElement &element) noexcept
+   {
+      if (!context_.empty() && context_.back() == &element) context_.pop_back();
+   }
+
+   void MetaModelBuilder::popContext() noexcept
+   {
+      if (!context_.empty()) context_.pop_back();
+   }
+
+   MetaModelBuilder::ContextScope MetaModelBuilder::enterContext(MetaElement &element)
+   {
+      return ContextScope(*this,element);
+   }
+
+   MetaModelBuilder::ContextScope::ContextScope(MetaModelBuilder &builder,
+      MetaElement &element) : builder_(&builder), expected_(&element)
+   {
+      builder_->pushContext(element);
+   }
+
+   MetaModelBuilder::ContextScope::~ContextScope() noexcept
+   {
+      if (builder_ != nullptr && expected_ != nullptr) builder_->popContext(*expected_);
+   }
+
+   MetaModelBuilder::ContextScope::ContextScope(ContextScope &&other) noexcept
+      : builder_(other.builder_), expected_(other.expected_)
+   {
+      other.builder_ = nullptr;
+      other.expected_ = nullptr;
+   }
+
+   MetaModelBuilder::SourceScope MetaModelBuilder::enterSource(
+      const ilic::SourceBuffer &source)
+   {
+      return SourceScope(*this,source);
+   }
+
+   MetaModelBuilder::SourceScope::SourceScope(MetaModelBuilder &builder,
+      const ilic::SourceBuffer &source) : builder_(&builder),
+      previousUri_(builder.currentSourceUri_), previousText_(builder.currentSourceText_),
+      previousMetaAttributes_(builder.pendingMetaAttributes_),
+      previousDocumentation_(builder.pendingDocumentation_),
+      loggerSourceScope_(builder.logger_,source.uri)
+   {
+      builder_->currentSourceUri_ = source.uri;
+      builder_->currentSourceText_ = source.text;
+      builder_->prepareMetaAttributes(source.text);
+   }
+
+   MetaModelBuilder::SourceScope::~SourceScope() noexcept
+   {
+      if (builder_ == nullptr) return;
+      builder_->currentSourceUri_ = previousUri_;
+      builder_->currentSourceText_ = previousText_;
+      builder_->pendingMetaAttributes_ = std::move(previousMetaAttributes_);
+      builder_->pendingDocumentation_ = std::move(previousDocumentation_);
+   }
+
+   MetaModelBuilder::SourceScope::SourceScope(SourceScope &&other) noexcept
+      : builder_(other.builder_), previousUri_(std::move(other.previousUri_)),
+      previousText_(std::move(other.previousText_)),
+      previousMetaAttributes_(std::move(other.previousMetaAttributes_)),
+      previousDocumentation_(std::move(other.previousDocumentation_)),
+      loggerSourceScope_(std::move(other.loggerSourceScope_))
+   {
+      other.builder_ = nullptr;
+   }
+
+   std::vector<std::string> MetaModelBuilder::unqualifiedImports(
+      const std::string &modelName) const
+   {
+      std::vector<std::string> result;
+      for (Import *import : store_.imports()) {
+         if (import != nullptr && import->ImportingP != nullptr &&
+             import->ImportedP != nullptr && import->_unqualified &&
+             import->ImportingP->Name == modelName) {
+            result.push_back(import->ImportedP->Name);
+         }
+      }
+      return result;
+   }
+
+   bool MetaModelBuilder::dependsOn(Package *package) const
+   {
+      if (package == nullptr || package->getClass() != "SubModel") return true;
+      auto *topic = currentTopic();
+      if (topic == nullptr) return true;
+      for (auto *candidate = topic; candidate != nullptr;
+           candidate = dynamic_cast<SubModel *>(candidate->_super)) {
+         if (candidate == package) return true;
+      }
+      auto *target = static_cast<SubModel *>(package);
+      for (Dependency *dependency : store_.dependencies()) {
+         if (dependency != nullptr && dependency->Dependent == target->_dataunit &&
+             dependency->Using == topic->_dataunit) return true;
+      }
+      return false;
+   }
+
+   void MetaModelBuilder::addModel(Model *model)
+   {
+      if (model == nullptr) return;
+      for (Model *existing : store_.models()) {
+         if (existing != nullptr && existing->Name == model->Name) return;
+      }
+      store_.addModel(*model);
+      if (model->Name == "INTERLIS") store_.setInterlisModel(*model);
+   }
+
+   void MetaModelBuilder::addImport(Import *import)
+   {
+      if (import != nullptr) store_.addImport(*import);
+   }
+
+   void MetaModelBuilder::addDataUnit(DataUnit *dataUnit)
+   {
+      if (dataUnit != nullptr) store_.addDataUnit(*dataUnit);
+   }
+
+   void MetaModelBuilder::addDependency(Dependency *dependency)
+   {
+      if (dependency != nullptr) store_.addDependency(*dependency);
+   }
+
+   void MetaModelBuilder::addAxisSpec(AxisSpec *axisSpec)
+   {
+      if (axisSpec != nullptr) store_.addAxisSpec(*axisSpec);
+   }
 
    static string trim_copy(const string &value)
    {
@@ -77,31 +237,11 @@ namespace metamodel {
       return decoded;
    }
 
-   void reset_input_state()
+    void MetaModelBuilder::prepareMetaAttributes(const string &source)
    {
-      AllPackages.clear();
-      AllTypes.clear();
-      AllUnits.clear();
-      AllImports.clear();
-      AllFunctions.clear();
-      AllLineForms.clear();
-      AllGraphics.clear();
-      PendingMetaAttributes.clear();
-      PendingDocumentation.clear();
-      CurrentSourceText.clear();
-      AnyClass = Class();
-      AnyStructure = Class();
-      UniversalClassesInitialized = false;
-      ili23 = true;
-      ili24 = true;
-      iliversion.clear();
-   }
-
-   void prepare_meta_attributes(const string &source)
-   {
-      CurrentSourceText = source;
-      PendingMetaAttributes.clear();
-      PendingDocumentation.clear();
+      currentSourceText_ = source;
+      pendingMetaAttributes_.clear();
+      pendingDocumentation_.clear();
 
       auto normalize_documentation = [](string value) {
          istringstream lines(value);
@@ -153,10 +293,10 @@ namespace metamodel {
             break;
          }
          if (!text.empty() && next < source.size())
-            PendingDocumentation[lineNumber] = text;
+            pendingDocumentation_[lineNumber] = text;
          search = end + 2;
       }
-      list<PendingMetaAttribute> pending;
+      vector<PendingMetaAttribute> pending;
       istringstream lines(source);
       string line;
       int lineNumber = 0;
@@ -187,152 +327,135 @@ namespace metamodel {
             size_t equals = option.find('=');
             string name = equals == string::npos ? "" : trim_copy(option.substr(0,equals));
             if (equals == string::npos || name.empty()) {
-               Log.error(DiagnosticId::MetaSyntax,
+               logger_.error(DiagnosticId::MetaSyntax,
                   "invalid meta attribute; expected !!@ name=value",lineNumber,
                   static_cast<int>(first == string::npos ? 0 : first));
                continue;
             }
             PendingMetaAttribute attribute;
-            attribute.Name = std::move(name);
-            attribute.Value = decode_meta_value(option.substr(equals + 1));
-            attribute.RawText = trimmed;
-            attribute.Line = lineNumber;
-            attribute.Column = static_cast<int>(first == string::npos ? 0 : first);
+            attribute.name = std::move(name);
+            attribute.value = decode_meta_value(option.substr(equals + 1));
+            attribute.rawText = trimmed;
+            attribute.line = lineNumber;
+            attribute.column = static_cast<int>(first == string::npos ? 0 : first);
             pending.push_back(std::move(attribute));
          }
          else if (trimmed.rfind("!!",0) != 0 && !pending.empty()) {
-            PendingMetaAttributes[lineNumber] = pending;
+            pendingMetaAttributes_[lineNumber] = pending;
             pending.clear();
          }
       }
       if (!pending.empty()) {
          const PendingMetaAttribute &attribute = pending.front();
-         Log.error(DiagnosticId::MetaDangling,
-            "meta attribute is not followed by a model element",attribute.Line,
-            attribute.Column);
+         logger_.error(DiagnosticId::MetaDangling,
+            "meta attribute is not followed by a model element",attribute.line,
+            attribute.column);
       }
-   }
-
-   static void initialize_universal_classes()
-   {
-      if (UniversalClassesInitialized) {
-         return;
-      }
-      AnyClass.Name = "ANYCLASS";
-      AnyClass.Kind = Class::ClassVal;
-      AnyStructure.Name = "ANYSTRUCTURE";
-      AnyStructure.Kind = Class::Structure;
-      UniversalClassesInitialized = true;
    }
 
    // mmobject helpers
 
-   void init_mmobject(MMObject* o, int line)
+   void MetaModelBuilder::initObject(MMObject* o, int line)
    {
       o->_line = line;
-      if (line > 0 && !Log.getCurrentSource().empty()) {
+      if (line > 0 && !currentSourceUri_.empty()) {
          o->_source.valid = true;
-         o->_source.uri = Log.getCurrentSource();
+         o->_source.uri = currentSourceUri_;
          o->_source.start.line = static_cast<size_t>(line - 1);
          o->_source.end = o->_source.start;
          o->_source.end.character = 1;
       }
    }
 
-   static size_t utf8_byte_offset(size_t codepointOffset)
+   size_t MetaModelBuilder::utf8ByteOffset(size_t codepointOffset) const
    {
       size_t byteOffset = 0;
       for (size_t index = 0;
-           index < codepointOffset && byteOffset < CurrentSourceText.size();++index) {
-         const unsigned char lead = static_cast<unsigned char>(CurrentSourceText[byteOffset]);
+           index < codepointOffset && byteOffset < currentSourceText_.size();++index) {
+         const unsigned char lead = static_cast<unsigned char>(currentSourceText_[byteOffset]);
          size_t width = 1;
          if ((lead & 0xe0) == 0xc0) width = 2;
          else if ((lead & 0xf0) == 0xe0) width = 3;
          else if ((lead & 0xf8) == 0xf0) width = 4;
-         byteOffset = min(CurrentSourceText.size(),byteOffset + width);
+         byteOffset = min(currentSourceText_.size(),byteOffset + width);
       }
       return byteOffset;
    }
 
-   static ilic::SourceRange token_source(antlr4::Token *token)
+   ilic::SourceRange MetaModelBuilder::tokenRange(antlr4::Token *token) const
    {
       ilic::SourceRange result;
-      if (token == nullptr || token->getStartIndex() > CurrentSourceText.size() ||
-          Log.getCurrentSource().empty()) return result;
-      const size_t start = utf8_byte_offset(token->getStartIndex());
-      const size_t end = utf8_byte_offset(token->getStopIndex() + 1);
-      ilic::SourceManager *sources = ilic::activeSourceManager();
-      ilic::SourceManager fallbackSources;
-      if (sources == nullptr || sources->get(Log.getCurrentSource()) == nullptr) {
-         fallbackSources.put(Log.getCurrentSource(),CurrentSourceText,0);
-         sources = &fallbackSources;
-      }
-      const ilic::SourcePosition startPosition = sources->position(Log.getCurrentSource(),start);
-      const ilic::SourcePosition endPosition = sources->position(Log.getCurrentSource(),end);
+      if (token == nullptr || token->getStartIndex() > currentSourceText_.size() || currentSourceUri_.empty()) return result;
+      const size_t start = utf8ByteOffset(static_cast<size_t>(token->getStartIndex()));
+      const size_t end = utf8ByteOffset(static_cast<size_t>(token->getStopIndex() + 1));
+      ilic::SourceManager sources;
+      sources.put(currentSourceUri_,currentSourceText_,0);
+      const ilic::SourcePosition startPosition = sources.position(currentSourceUri_,start);
+      const ilic::SourcePosition endPosition = sources.position(currentSourceUri_,end);
       result.valid = true;
-      result.uri = Log.getCurrentSource();
+      result.uri = currentSourceUri_;
       result.start = {startPosition.line,startPosition.utf16Column,startPosition.offset};
       result.end = {endPosition.line,endPosition.utf16Column,endPosition.offset};
       return result;
    }
 
-   void set_selection_source(MetaElement *element,antlr4::Token *token)
+   void MetaModelBuilder::setSelectionSource(MetaElement *element,antlr4::Token *token)
    {
-      if (element != nullptr) element->_selectionSource = token_source(token);
+      if (element != nullptr) element->_selectionSource = tokenRange(token);
    }
 
-   void set_end_selection_source(MetaElement *element,antlr4::Token *token)
+   void MetaModelBuilder::setEndSelectionSource(MetaElement *element,antlr4::Token *token)
    {
-      if (element != nullptr) element->_endSelectionSource = token_source(token);
+      if (element != nullptr) element->_endSelectionSource = tokenRange(token);
    }
 
-   void set_reference_source(MMObject *object,const string &kind,antlr4::Token *token)
+   void MetaModelBuilder::setReferenceSource(MMObject *object,string kind,antlr4::Token *token)
    {
       if (object == nullptr) return;
-      const ilic::SourceRange source = token_source(token);
+      const ilic::SourceRange source = tokenRange(token);
       if (source.valid) object->_referenceSources[kind] = source;
    }
 
-   void set_reference_source(MMObject *object,const string &kind,
+   void MetaModelBuilder::setReferenceSource(MMObject *object,string kind,
       antlr4::ParserRuleContext *context)
    {
-      set_reference_source(object,kind,context == nullptr ? nullptr : context->getStop());
+      setReferenceSource(object,kind,context == nullptr ? nullptr : context->getStop());
    }
 
    // metaelement helpers
 
-   void init_metaelement(MetaElement* e, int line)
+   void MetaModelBuilder::initMetaElement(MetaElement* e, int line)
    {
 
       // list <DocText> Documentation;
       // ROLE from ASSOCIATION MetaAttributes
       // list <MetaAttribute *> MetaAttribute;
 
-      init_mmobject(e, line);
-      auto metadata = PendingMetaAttributes.find(line);
-      if (metadata != PendingMetaAttributes.end()) {
+      initObject(e, line);
+      auto metadata = pendingMetaAttributes_.find(line);
+      if (metadata != pendingMetaAttributes_.end()) {
          for (const auto &entry : metadata->second) {
-            MetaAttribute *attribute = make_mmobject<MetaAttribute>();
-            init_mmobject(attribute,entry.Line);
-            attribute->_source.start.character = static_cast<size_t>(entry.Column);
+            MetaAttribute *attribute = store_.make<MetaAttribute>();
+            initObject(attribute,entry.line);
+            attribute->_source.start.character = static_cast<size_t>(entry.column);
             attribute->_source.end = attribute->_source.start;
-            attribute->_source.end.character += entry.RawText.size();
-            attribute->Name = entry.Name;
-            attribute->Value = entry.Value;
-            attribute->_rawText = entry.RawText;
+            attribute->_source.end.character += entry.rawText.size();
+            attribute->Name = entry.name;
+            attribute->Value = entry.value;
+            attribute->_rawText = entry.rawText;
             attribute->MetaElement = e;
             e->MetaAttribute.push_back(attribute);
          }
       }
-      auto documentation = PendingDocumentation.find(line);
-      if (documentation != PendingDocumentation.end() &&
+      auto documentation = pendingDocumentation_.find(line);
+      if (documentation != pendingDocumentation_.end() &&
           !documentation->second.empty()) {
-         auto *doc = make_mmobject<DocText>();
-         init_mmobject(doc,line);
+         auto *doc = store_.make<DocText>();
+         initObject(doc,line);
          doc->Text = documentation->second;
          e->Documentation.push_back(doc);
       }
-      MMObject *ctx = get_context();
+      MMObject *ctx = current();
       if (ctx == nullptr) {
          return;
       }
@@ -383,9 +506,9 @@ namespace metamodel {
 
    }
 
-   void init_extendableme(ExtendableME* e, int line)
+   void MetaModelBuilder::initExtendable(ExtendableME* e, int line)
    {
-      init_metaelement(e, line);
+      initMetaElement(e, line);
       // bool Abstract;
       // bool Final;
       // ROLE from ASSOCIATION Inheritance
@@ -396,82 +519,82 @@ namespace metamodel {
 
    // package helpers
 
-   void init_package(Package* p, int line)
+   void MetaModelBuilder::initPackage(Package* p, int line)
    {
-      init_metaelement(p, line);
+      initMetaElement(p, line);
       // ROLE from ASSOCIATION PackageElements
       // list <MetaElement *> Element;
    }
 
    // Model helpers
 
-   Model* find_model(string name, int line)
+   Model* MetaModelBuilder::findModel(const string &name, int line)
    {
 
-      Log.debug("find_model " + name);
+      logger_.debug("findModel " + name);
 
-      for (Model* m : get_all_models()) {
+      for (Model* m : store_.models()) {
          if (m->Name == name) {
             return m;
          }
       }
 
-      Log.error(DiagnosticId::NameModelNotFound,"model " + name + " not found.",line);
+      logger_.error(DiagnosticId::NameModelNotFound,"model " + name + " not found.",line);
       return nullptr;
 
    }
 
    // Topic / DataUnit helpers
 
-   DataUnit* find_dataunit(string name, int line)
+   DataUnit* MetaModelBuilder::findDataUnit(const string &name, int line)
    {
-      Log.debug("find_dataunit " + name);
-      for (DataUnit* u : get_all_dataunits()) {
-         if (get_path(u) == (get_path(get_model_context()) + "." + name + ".BASKET")) {
+      logger_.debug("findDataUnit " + name);
+      for (DataUnit* u : store_.dataUnits()) {
+         if (get_path(u) == (get_path(currentModel()) + "." + name + ".BASKET")) {
             return u;
          }
          else if (get_path(u) == (name + ".BASKET")) {
             return u;
          }
       }
-      Log.error(DiagnosticId::NameTopicNotFound,"unknown topic " + name,line);
+      logger_.error(DiagnosticId::NameTopicNotFound,"unknown topic " + name,line);
       return nullptr;
    }
 
-   void add_package(Package* p)
+   void MetaModelBuilder::addPackage(Package* p)
    {
       if (p == nullptr) {
          return;
       }
-      for (auto pp : AllPackages) {
+      for (auto pp : store_.packages()) {
          if (get_path(pp) == get_path(p)) {
             if (pp->ElementInPackage == nullptr ||
                 pp->ElementInPackage != p->ElementInPackage) {
-               Log.error(DiagnosticId::NameMultipleDeclarations,
+               logger_.error(DiagnosticId::NameMultipleDeclarations,
                   "multiple declarations of " + get_path(p),diagnostic_range(p));
             }
             return;
          }
       }
-      AllPackages.push_back(p);
+      store_.addPackage(*p);
    }
 
-   Package* find_package(string name, int line)
+   Package* MetaModelBuilder::findPackage(const string &name, int line)
    {
       string package_name = name;
       if (ends_with(package_name,".BASKET")) {
          // DataUnit
          package_name = package_name.substr(0,package_name.length()-7);
       }
-      Log.debug("find_package " + package_name);
-      for (Package* p : AllPackages) {
-         for (auto unqualified : get_all_unqualified_imports(get_model_context()->Name)) {
+      logger_.debug("findPackage " + package_name);
+      for (Package* p : store_.packages()) {
+         for (auto unqualified : unqualifiedImports(currentModel()->Name)) {
             if (get_path(p) == unqualified + "." + package_name) {
                return p;
             }
          }
       }
-      for (Package* p : AllPackages) {
+      for (Package* p : store_.packages()) {
          if (get_path(p) == package_name) {
             return p;
          }
@@ -479,54 +602,54 @@ namespace metamodel {
             return p;
          }
       }
-      Log.error(DiagnosticId::NamePackageNotFound,"unknown package " + package_name,line);
+      logger_.error(DiagnosticId::NamePackageNotFound,"unknown package " + package_name,line);
       return nullptr;
    }
 
-   SubModel* find_topic(string name, int line)
+   SubModel* MetaModelBuilder::findTopic(const string &name, int line)
    {
-      Log.debug("find_topic " + name);
-      Package *p = find_package(name,line);
+      logger_.debug("findTopic " + name);
+      Package *p = findPackage(name,line);
       if (p->getClass() == "SubModel") {
          return static_cast<SubModel *>(p);
       }
       else {
-         Log.error(DiagnosticId::ReferenceTopicRequired,name + " is not a topic",0);
+         logger_.error(DiagnosticId::ReferenceTopicRequired,name + " is not a topic",0);
          return nullptr;
       }         
    }
 
    // Unit helpers
 
-   void add_unit(Unit* u)
+   void MetaModelBuilder::addUnit(Unit* u)
    {
       if (u == nullptr) {
          return;
       }
-      for (Unit* uu : AllUnits) {
+      for (Unit* uu : store_.units()) {
          if (get_path(uu) == get_path(u)) {
-            Log.error(DiagnosticId::NameMultipleDeclarations,
+            logger_.error(DiagnosticId::NameMultipleDeclarations,
                "multiple declaration of unit " + u->Name,diagnostic_range(u));
             return;
          }
       }
-      AllUnits.push_back(u);
+      store_.addUnit(*u);
    }
 
-   Unit* find_unit(string name, int line)
+   Unit* MetaModelBuilder::findUnit(const string &name, int line)
    {
-      Log.debug("find_unit " + name);
+      logger_.debug("findUnit " + name);
 
       // Qualified unit references identify their declaration directly. The
       // semantic checker separately enforces that the declaring model was
       // imported at this lexical occurrence.
-      for (Unit* u : AllUnits) {
+      for (Unit* u : store_.units()) {
          if (get_path(u) == name) {
             return u;
          }
       }
 
-      Model *model = get_model_context();
+      Model *model = currentModel();
       auto matches = [&name](Unit *unit) {
          return unit != nullptr && (unit->Name == name || unit->_unitname == name);
       };
@@ -534,16 +657,16 @@ namespace metamodel {
       // Short unit names are resolved in the current model first and then in
       // directly imported models. This avoids the old load-order-dependent
       // global lookup while retaining the RefHB unit-short-name notation.
-      for (Unit *u : AllUnits) {
+      for (Unit *u : store_.units()) {
          if (matches(u) && u->ElementInPackage == model) {
             return u;
          }
       }
-      for (Import *import : get_all_imports()) {
+      for (Import *import : store_.imports()) {
          if (import == nullptr || import->ImportingP != model) {
             continue;
          }
-         for (Unit *u : AllUnits) {
+         for (Unit *u : store_.units()) {
             if (matches(u) && u->ElementInPackage == import->ImportedP) {
                return u;
             }
@@ -553,24 +676,24 @@ namespace metamodel {
       // Preserve a useful semantic "missing import" diagnostic for an
       // otherwise uniquely named unit instead of reducing it to an unknown
       // symbol solely because the model omitted IMPORTS.
-      for (Unit *u : AllUnits) {
+      for (Unit *u : store_.units()) {
          if (matches(u)) {
             return u;
          }
       }
-      Log.error(DiagnosticId::NameUnitNotFound,"unknown unit " + name,line);
+      logger_.error(DiagnosticId::NameUnitNotFound,"unknown unit " + name,line);
       return nullptr;
    }
 
    // Type helpers
 
-   void init_type(Type* t, int line)
+   void MetaModelBuilder::initType(Type* t, int line)
    {
-      init_extendableme(t, line);
+      initExtendable(t, line);
       // FunctionDef *LFTParent;
    }
 
-   void add_type(Type* t)
+   void MetaModelBuilder::addType(Type* t)
    {
       if (t == nullptr) {
          return;
@@ -578,22 +701,22 @@ namespace metamodel {
       if (util::starts_with(t->Name, "ILIC_")) {
          t->Name = t->Name.substr(5);
       }
-      Log.debug(">>> add_type " + get_path(t));
-      for (Type* tt : AllTypes) {
+      logger_.debug(">>> addType " + get_path(t));
+      for (Type* tt : store_.types()) {
          if (get_path(tt) == get_path(t) && t->Name != "???") {
             if (tt->ElementInPackage == nullptr ||
                 tt->ElementInPackage != t->ElementInPackage) {
-               Log.error(DiagnosticId::NameMultipleDeclarations,
+               logger_.error(DiagnosticId::NameMultipleDeclarations,
                   "multiple declarations of " + get_path(t),diagnostic_range(t));
             }
             return;
          }
       }
-      Log.debug("<<< add_type " + get_path(t));
-      AllTypes.push_back(t);
+      logger_.debug("<<< addType " + get_path(t));
+      store_.addType(*t);
    }
 
-   static Type* find_type(string name, int line, bool error)
+   Type* MetaModelBuilder::findType(const string &name, int line, bool error)
    {
       
       string search;
@@ -611,10 +734,10 @@ namespace metamodel {
          search = "INTERLIS.VALIGNMENT";
       }
 
-      MetaElement *ctx = get_package_context();
+      MetaElement *ctx = currentPackage();
          
-      string package_path = get_path(get_package_context());
-      Log.debug(">>> find_type <" + search + "> in context " + package_path);
+      string package_path = get_path(currentPackage());
+      logger_.debug(">>> findType <" + search + "> in context " + package_path);
 
       // A class inherited through an extended topic may be addressed through
       // the extending topic's qualified path. The element itself remains
@@ -623,7 +746,7 @@ namespace metamodel {
       vector<string> searches({search});
       for (size_t index = 0; index < searches.size(); ++index) {
          string candidate = searches[index];
-         for (Package *package : AllPackages) {
+         for (Package *package : store_.packages()) {
             if (package->getClass() != "SubModel") {
                continue;
             }
@@ -642,7 +765,7 @@ namespace metamodel {
       }
 
       Type *found = nullptr;
-      for (Type* t : AllTypes) {
+      for (Type* t : store_.types()) {
          string path = get_path(t);
          for (auto candidate : searches) {
             if (candidate == path) {
@@ -655,13 +778,13 @@ namespace metamodel {
          }
          if (ctx->getClass() == "Model") {
             string first_unqualified_match = "";
-            for (auto unqualified : get_all_unqualified_imports(ctx->Name)) {
+            for (auto unqualified : unqualifiedImports(ctx->Name)) {
                if (path == unqualified + "." + search) {
                   if (first_unqualified_match == "") {
                      first_unqualified_match = unqualified;
                   }
                   else {
-                     Log.error(DiagnosticId::NameAmbiguous,
+                     logger_.error(DiagnosticId::NameAmbiguous,
                         "ambiguous path " + search + " found in " +
                            first_unqualified_match + " and " + unqualified,line);
                   }
@@ -674,14 +797,14 @@ namespace metamodel {
             if (path == get_parent_path(ctx) + "." + search) {
                found = t;
             }
-            for (auto unqualified : get_all_unqualified_imports(get_parent_path(ctx))) {
+            for (auto unqualified : unqualifiedImports(get_parent_path(ctx))) {
                string first_unqualified_match = "";
                if (path == unqualified + "." + search) {
                   if (first_unqualified_match == "") {
                      first_unqualified_match = unqualified;
                   }
                   else {
-                     Log.error(DiagnosticId::NameAmbiguous,
+                     logger_.error(DiagnosticId::NameAmbiguous,
                         "ambiguous path " + search + " found in " +
                            first_unqualified_match + " and " + unqualified,line);
                   }
@@ -701,24 +824,24 @@ namespace metamodel {
       }
       
       if (found != nullptr) {
-         Log.debug("<<< find_type " + get_path(found));
+         logger_.debug("<<< findType " + get_path(found));
          return found;
       }
 
       if (error) {
-         Log.error(DiagnosticId::NameTypeNotFound,"type " + search + " not found.",line);
+         logger_.error(DiagnosticId::NameTypeNotFound,"type " + search + " not found.",line);
       }
 
       return nullptr;
 
    }
 
-   Type* find_type(string name, int line)
+   Type* MetaModelBuilder::findType(const string &name, int line)
    {
-      return find_type(name, line, true);
+      return findType(name, line, true);
    }
 
-   string get_type_string(Type *t)
+   string MetaModelBuilder::typeString(Type *t) const
    {
       if (t == nullptr) {
          return "???";
@@ -731,14 +854,14 @@ namespace metamodel {
       }
    }
 
-   void init_domaintype(DomainType* t, int line)
+   void MetaModelBuilder::initDomainType(DomainType* t, int line)
    {
-      init_type(t, line);
+      initType(t, line);
    }
 
-   DomainType* find_domaintype(string name, int line)
+   DomainType* MetaModelBuilder::findDomainType(const string &name, int line)
    {
-      Type* t = find_type(name, line);
+      Type* t = findType(name, line);
       if (t == nullptr) {
          return nullptr;
       }
@@ -752,27 +875,27 @@ namespace metamodel {
 
    // Class helpers
 
-   void init_class(Class* c, int line)
+   void MetaModelBuilder::initClass(Class* c, int line)
    {
-      init_type(c, line);
+      initType(c, line);
    }
 
-   void add_class(Class* c)
+   void MetaModelBuilder::addClass(Class* c)
    {
-      add_type(c);
+      addType(c);
    }
 
-   Class* find_class_or_view(string name,int line)
+   Class* MetaModelBuilder::findClassOrView(const string &name,int line)
    {
 
-      Type* t = find_type(name, line, false);
+      Type* t = findType(name, line, false);
       if (t == nullptr) {
-         Log.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
+         logger_.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
          return nullptr;
       }
 
       if (t->getClass() != "Class" && t->getClass() != "View") {
-         Log.error(DiagnosticId::ReferenceClassOrViewRequired,
+         logger_.error(DiagnosticId::ReferenceClassOrViewRequired,
             name + " is no class or view",line);
          return nullptr;
       }
@@ -781,24 +904,24 @@ namespace metamodel {
 
    }
 
-   Class* find_class_or_structure(string name,int line)
+   Class* MetaModelBuilder::findClassOrStructure(const string &name,int line)
    {
 
-      Type* t = find_type(name, line, false);
+      Type* t = findType(name, line, false);
       if (t == nullptr) {
-         Log.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
+         logger_.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
          return nullptr;
       }
 
       if (t->getClass() != "Class") {
-         Log.error(DiagnosticId::ReferenceClassOrStructureRequired,
+         logger_.error(DiagnosticId::ReferenceClassOrStructureRequired,
             name + " is no class or structure",line);
          return nullptr;
       }
       
       Class *c = static_cast<Class *>(t);
       if (c->Kind != Class::ClassVal && c->Kind != Class::Structure) {
-         Log.error(DiagnosticId::ReferenceClassOrStructureRequired,
+         logger_.error(DiagnosticId::ReferenceClassOrStructureRequired,
             name + " is no class or structure",line);
          return nullptr;
       }
@@ -807,17 +930,17 @@ namespace metamodel {
 
    }
 
-   Class* find_class_type(string name,int line)
+   Class* MetaModelBuilder::findClassType(const string &name,int line)
    {
 
-      Type* t = find_type(name, line, false);
+      Type* t = findType(name, line, false);
       if (t == nullptr) {
-         Log.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
+         logger_.error(DiagnosticId::NameViewableNotFound,"viewable " + name + " not found",line);
          return nullptr;
       }
 
       if (t->getClass() != "Class") {
-         Log.error(DiagnosticId::ReferenceClassStructureOrAssociationRequired,
+         logger_.error(DiagnosticId::ReferenceClassStructureOrAssociationRequired,
             name + " is no class, structure or association ",line);
          return nullptr;
       }
@@ -826,39 +949,37 @@ namespace metamodel {
 
    }
 
-   Class* find_class(string name, int line)
+   Class* MetaModelBuilder::findClass(const string &name, int line)
    {
-      Log.debug("find_class " + name);
+      logger_.debug("find_class " + name);
       Class* c;
-      if (name == "ANYCLASS" || name == "INTERLIS.ANYCLASS" || name == "CLASS" || name == "INTERLIS.CLASS") {
-         initialize_universal_classes();
-         c = &AnyClass;
+      if (name == "ANYCLASS" || name == "INTERLIS.ANYCLASS" || name == "CLASS" || name == "INTERLIS.CLASS") { (void)store_.anyClass(); (void)store_.anyStructure();
+         c = &store_.anyClass();
       }
-      else if (name == "ANYSTRUCTURE" || name == "INTERLIS.ANYSTRUCTURE" || name == "STRUCTURE" || name == "INTERLIS.STRUCTURE") {
-         initialize_universal_classes();
-         c = &AnyStructure;
+      else if (name == "ANYSTRUCTURE" || name == "INTERLIS.ANYSTRUCTURE" || name == "STRUCTURE" || name == "INTERLIS.STRUCTURE") { (void)store_.anyClass(); (void)store_.anyStructure();
+         c = &store_.anyStructure();
       }
       else {
-         Type* t = find_type(name, line, false);
+         Type* t = findType(name, line, false);
          if (t == nullptr) {
-            Log.error(DiagnosticId::NameClassNotFound,"class " + name + " not found",line);
+            logger_.error(DiagnosticId::NameClassNotFound,"class " + name + " not found",line);
             return nullptr;
          }
          if (t->getClass() != "Class") {
-            Log.error(DiagnosticId::ReferenceClassRequired,name + " is no class",line);
+            logger_.error(DiagnosticId::ReferenceClassRequired,name + " is no class",line);
             return nullptr;
          }
          c = static_cast<Class *>(t);
          if (c->Kind != Class::ClassVal) {
-            Log.error(DiagnosticId::ReferenceClassRequired,name + " is no class",line);
+            logger_.error(DiagnosticId::ReferenceClassRequired,name + " is no class",line);
          }
       }
       return c;
    }
 
-   Class* find_class(Package* p, string name, int line)
+   Class* MetaModelBuilder::findClass(Package* p, const string &name, int line)
    {
-      Log.debug("find_class " + name);
+      logger_.debug("find_class " + name);
       if (p == nullptr) {
          return nullptr;
       }
@@ -870,33 +991,33 @@ namespace metamodel {
             }
          }
       }
-      Log.error(DiagnosticId::NameClassNotFound,"class " + name + " not found",line);
+      logger_.error(DiagnosticId::NameClassNotFound,"class " + name + " not found",line);
       return nullptr;
    }
 
-   Class* find_structure(string name, int line)
+   Class* MetaModelBuilder::findStructure(const string &name, int line)
    {
-      Log.debug("find_structure " + name);
-      Type* t = find_type(name, line, false);
+      logger_.debug("findStructure " + name);
+      Type* t = findType(name, line, false);
       if (t == nullptr) {
-         Log.error(DiagnosticId::NameStructureNotFound,
+         logger_.error(DiagnosticId::NameStructureNotFound,
             "structure " + name + " not found",line);
          return nullptr;
       }
       if (t->getClass() != "Class") {
-         Log.error(DiagnosticId::ReferenceStructureRequired,name + " is no structure",line);
+         logger_.error(DiagnosticId::ReferenceStructureRequired,name + " is no structure",line);
          return nullptr;
       }
       Class *c = static_cast<Class *>(t);
       if (c->Kind != Class::Structure) {
-         Log.error(DiagnosticId::ReferenceStructureRequired,name + " is no structure",line);
+         logger_.error(DiagnosticId::ReferenceStructureRequired,name + " is no structure",line);
       }
       return c;
    }
 
-   Class* find_structure(Package* p, string name, int line)
+   Class* MetaModelBuilder::findStructure(Package* p, const string &name, int line)
    {
-      Log.debug("find_structure " + name);
+      logger_.debug("findStructure " + name);
       if (p == nullptr) {
          return nullptr;
       }
@@ -908,31 +1029,31 @@ namespace metamodel {
             }
          }
       }
-      Log.error(DiagnosticId::NameStructureNotFound,
+      logger_.error(DiagnosticId::NameStructureNotFound,
          "structure " + name + " not found",line);
       return nullptr;
    }
 
-   Class* find_association(string name,int line,const ilic::SourceRange &referenceRange)
+   Class* MetaModelBuilder::findAssociation(const string &name,int line,const ilic::SourceRange &referenceRange)
    {
-      Log.debug("find_association " + name);
-      Type* t = find_type(name, line, false);
+      logger_.debug("findAssociation " + name);
+      Type* t = findType(name, line, false);
       if (t == nullptr) {
-         Log.error(DiagnosticId::NameAssociationNotFound,
+         logger_.error(DiagnosticId::NameAssociationNotFound,
             "association " + name + " not found",line);
          return nullptr;
       }
       ilic::SourceRange primaryRange = referenceRange;
-      if (!primaryRange.valid && line > 0 && !Log.getCurrentSource().empty()) {
+      if (!primaryRange.valid && line > 0 && !currentSourceUri_.empty()) {
          primaryRange.valid = true;
-         primaryRange.uri = Log.getCurrentSource();
+         primaryRange.uri = currentSourceUri_;
          primaryRange.start.line = static_cast<size_t>(line - 1);
          primaryRange.end = primaryRange.start;
          primaryRange.end.character++;
       }
       if (t->getClass() != "Class") {
          const string declaration = get_path(t);
-         Log.error(DiagnosticId::AssociationInvalidBaseKind,
+         logger_.error(DiagnosticId::AssociationInvalidBaseKind,
             declaration + " is a " + diagnostic_type_kind(t) +
                ", but an ASSOCIATION is required as an association base",
             primaryRange,
@@ -943,7 +1064,7 @@ namespace metamodel {
       Class *c = static_cast<Class *>(t);
       if (c->Kind != Class::Association) {
          const string declaration = get_path(c);
-         Log.error(DiagnosticId::AssociationInvalidBaseKind,
+         logger_.error(DiagnosticId::AssociationInvalidBaseKind,
             declaration + " is a " + diagnostic_type_kind(c) +
                ", but an ASSOCIATION is required as an association base",
             primaryRange,
@@ -954,12 +1075,12 @@ namespace metamodel {
       return c;
    }
 
-   Class* find_association(Package* p, string name, int line)
+   Class* MetaModelBuilder::findAssociation(Package* p, const string &name, int line)
    {
       if (p == nullptr) {
          return nullptr;
       }
-      Log.debug("find_association " + name);
+      logger_.debug("findAssociation " + name);
       for (auto e : p->Element) {
          if (e->Name == name && e->getClass() == "Class") {
             Class* c = static_cast<Class*>(e);
@@ -968,32 +1089,32 @@ namespace metamodel {
             }
          }
       }
-      Log.error(DiagnosticId::NameAssociationNotFound,
+      logger_.error(DiagnosticId::NameAssociationNotFound,
          "association " + name + " not found",line);
       return nullptr;
    }
 
-   View* find_view(string name, int line)
+   View* MetaModelBuilder::findView(const string &name, int line)
    {
-      Log.debug("find_view " + name);
-      Type* t = find_type(name, line, false);
+      logger_.debug("findView " + name);
+      Type* t = findType(name, line, false);
       if (t == nullptr) {
-         Log.error(DiagnosticId::NameViewNotFound,"view " + name + " not found",line);
+         logger_.error(DiagnosticId::NameViewNotFound,"view " + name + " not found",line);
          return nullptr;
       }
       if (t->getClass() != "View") {
-         Log.error(DiagnosticId::ReferenceViewRequired,name + " is no view",line);
+         logger_.error(DiagnosticId::ReferenceViewRequired,name + " is no view",line);
          return nullptr;
       }
       return static_cast<View *>(t);
    }
 
-   AttrOrParam* find_attribute(Class* c,string name)
+   AttrOrParam* MetaModelBuilder::findAttribute(Class* c,const string &name)
    {
       if (c == nullptr) {
          return nullptr;
       }
-      Log.debug("find_attribute " + name + " in context " + get_path(c));
+      logger_.debug("findAttribute " + name + " in context " + get_path(c));
       for (auto a : c->ClassAttribute) {
          if (a->Name == name) {
             return a;
@@ -1001,19 +1122,19 @@ namespace metamodel {
       }
       if (c->Super != nullptr) {
          Class* s = static_cast<Class*>(c->Super);
-         return find_attribute(s,name);
+         return findAttribute(s,name);
       }
       else {
          return nullptr;
       }
    }
 
-   Role* find_role(Class* c,string name)
+   Role* MetaModelBuilder::findRole(Class* c,const string &name)
    {
       if (c == nullptr) {
          return nullptr;
       }
-      Log.debug("find_role " + name + " in context " + get_path(c) + " " + to_string(c->_roleaccess.size()));
+      logger_.debug("findRole " + name + " in context " + get_path(c) + " " + to_string(c->_roleaccess.size()));
       for (auto r : c->Role) {
          if (r->Name == name) {
             return r;
@@ -1026,16 +1147,16 @@ namespace metamodel {
       }
       if (c->Super != nullptr) {
          Class* s = static_cast<Class*>(c->Super);
-         return find_role(s,name);
+         return findRole(s,name);
       }
       else {
          return nullptr;
       }
    }
 
-   AttrOrParam* find_parameter(Class* c,string name,int line)
+   AttrOrParam* MetaModelBuilder::findParameter(Class* c,const string &name,int line)
    {
-      Log.debug("find_paramer " + name);
+      logger_.debug("find_paramer " + name);
       if (c == nullptr) {
          return nullptr;
       }
@@ -1046,10 +1167,10 @@ namespace metamodel {
       }
       if (c->Super != nullptr) {
          Class* s = static_cast<Class*>(c->Super);
-         return find_parameter(s,name,line);
+         return findParameter(s,name,line);
       }
       else {
-         Log.error(DiagnosticId::NameParameterNotFound,
+         logger_.error(DiagnosticId::NameParameterNotFound,
             "parameter " + name + " not found",line);
          return nullptr;
       }
@@ -1057,44 +1178,44 @@ namespace metamodel {
 
    // Graphic helpers
 
-   void init_graphic(Graphic* g, int line)
+   void MetaModelBuilder::initGraphic(Graphic* g, int line)
    {
-      init_extendableme(g, line);
+      initExtendable(g, line);
    }
 
-   void add_graphic(Graphic* g)
+   void MetaModelBuilder::addGraphic(Graphic* g)
    {
       if (g == nullptr) {
          return;
       }
-      Log.debug(">>> add_graphic " + get_path(g));
-      for (Graphic* gg : AllGraphics) {
+      logger_.debug(">>> addGraphic " + get_path(g));
+      for (Graphic* gg : store_.graphics()) {
          if (get_path(gg) == get_path(g)) {
             if (gg->ElementInPackage == nullptr ||
                 gg->ElementInPackage != g->ElementInPackage) {
-               Log.error(DiagnosticId::NameMultipleDeclarations,
+               logger_.error(DiagnosticId::NameMultipleDeclarations,
                   "multiple declarations of " + get_path(g),diagnostic_range(g));
             }
             return;
          }
       }
-      Log.debug("<<< add_graphic " + get_path(g));
-      AllGraphics.push_back(g);
+      logger_.debug("<<< addGraphic " + get_path(g));
+      store_.addGraphic(*g);
    }
 
-   Graphic* find_graphic(string name,int line)
+   Graphic* MetaModelBuilder::findGraphic(const string &name,int line)
    {
 
       string search;
       search = name;
 
-      MetaElement *ctx = get_package_context();
+      MetaElement *ctx = currentPackage();
          
-      string package_path = get_path(get_package_context());
-      Log.debug(">>> find_graphic <" + search + "> in context " + package_path);
+      string package_path = get_path(currentPackage());
+      logger_.debug(">>> findGraphic <" + search + "> in context " + package_path);
 
       Graphic *found = nullptr;
-      for (Graphic* g : AllGraphics) {
+      for (Graphic* g : store_.graphics()) {
          string path = get_path(g);
          if (path == search) {
             found = g;
@@ -1105,7 +1226,7 @@ namespace metamodel {
             break;
          }
          else if (ctx->getClass() == "Model") {
-            for (auto unqualified : get_all_unqualified_imports(ctx->Name)) {
+            for (auto unqualified : unqualifiedImports(ctx->Name)) {
                if (path == unqualified + "." + search) {
                   found = g;
                   break;
@@ -1125,7 +1246,7 @@ namespace metamodel {
                found = g;
                break;
             }
-            for (auto unqualified : get_all_unqualified_imports(get_parent_path(ctx))) {
+            for (auto unqualified : unqualifiedImports(get_parent_path(ctx))) {
                if (path == unqualified + "." + search) {
                   found = g;
                   break;
@@ -1134,7 +1255,7 @@ namespace metamodel {
          }
       }
       
-      Log.debug("<<< find_graphic " + get_path(found));
+      logger_.debug("<<< findGraphic " + get_path(found));
       
       return found;
 
@@ -1142,46 +1263,46 @@ namespace metamodel {
 
    // expression helpers
 
-   void init_expression(Expression* e, int line)
+   void MetaModelBuilder::initExpression(Expression* e, int line)
    {
-      init_mmobject(e, line);
-      e->OccurrenceScope = get_context();
-      e->OccurrencePackage = get_package_context();
+      initObject(e, line);
+      e->OccurrenceScope = dynamic_cast<MetaElement *>(current());
+      e->OccurrencePackage = currentPackage();
    }
 
-   void init_factor(Factor* f, int line)
+   void MetaModelBuilder::initFactor(Factor* f, int line)
    {
-      init_expression(f, line);
+      initExpression(f, line);
    }
 
    // function helpers
 
-   void init_function(FunctionDef* f, int line)
+   void MetaModelBuilder::initFunction(FunctionDef* f, int line)
    {
-      init_metaelement(f, line);
+      initMetaElement(f, line);
    }
 
-   void add_function(FunctionDef* function)
+   void MetaModelBuilder::addFunction(FunctionDef* function)
    {
       if (function == nullptr) {
          return;
       }
-      Log.debug("add_function " + function->Name + "(" + get_path(function) + ")");
-      for (FunctionDef* f : AllFunctions) {
+      logger_.debug("addFunction " + function->Name + "(" + get_path(function) + ")");
+      for (FunctionDef* f : store_.functions()) {
          if (f->Name == function->Name) {
             // add domain type only once
             return;
          }
       }
-      AllFunctions.push_back(function);
+      store_.addFunction(*function);
    }
 
-   FunctionDef* find_function(string name, int line)
+   FunctionDef* MetaModelBuilder::findFunction(const string &name, int line)
    {
 
-      Log.debug("find_function " + name);
+      logger_.debug("findFunction " + name);
 
-      for (FunctionDef* f : AllFunctions) {
+      for (FunctionDef* f : store_.functions()) {
          if (get_path(f) == name) {
             return f;
          }
@@ -1190,7 +1311,7 @@ namespace metamodel {
          }
       }
 
-      Log.error(DiagnosticId::NameFunctionNotFound,
+      logger_.error(DiagnosticId::NameFunctionNotFound,
          "function " + name + " not found",line);
       return nullptr;
 
@@ -1198,32 +1319,32 @@ namespace metamodel {
 
    // lineform helpers
 
-   void init_lineform(LineForm* f, int line)
+   void MetaModelBuilder::initLineForm(LineForm* f, int line)
    {
-      init_metaelement(f, line);
+      initMetaElement(f, line);
    }
 
-   void add_lineform(LineForm* lineform)
+   void MetaModelBuilder::addLineForm(LineForm* lineform)
    {
       if (lineform == nullptr) {
          return;
       }
-      Log.debug("add_lineform " + lineform->Name + "(" + get_path(lineform) + ")");
-      for (LineForm* f : AllLineForms) {
+      logger_.debug("addLineForm " + lineform->Name + "(" + get_path(lineform) + ")");
+      for (LineForm* f : store_.lineForms()) {
          if (f->Name == lineform->Name) {
             // add domain type only once
             return;
          }
       }
-      AllLineForms.push_back(lineform);
+      store_.addLineForm(*lineform);
    }
 
-   LineForm* find_lineform(string name, int line)
+   LineForm* MetaModelBuilder::findLineForm(const string &name, int line)
    {
 
-      Log.debug("find_lineform " + name);
+      logger_.debug("findLineForm " + name);
 
-      for (LineForm* f : AllLineForms) {
+      for (LineForm* f : store_.lineForms()) {
          if (get_path(f) == name) {
             return f;
          }
@@ -1232,7 +1353,7 @@ namespace metamodel {
          }
       }
 
-      Log.error(DiagnosticId::NameLineFormNotFound,
+      logger_.error(DiagnosticId::NameLineFormNotFound,
          "lineform " + name + " not found.",line);
       return nullptr;
 
@@ -1240,27 +1361,28 @@ namespace metamodel {
 
    // constraint helpers
 
-   void init_constraint(Constraint* c, int line)
+   void MetaModelBuilder::initConstraint(Constraint* c, int line)
    {
-      init_metaelement(c, line);
+      initMetaElement(c, line);
    }
 
    // other helpers
 
-   void debug(antlr4::ParserRuleContext *ctx, string message)
+   void MetaModelBuilder::debug(antlr4::ParserRuleContext *ctx, string message)
    {
-      Log.debug(message + ", line=" + to_string(ctx->start->getLine()));
+      logger_.debug(message + ", line=" +
+         to_string(ctx == nullptr ? -1 : ctx->start->getLine()));
    }
 
-   Type* any_to_type(antlrcpp::Any any)
+   Type* MetaModelBuilder::anyToType(antlrcpp::Any any)
    {
 
-      Log.debug(">>> any_to_type()");
+      logger_.debug(">>> anyToType()");
       Type* t;
 
       try {
          t = any.as<TypeRelatedType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1268,7 +1390,7 @@ namespace metamodel {
 
       try {
          t = any.as<ClassRelatedType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1276,7 +1398,7 @@ namespace metamodel {
 
       try {
          t = any.as<BooleanType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1284,7 +1406,7 @@ namespace metamodel {
 
       try {
          t = any.as<TextType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1292,7 +1414,7 @@ namespace metamodel {
 
       try {
          t = any.as<BlackboxType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1300,7 +1422,7 @@ namespace metamodel {
 
       try {
          t = any.as<NumType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1308,7 +1430,7 @@ namespace metamodel {
 
       try {
          t = any.as<CoordType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1316,7 +1438,7 @@ namespace metamodel {
 
       try {
          AnyOIDType* t = any.as<AnyOIDType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1324,7 +1446,7 @@ namespace metamodel {
 
       try {
          AttributeRefType* t = any.as<AttributeRefType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1332,7 +1454,7 @@ namespace metamodel {
 
       try {
          t = any.as<EnumType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1340,7 +1462,7 @@ namespace metamodel {
 
       try {
          t = any.as<EnumTreeValueType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1348,7 +1470,7 @@ namespace metamodel {
 
       try {
          t = any.as<LineType*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1356,7 +1478,7 @@ namespace metamodel {
 
       try {
          t = any.as<Class*>();
-         Log.debug(">>> class=" + t->getClass());
+         logger_.debug(">>> class=" + t->getClass());
          return t;
       }
       catch (exception e) {
@@ -1364,40 +1486,40 @@ namespace metamodel {
 
       try {
          t = any.as<DomainType*>();
-         Log.debug(">>> DomainType class=" + t->getClass());
+         logger_.debug(">>> DomainType class=" + t->getClass());
          return t;
       }
       catch (exception e) {
       }
 
-      Log.internal_error("any_to_type: unsupported type", 1);
+      logger_.internal_error("anyToType: unsupported type", 1);
       return nullptr;
 
    }
 
-   DomainType* any_to_domaintype(antlrcpp::Any any)
+   DomainType* MetaModelBuilder::anyToDomainType(antlrcpp::Any any)
    {
-      Type* t = any_to_type(any);
+      Type* t = anyToType(any);
       try {
          return static_cast<DomainType*>(t);
       }
       catch (exception e) {
-         Log.internal_error("unable to cast " + t->getClass() + " to DomainType (" + e.what(), 1);
+         logger_.internal_error("unable to cast " + t->getClass() + " to DomainType (" + e.what(), 1);
          return nullptr;
       }
    }
 
-   int get_line(antlr4::ParserRuleContext *ctx)
+   int MetaModelBuilder::line(antlr4::ParserRuleContext *ctx)
    {
       return ctx->start->getLine();
    }
 
-   int get_line(antlr4::Token *token)
+   int MetaModelBuilder::line(antlr4::Token *token)
    {
       return token->getLine();
    }
    
-   int get_line(antlr4::tree::TerminalNode* node)
+   int MetaModelBuilder::line(antlr4::tree::TerminalNode* node)
    {
       return node->getSymbol()->getLine();
    }
@@ -1547,7 +1669,7 @@ namespace metamodel {
       "URL"
    };
 
-   bool is_reserved_name(string name) 
+   bool MetaModelBuilder::isReservedName(const string &name)
    {
       for (auto n: reserved_names) {
          if (n == name) {

@@ -1,7 +1,5 @@
 #include "IliParserErrorListener.h"
 
-#include "../../util/Logger.h"
-
 using namespace parser;
 
 void IliParserErrorListener::syntaxError(
@@ -9,7 +7,7 @@ void IliParserErrorListener::syntaxError(
    size_t charPositionInLine, const std::string &msg, std::exception_ptr e
 )
 {
-   Log.error(util::DiagnosticId::ParseSyntax,msg,static_cast<int>(line),
+   logger_.error(util::DiagnosticId::ParseSyntax,msg,static_cast<int>(line),
       static_cast<int>(charPositionInLine));
 }
 

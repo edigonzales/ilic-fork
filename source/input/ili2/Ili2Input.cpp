@@ -4,7 +4,7 @@
 #include "../parser/IliParserErrorListener.h"
 #include "../parser/generated/Ili2Lexer.cpp"
 #include "../parser/generated/Ili2Parser.cpp"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 #include "../../util/StringUtil.h"
 
@@ -12,8 +12,6 @@ using namespace input;
 using namespace parser;
 using namespace metamodel;
 using namespace util;
-
-string input_file = "";
 
 // general methods
 
@@ -24,51 +22,42 @@ antlrcpp::Any::Base::~Base()
 }
 */
 
-void input::parseIli2(string ilifile)
+void input::parseIli2(const ilic::SourceBuffer &source,
+   metamodel::MetaModelBuilder &builder,util::Logger &logger)
 {
 
    try {
       
-      string input;
-      if (ilifile == "INTERLIS") {
-         input = getInterlisModel23();
-         input_file = "internal";
-      }
-      else {
-         input = util::load_filtered_string_from_file(ilifile);
-         input_file = ilifile;
-      }
-      Log.setCurrentSource(input_file);
-      Log.setCategory("parser");
+      auto sourceScope = builder.enterSource(source);
+      auto categoryScope = logger.categoryScope("parser");
 
-      antlr4::ANTLRInputStream inputstream(input);
-      prepare_meta_attributes(input);
-      int errors = Log.getErrorCount();
+      antlr4::ANTLRInputStream inputstream(source.text);
+      int errors = logger.getErrorCount();
 
-      Log.debug("creating ili2 lexer ...");
+      logger.debug("creating ili2 lexer ...");
       lexer::Ili2Lexer ili2lexer(&inputstream);
       antlr4::CommonTokenStream tokens(&ili2lexer);
 
-      Log.debug("creating ili2 parser ...");
-      parser::IliParserErrorListener errorListener;
+      logger.debug("creating ili2 parser ...");
+      parser::IliParserErrorListener errorListener(logger);
       parser::Ili2Parser ili2parser(&tokens);
       ili2parser.removeErrorListeners();
       ili2parser.addErrorListener(&errorListener);
       parser::Ili2Parser::Interlis2DefContext *ili2d = ili2parser.interlis2Def();
 
-      if (Log.getErrorCount() != errors) {
-         Log.info("compiling aborted due to parsing errors");
+      if (logger.getErrorCount() != errors) {
+         logger.info("compiling aborted due to parsing errors");
          return;
       }
 
-      Log.debug("ili2 building meta model ...");
-      input::Ili2Input ili2input;
+      logger.debug("ili2 building meta model ...");
+      input::Ili2Input ili2input(builder,logger);
       ili2input.visit(ili2d);
 
    }
    catch (const exception &e) {
-      Log.setLevel(1);
-      Log.internal_error(string(e.what()),1);
+      logger.setLevel(1);
+      logger.internal_error(string(e.what()),1);
    }
    
 }
@@ -86,29 +75,23 @@ antlrcpp::Any Ili2Input::visitInterlis2Def(Ili2Parser::Interlis2DefContext *ctx)
      SEMI (modelDef)* EOF
    */
 
-   iliversion = ctx->iliversion->getText();
-   if (iliversion == "2.3") {
-      ili23 = true;
-      ili24 = false;
-   }
-   if (iliversion == "2.4") {
-      ili24 = true;
-      ili23 = false;
-   }
-   debug(ctx,">>> visitInterlis2Def(" + iliversion + ")");
-   Log.incNestLevel();
+   const string iliversion = ctx->iliversion->getText();
+   builder_.setLanguageVersion(iliversion == "2.4" ?
+      IliLanguageVersion::Ili24 : IliLanguageVersion::Ili23);
+   builder_.debug(ctx,">>> visitInterlis2Def(" + iliversion + ")");
+   logger_.incNestLevel();
    visitChildren(ctx);
-   Log.decNestLevel();
-   debug(ctx,"<<< visitInterlis2Def(" + iliversion + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitInterlis2Def(" + iliversion + ")");
    return nullptr;
 
 }
 
 antlrcpp::Any Ili2Input::visitMetaDataBasketRef(parser::Ili2Parser::MetaDataBasketRefContext *ctx)
 {
-   debug(ctx,">>> visitMetaDataBasketRef()");
+   builder_.debug(ctx,">>> visitMetaDataBasketRef()");
    // to do !!!
-   debug(ctx,"<<< visitMetaDataBasketRef()");
+   builder_.debug(ctx,"<<< visitMetaDataBasketRef()");
    return nullptr;
 }
 
@@ -128,13 +111,13 @@ MetaBasketDef *find_meta_basket_in(Package *package,const string &name)
    return nullptr;
 }
 
-MetaBasketDef *find_meta_basket(const string &path)
+MetaBasketDef *find_meta_basket(MetaModelBuilder &builder,const string &path)
 {
    string name = path;
    size_t dot = name.rfind('.');
    if (dot != string::npos) name = name.substr(dot + 1);
-   if (MetaBasketDef *found = find_meta_basket_in(get_package_context(),name)) return found;
-   for (Model *model : get_all_models()) {
+   if (MetaBasketDef *found = find_meta_basket_in(builder.currentPackage(),name)) return found;
+   for (Model *model : builder.store().models()) {
       if (MetaBasketDef *found = find_meta_basket_in(model,name)) return found;
    }
    return nullptr;
@@ -165,20 +148,20 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBask
                          ( COMMA metaobjectname=NAME)*)* SEMI
    */
 
-   debug(ctx,">>> visitMetaDataBasketDef()");
-   MetaBasketDef *basket = make_mmobject<MetaBasketDef>();
-   init_extendableme(basket,get_line(ctx));
-   set_selection_source(basket,ctx->basketname);
+   builder_.debug(ctx,">>> visitMetaDataBasketDef()");
+   MetaBasketDef *basket = builder_.store().make<MetaBasketDef>();
+   builder_.initExtendable(basket,builder_.line(ctx));
+   builder_.setSelectionSource(basket,ctx->basketname);
    basket->Name = ctx->basketname->getText();
    basket->Kind = ctx->SIGN() == nullptr ? MetaBasketDef::RefSystemB : MetaBasketDef::SignB;
    basket->Final = ctx->FINAL() != nullptr;
-   basket->MetaDataTopic = find_dataunit(visitPath(ctx->path()),get_line(ctx->path()));
+   basket->MetaDataTopic = builder_.findDataUnit(visitPath(ctx->path()),builder_.line(ctx->path()));
    if (ctx->metaDataBasketRef() != nullptr) {
-      basket->Super = find_meta_basket(ctx->metaDataBasketRef()->getText());
+      basket->Super = find_meta_basket(builder_,ctx->metaDataBasketRef()->getText());
       if (basket->Super == nullptr) {
-         Log.error(DiagnosticId::MetadataBasketNotFound,
+         logger_.error(DiagnosticId::MetadataBasketNotFound,
             "metadata basket " + ctx->metaDataBasketRef()->getText() + " not found",
-            get_line(ctx));
+            builder_.line(ctx));
       }
    }
 
@@ -208,24 +191,24 @@ antlrcpp::Any Ili2Input::visitMetaDataBasketDef(parser::Ili2Parser::MetaDataBask
       if (terminal == nullptr || terminal->getSymbol()->getType() != parser::Ili2Parser::NAME) continue;
       if (expectClass) {
          Package *objectPackage = basket->MetaDataTopic == nullptr
-            ? get_package_context() : basket->MetaDataTopic->ElementInPackage;
+            ? builder_.currentPackage() : basket->MetaDataTopic->ElementInPackage;
          objectClass = find_viewable_in(objectPackage,text);
          if (objectClass == nullptr) {
-            Log.error(DiagnosticId::NameViewableNotFound,
-               "viewable " + text + " not found",get_line(terminal));
+            logger_.error(DiagnosticId::NameViewableNotFound,
+               "viewable " + text + " not found",builder_.line(terminal));
          }
          expectClass = false;
       }
       else if (expectObject) {
-         MetaObjectDef *object = make_mmobject<MetaObjectDef>();
-         init_mmobject(object,get_line(terminal));
+         MetaObjectDef *object = builder_.store().make<MetaObjectDef>();
+         builder_.initObject(object,builder_.line(terminal));
          object->Name = text;
          object->Class = objectClass;
          object->MetaBasketDef.push_back(basket);
          basket->Members.push_back(object);
       }
    }
-   debug(ctx,"<<< visitMetaDataBasketDef()");
+   builder_.debug(ctx,"<<< visitMetaDataBasketDef()");
 
    return basket;
 
@@ -242,24 +225,24 @@ antlrcpp::Any Ili2Input::visitRunTimeParameterDef(parser::Ili2Parser::RunTimePar
    : runtimeparametername=NAME COLON attrTypeDef SEMI
    */
 
-   debug(ctx,">>> visitRunTimeParameterDef()");
+   builder_.debug(ctx,">>> visitRunTimeParameterDef()");
 
    for (auto p : ctx->runTimeParameter()) {
-      AttrOrParam *a = make_mmobject<AttrOrParam>();
-      init_mmobject(a,get_line(p->runtimeparametername));
-      set_selection_source(a,p->runtimeparametername);
+      AttrOrParam *a = builder_.store().make<AttrOrParam>();
+      builder_.initObject(a,builder_.line(p->runtimeparametername));
+      builder_.setSelectionSource(a,p->runtimeparametername);
       a->Name = p->runtimeparametername->getText();
-      a->ElementInPackage = get_model_context();
-      push_context(a);
+      a->ElementInPackage = builder_.currentModel();
+      builder_.pushContext(*a);
       a->Type = visitAttrTypeDef(p->attrTypeDef());
-      pop_context();
+      builder_.popContext();
       if (a->Type != nullptr) {
          a->Type->_attr = a;
       }
-      get_model_context()->_runtimeparameter.push_back(a);
+      builder_.currentModel()->_runtimeparameter.push_back(a);
    }
 
-   debug(ctx,"<<< visitRunTimeParameterDef()");
+   builder_.debug(ctx,"<<< visitRunTimeParameterDef()");
 
    return nullptr;
 

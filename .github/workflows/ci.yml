@@ -177,6 +177,76 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
           LSAN_OPTIONS: exitcode=23
         run: ctest --test-dir build/sanitizers --output-on-failure -j2
+  native-thread-sanitizer-linux:
+    name: Native TSan (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install --yes clang libcurl4-openssl-dev ninja-build
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Configure TSan build
+        run: >-
+          cmake -S . -B build/tsan -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_CXX_COMPILER=clang++
+          -DBUILD_TESTING=ON
+          -DILIC_ENABLE_NATIVE_REPOSITORY=ON
+          -DILIC_STATIC_DISTRIBUTION=OFF
+          -DILIC_ENABLE_SANITIZERS=OFF
+          -DILIC_ENABLE_THREAD_SANITIZER=ON
+      - name: Build TSan compiler and tests
+        run: cmake --build build/tsan --parallel
+      - name: Run TSan tests
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: ctest --test-dir build/tsan --output-on-failure
+      - name: Download pinned conformance suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          suite_commit=88576ffc4cd491dd72d2375eb897ea9f3f55d2c3
+          archive="$RUNNER_TEMP/interlis-conformance-suite.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://codeberg.org/edigonzales/interlis-compiler-testsuite/archive/${suite_commit}.tar.gz" \
+            --output "$archive"
+          mkdir -p conformance-suite
+          tar --extract --gzip --strip-components=1 --file="$archive" --directory=conformance-suite
+      - name: Run full conformance suite under TSan
+        id: conformance-tsan
+        continue-on-error: true
+        shell: bash
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: |
+          set +e
+          java conformance-suite/InterlisConformance.java run \
+            --suite conformance-suite/suite/test-cases.json \
+            --compiler ilic=build/tsan/ilic \
+            --baseline ilic=conformance/known-failures.json \
+            --out build/conformance-tsan
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Upload TSan conformance reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ilic-conformance-tsan
+          path: build/conformance-tsan/
+          if-no-files-found: warn
+      - name: Enforce TSan conformance result
+        if: always()
+        shell: bash
+        run: exit "${{ steps.conformance-tsan.outputs.exit_code || '2' }}"
   wasm-and-packages:
     name: WASM and JavaScript packages
     runs-on: ubuntu-latest

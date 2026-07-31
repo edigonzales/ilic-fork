@@ -1,6 +1,6 @@
 #include "TextWriter.h"
 
-#include "Logger.h"
+#include <stdexcept>
 
 using namespace util;
 
@@ -48,7 +48,7 @@ void TextWriter::decNestLevel()
 {
    nestlevel--;
    if (nestlevel < 0) {
-      Log.internal_error("TextWriter: nestlevel is " + to_string(nestlevel));
+      throw std::runtime_error("TextWriter: nestlevel is " + to_string(nestlevel));
    }
 };
 

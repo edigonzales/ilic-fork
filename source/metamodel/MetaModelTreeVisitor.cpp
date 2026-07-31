@@ -57,28 +57,28 @@ static void visitDataUnit(MetaModelTreeVisitor* visitor, DataUnit* t);
 
 // helpers
 
-static void debug1(MMObject *o,string classname)
+static void debug1(MetaModelTreeVisitor *visitor,MMObject *o,string classname)
 {
-   Log.debug(">>> visit" + classname + "(path=" + get_path(o) + ", line=" + to_string(o->_line) + ")");
-   Log.incNestLevel();
+   visitor->logger().debug(">>> visit" + classname + "(path=" + get_path(o) + ", line=" + to_string(o->_line) + ")");
+   visitor->logger().incNestLevel();
 }
 
-static void debug2(MMObject *o,string classname)
+static void debug2(MetaModelTreeVisitor *visitor,MMObject *o,string classname)
 {
-   Log.decNestLevel();
-   Log.debug("<<< visit" + classname + "(path=" + get_path(o) + ", line=" + to_string(o->_line) + ")");
+   visitor->logger().decNestLevel();
+   visitor->logger().debug("<<< visit" + classname + "(path=" + get_path(o) + ", line=" + to_string(o->_line) + ")");
 }
 
-static string metamodel_ignore_visit_exception = "ignoreVisit";
+static const string metamodel_ignore_visit_exception = "ignoreVisit";
 void MetaModelTreeVisitor::ignoreVisit()
 {
    throw metamodel_ignore_visit_exception;
 }
 
-static void accept_exception(string e, string what)
+static void accept_exception(util::Logger &logger,string e, string what)
 {
    if (e != what) {
-      Log.internal_error("unexpected exception " + what, 1);
+      logger.internal_error("unexpected exception " + what, 1);
    }
 }
 
@@ -94,135 +94,135 @@ static void visitMMObject(MetaModelTreeVisitor* visitor, MMObject* o)
    */
 
    if (visitor->visitMMObjectOverride()) {
-      debug1(o,"MMObject");
+      debug1(visitor,o,"MMObject");
       visitor->visitMMObject(o);
-      debug2(o,"MMObject");
+      debug2(visitor,o,"MMObject");
    }
 }
 
 static void visitClassRelatedType(MetaModelTreeVisitor* visitor, ClassRelatedType* t)
 {
    if (visitor->visitClassRelatedTypeOverride()) {
-      debug1(t,"ClassRelatedType");
+      debug1(visitor,t,"ClassRelatedType");
       visitor->visitClassRelatedType(t);
-      debug2(t,"ClassRelatedType");
+      debug2(visitor,t,"ClassRelatedType");
    }
 }
 
 static void visitTransferElement(MetaModelTreeVisitor* visitor, TransferElement* e)
 {
    if (visitor->visitTransferElementOverride()) {
-      debug1(e,"TransferElement");
+      debug1(visitor,e,"TransferElement");
       visitor->visitTransferElement(e);
-      debug2(e,"TransferElement");
+      debug2(visitor,e,"TransferElement");
    }
 }
 
 static void visitIli1TransferElement(MetaModelTreeVisitor* visitor, Ili1TransferElement* e)
 {
    if (visitor->visitIli1TransferElementOverride()) {
-      debug1(e,"Ili1TransferElement");
+      debug1(visitor,e,"Ili1TransferElement");
       visitor->visitIli1TransferElement(e);
-      debug2(e,"Ili1TransferElement");
+      debug2(visitor,e,"Ili1TransferElement");
    }
 }
 
 static void visitAllowedInBasket(MetaModelTreeVisitor* visitor, AllowedInBasket* b)
 {
    if (visitor->visitAllowedInBasketOverride()) {
-      debug1(b,"AllowedInBasket");
+      debug1(visitor,b,"AllowedInBasket");
       visitor->visitAllowedInBasket(b);
-      debug2(b,"AllowedInBasket");
+      debug2(visitor,b,"AllowedInBasket");
    }
 }
 
 static void visitSimpleConstraint(MetaModelTreeVisitor* visitor, SimpleConstraint* c)
 {
    if (visitor->visitSimpleConstraintOverride()) {
-      debug1(c,"SimpleConstraint");
+      debug1(visitor,c,"SimpleConstraint");
       visitor->visitSimpleConstraint(c);
-      debug2(c,"SimpleConstraint");
+      debug2(visitor,c,"SimpleConstraint");
    }
 }
 
 static void visitAxisSpec(MetaModelTreeVisitor* visitor, AxisSpec* s)
 {
    if (visitor->visitAxisSpecOverride()) {
-      debug1(s,"AxisSpec");
+      debug1(visitor,s,"AxisSpec");
       visitor->visitAxisSpec(s);
-      debug2(s,"AxisSpec");
+      debug2(visitor,s,"AxisSpec");
    }
 }
 
 static void visitNumsRefSys(MetaModelTreeVisitor* visitor, NumsRefSys* s)
 {
    if (visitor->visitNumsRefSysOverride()) {
-      debug1(s,"NumsRefSys");
+      debug1(visitor,s,"NumsRefSys");
       visitor->visitNumsRefSys(s);
-      debug2(s,"NumsRefSys");
+      debug2(visitor,s,"NumsRefSys");
    }
 }
 
 static void visitARefRestriction(MetaModelTreeVisitor* visitor, ARefRestriction* r)
 {
    if (visitor->visitARefRestrictionOverride()) {
-      debug1(r,"ARefRestriction");
+      debug1(visitor,r,"ARefRestriction");
       visitor->visit(r);
-      debug2(r,"ARefRestriction");
+      debug2(visitor,r,"ARefRestriction");
    }
 }
 
 static void visitLinesForm(MetaModelTreeVisitor* visitor, LinesForm* f)
 {
    if (visitor->visitLinesFormOverride()) {
-      debug1(f,"LinesForm");
+      debug1(visitor,f,"LinesForm");
       visitor->visitLinesForm(f);
-      debug2(f,"LinesForm");
+      debug2(visitor,f,"LinesForm");
    }
 }
 
 static void visitFactor(MetaModelTreeVisitor* visitor, Factor* f)
 {
    if (visitor->visitFactorOverride()) {
-      debug1(f,"Factor");
+      debug1(visitor,f,"Factor");
       visitor->visitFactor(f);
-      debug2(f,"Factor");
+      debug2(visitor,f,"Factor");
    }
 }
 
 static void visitExistenceDef(MetaModelTreeVisitor* visitor, ExistenceDef* d)
 {
    if (visitor->visitExistenceDefOverride()) {
-      debug1(d,"ExistenceDef");
+      debug1(visitor,d,"ExistenceDef");
       visitor->visitExistenceDef(d);
-      debug2(d,"ExistenceDef");
+      debug2(visitor,d,"ExistenceDef");
    }
 }
 
 static void visitExistenceConstraint(MetaModelTreeVisitor* visitor, ExistenceConstraint* c)
 {
    if (visitor->visitExistenceConstraintOverride()) {
-      debug1(c,"ExistenceConstraint");
+      debug1(visitor,c,"ExistenceConstraint");
       visitor->visitExistenceConstraint(c);
-      debug2(c,"ExistenceConstraint");
+      debug2(visitor,c,"ExistenceConstraint");
    }
 }
 
 static void visitUniqueConstraint(MetaModelTreeVisitor* visitor, UniqueConstraint* c)
 {
    if (visitor->visitUniqueConstraintOverride()) {
-      debug1(c,"UniqueConstraint");
+      debug1(visitor,c,"UniqueConstraint");
       visitor->visitUniqueConstraint(c);
-      debug2(c,"UniqueConstraint");
+      debug2(visitor,c,"UniqueConstraint");
    }
 }
 
 static void visitSetConstraint(MetaModelTreeVisitor* visitor, SetConstraint* s)
 {
    if (visitor->visitSetConstraintOverride()) {
-      debug1(s,"SetConstraint");
+      debug1(visitor,s,"SetConstraint");
       visitor->visitSetConstraint(s);
-      debug2(s,"SetConstraint");
+      debug2(visitor,s,"SetConstraint");
    }
 }
 
@@ -237,9 +237,9 @@ static void visitDocText(MetaModelTreeVisitor *visitor, DocText *t)
    */
 
    if (visitor->visitDocTextOverride()) {
-      debug1(t,"DocText");
+      debug1(visitor,t,"DocText");
       visitor->visitDocText(t);
-      debug2(t,"DocText");
+      debug2(visitor,t,"DocText");
    }
 
 }
@@ -258,9 +258,9 @@ static void visitMetaAttribute(MetaModelTreeVisitor *visitor, MetaAttribute *t)
    */
 
    if (visitor->visitMetaAttributeOverride()) {
-      debug1(t,"MetaAttribute");
+      debug1(visitor,t,"MetaAttribute");
       visitor->visitMetaAttribute(t);
-      debug2(t,"MetaAttribute");
+      debug2(visitor,t,"MetaAttribute");
    }
 
 }
@@ -282,9 +282,9 @@ static void visitMetaElement(MetaModelTreeVisitor *visitor, MetaElement *t)
 
    visitMMObject(visitor, t);
    if (visitor->visitMetaElementOverride()) {
-      debug1(t,"MetaElement");
+      debug1(visitor,t,"MetaElement");
       visitor->visitMetaElement(t);
-      debug2(t,"MetaElement");
+      debug2(visitor,t,"MetaElement");
    }
 
    for (auto v : t->Documentation) {
@@ -314,9 +314,9 @@ static void visitExtendableME(MetaModelTreeVisitor *visitor, ExtendableME *t)
 
    visitMetaElement(visitor,t);
    if (visitor->visitExtendableMEOverride()) {
-      debug1(t,"ExtendableME");
+      debug1(visitor,t,"ExtendableME");
       visitor->visitExtendableME(t);
-      debug2(t,"ExtendableME");
+      debug2(visitor,t,"ExtendableME");
    }
 
    for (auto v : t->Sub) {
@@ -337,9 +337,9 @@ static void visitPackage(MetaModelTreeVisitor *visitor, Package *t)
 
    visitMetaElement(visitor,t);
    if (visitor->visitPackageOverride()) {
-      debug1(t,"Package");
+      debug1(visitor,t,"Package");
       visitor->visitPackage(t);
-      debug2(t,"Package");
+      debug2(visitor,t,"Package");
    }
    
    for (auto *me : t->Element) {
@@ -449,7 +449,7 @@ static void visitPackage(MetaModelTreeVisitor *visitor, Package *t)
          visitFormattedType(visitor, static_cast<FormattedType*>(me));
       }
       else {
-         Log.debug(visitor->getShortName() + ":visitPackage.Element(" + get_path(me) + ") unsupported type " + me->getClass());
+         visitor->logger().debug(visitor->getShortName() + ":visitPackage.Element(" + get_path(me) + ") unsupported type " + me->getClass());
       }
    }
    
@@ -474,9 +474,9 @@ static void visitIli1Format(MetaModelTreeVisitor *visitor, Ili1Format *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitIli1FormatOverride()) {
-      debug1(t,"Ili1Format");
+      debug1(visitor,t,"Ili1Format");
       visitor->visitIli1Format(t);
-      debug2(t,"Ili1Format");
+      debug2(visitor,t,"Ili1Format");
    }
 
 }
@@ -484,22 +484,22 @@ static void visitIli1Format(MetaModelTreeVisitor *visitor, Ili1Format *t)
 static void preVisitSubModel(MetaModelTreeVisitor *visitor,SubModel *m)
 {
    if (visitor->preVisitSubModelOverride()) {
-      Log.debug(">>> preVisitSubModel(" + get_path(m) + ")");
-      Log.incNestLevel();
+      visitor->logger().debug(">>> preVisitSubModel(" + get_path(m) + ")");
+      visitor->logger().incNestLevel();
       visitor->preVisitSubModel(m);
-      Log.decNestLevel();
-      Log.debug("<<< preVisitSubModel(" + get_path(m) + ")");
+      visitor->logger().decNestLevel();
+      visitor->logger().debug("<<< preVisitSubModel(" + get_path(m) + ")");
    }
 }
 
 static void postVisitSubModel(MetaModelTreeVisitor *visitor,SubModel *m)
 {
    if (visitor->postVisitSubModelOverride()) {
-      Log.debug(">>> postVisitSubModel(" + get_path(m) + ")");
-      Log.incNestLevel();
+      visitor->logger().debug(">>> postVisitSubModel(" + get_path(m) + ")");
+      visitor->logger().incNestLevel();
       visitor->postVisitSubModel(m);
-      Log.decNestLevel();
-      Log.debug("<<< postVisitSubModel(" + get_path(m) + ")");
+      visitor->logger().decNestLevel();
+      visitor->logger().debug("<<< postVisitSubModel(" + get_path(m) + ")");
    }
 }
 
@@ -515,7 +515,7 @@ static void visitSubModel(MetaModelTreeVisitor *visitor, SubModel *t)
    preVisitSubModel(visitor,t);
 
    if (visitor->visitSubModelOverride()) {
-      debug1(t,"SubModel");
+      debug1(visitor,t,"SubModel");
    }
    
    try {   
@@ -523,11 +523,11 @@ static void visitSubModel(MetaModelTreeVisitor *visitor, SubModel *t)
       visitPackage(visitor,t);
    }
    catch (string e){
-      accept_exception(e,"ignoreVisit");
+      accept_exception(visitor->logger(),e,"ignoreVisit");
    }
 
    if (visitor->visitSubModelOverride()) {
-      debug2(t,"SubModel");
+      debug2(visitor,t,"SubModel");
    }
 
    postVisitSubModel(visitor,t);
@@ -546,9 +546,9 @@ static void visitMultiplicity(MetaModelTreeVisitor *visitor, Multiplicity *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitMultiplicityOverride()) {
-      debug1(t,"Multiplicity");
+      debug1(visitor,t,"Multiplicity");
       visitor->visitMultiplicity(t);
-      debug2(t,"Multiplicity");
+      debug2(visitor,t,"Multiplicity");
    }
 
 }
@@ -567,9 +567,9 @@ static void visitConstraint(MetaModelTreeVisitor *visitor, Constraint *t)
 
    visitMetaElement(visitor,t);
    if (visitor->visitConstraintOverride()) {
-      debug1(t,"Constraint");
+      debug1(visitor,t,"Constraint");
       visitor->visitConstraint(t);
-      debug2(t,"Constraint");
+      debug2(visitor,t,"Constraint");
    }
    if (t->getClass() == "SimpleConstraint") {
       visitSimpleConstraint(visitor,static_cast<SimpleConstraint *>(t));
@@ -584,7 +584,7 @@ static void visitConstraint(MetaModelTreeVisitor *visitor, Constraint *t)
       visitSetConstraint(visitor,static_cast<SetConstraint *>(t));
    }
    else {
-      Log.internal_error("unknown constraint type " + t->getClass());
+      visitor->logger().internal_error("unknown constraint type " + t->getClass());
    }
 
 }
@@ -608,7 +608,7 @@ static void visitDomainType(MetaModelTreeVisitor *visitor, DomainType *t)
    */
 
    if (visitor->visitDomainTypeOverride()) {
-      debug1(t,"DomainType");
+      debug1(visitor,t,"DomainType");
    }
 
    try {
@@ -626,11 +626,11 @@ static void visitDomainType(MetaModelTreeVisitor *visitor, DomainType *t)
       
    }
    catch (string e){
-      accept_exception(e,"ignoreVisit");
+      accept_exception(visitor->logger(),e,"ignoreVisit");
    }
 
    if (visitor->visitDomainTypeOverride()) {
-      debug2(t,"DomainType");
+      debug2(visitor,t,"DomainType");
    }
 
 }
@@ -647,9 +647,9 @@ static void visitTypeRelatedType(MetaModelTreeVisitor *visitor, TypeRelatedType 
 
    visitDomainType(visitor,t);
    if (visitor->visitTypeRelatedTypeOverride()) {
-      debug1(t,"TypeRelatedType");
+      debug1(visitor,t,"TypeRelatedType");
       visitor->visitTypeRelatedType(t);
-      debug2(t,"TypeRelatedType");
+      debug2(visitor,t,"TypeRelatedType");
    }
 
 }
@@ -674,9 +674,9 @@ static void visitType(MetaModelTreeVisitor *visitor, Type *t)
 
    visitExtendableME(visitor,t);
    if (visitor->visitTypeOverride()) {
-      debug1(t,"ExtendableME");
+      debug1(visitor,t,"ExtendableME");
       visitor->visitType(t);
-      debug2(t,"ExtendableME");
+      debug2(visitor,t,"ExtendableME");
    }
 
    for (auto v : t->AttrOrParam) {
@@ -701,9 +701,9 @@ static void preVisitClass(MetaModelTreeVisitor *visitor,Class *c)
 {
 
    if (visitor->preVisitClassOverride()) {
-      Log.debug(">>> preVisitClass(" + get_path(c) + ")");
+      visitor->logger().debug(">>> preVisitClass(" + get_path(c) + ")");
       visitor->preVisitClass(c);
-      Log.debug("<<< preVisitClass(" + get_path(c) + ")");
+      visitor->logger().debug("<<< preVisitClass(" + get_path(c) + ")");
    }
    
 }
@@ -712,9 +712,9 @@ static void postVisitClass(MetaModelTreeVisitor *visitor,Class *c)
 {
 
    if (visitor->postVisitClassOverride()) {
-      Log.debug(">>> postVisitClass(" + get_path(c) + ")");
+      visitor->logger().debug(">>> postVisitClass(" + get_path(c) + ")");
       visitor->postVisitClass(c);
-      Log.debug("<<< postVisitClass(" + get_path(c) + ")");
+      visitor->logger().debug("<<< postVisitClass(" + get_path(c) + ")");
    }
 
 }
@@ -769,9 +769,9 @@ static void visitClass(MetaModelTreeVisitor *visitor, Class *t)
    visitType(visitor,t);
 
    if (visitor->visitClassOverride()) {
-      debug1(t,"Class");
+      debug1(visitor,t,"Class");
       visitor->visitClass(t);
-      debug2(t,"Class");
+      debug2(visitor,t,"Class");
    }
 
    for (auto v : t->Role) {
@@ -840,9 +840,9 @@ static void visitExpression(MetaModelTreeVisitor *visitor, Expression *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitExpressionOverride()) {
-      debug1(t,"Expression");
+      debug1(visitor,t,"Expression");
       visitor->visitExpression(t);
-      debug2(t,"Expression");
+      debug2(visitor,t,"Expression");
    }
 
 }
@@ -868,9 +868,9 @@ static void visitAttrOrParam(MetaModelTreeVisitor *visitor, AttrOrParam *t)
 
    visitExtendableME(visitor,t);
    if (visitor->visitAttrOrParamOverride()) {
-      debug1(t,"AttrOrParam");
+      debug1(visitor,t,"AttrOrParam");
       visitor->visitAttrOrParam(t);
-      debug2(t,"AttrOrParam");
+      debug2(visitor,t,"AttrOrParam");
    }
 
    for (auto v : t->Derivates) {
@@ -899,9 +899,9 @@ static void visitMultiValue(MetaModelTreeVisitor *visitor, MultiValue *t)
 
    visitTypeRelatedType(visitor,t);
    if (visitor->visitMultiValueOverride()) {
-      debug1(t,"MultiValue");
+      debug1(visitor,t,"MultiValue");
       visitor->visitMultiValue(t);
-      debug2(t,"MultiValue");
+      debug2(visitor,t,"MultiValue");
    }
 
 }
@@ -917,9 +917,9 @@ static void visitReferenceType(MetaModelTreeVisitor *visitor, ReferenceType *t)
 
    visitClassRelatedType(visitor,t);
    if (visitor->visitReferenceTypeOverride()) {
-      debug1(t,"RefernceType");
+      debug1(visitor,t,"RefernceType");
       visitor->visitReferenceType(t);
-      debug2(t,"RefernceType");
+      debug2(visitor,t,"RefernceType");
    }
 
 }
@@ -946,9 +946,9 @@ static void visitRole(MetaModelTreeVisitor *visitor, Role *t)
 
    visitReferenceType(visitor,t);
    if (visitor->visitRoleOverride()) {
-      debug1(t,"Role");
+      debug1(visitor,t,"Role");
       visitor->visitRole(t);
-      debug2(t,"Role");
+      debug2(visitor,t,"Role");
    }
 
    for (auto v : t->Derivates) {
@@ -981,9 +981,9 @@ static void visitExplicitAssocAccess(MetaModelTreeVisitor *visitor, ExplicitAsso
 
    visitExtendableME(visitor,t);
    if (visitor->visitExplicitAssocAccessOverride()) {
-      debug1(t,"ExplicitAssocAccess");
+      debug1(visitor,t,"ExplicitAssocAccess");
       visitor->visitExplicitAssocAccess(t);
-      debug2(t,"ExplicitAssocAccess");
+      debug2(visitor,t,"ExplicitAssocAccess");
    }
 
 }
@@ -1000,9 +1000,9 @@ static void visitAssocAcc(MetaModelTreeVisitor *visitor, AssocAcc *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitAssocAccOverride()) {
-      debug1(t,"AssocAcc");
+      debug1(visitor,t,"AssocAcc");
       visitor->visitAssocAcc(t);
-      debug2(t,"AssocAcc");
+      debug2(visitor,t,"AssocAcc");
    }
 
 }
@@ -1026,9 +1026,9 @@ static void visitDataUnit(MetaModelTreeVisitor *visitor, DataUnit *t)
 
    visitExtendableME(visitor,t);
    if (visitor->visitDataUnitOverride()) {
-      debug1(t,"DataUnit");
+      debug1(visitor,t,"DataUnit");
       visitor->visitDataUnit(t);
-      debug2(t,"DataUnit");
+      debug2(visitor,t,"DataUnit");
    }
 
    for (auto v : t->MetaBasketDef) {
@@ -1048,15 +1048,15 @@ static void visitContext(MetaModelTreeVisitor *visitor, Context *t)
    visitMetaElement(visitor,t);
    bool visitDefinitions = true;
    if (visitor->visitContextOverride()) {
-      debug1(t,"Context");
+      debug1(visitor,t,"Context");
       try {
          visitor->visitContext(t);
       }
       catch (string e) {
-         accept_exception(e,"ignoreVisit");
+         accept_exception(visitor->logger(),e,"ignoreVisit");
          visitDefinitions = false;
       }
-      debug2(t,"Context");
+      debug2(visitor,t,"Context");
    }
 
    if (visitDefinitions) {
@@ -1082,9 +1082,9 @@ static void visitGenericDef(MetaModelTreeVisitor *visitor, GenericDef *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitGenericDefOverride()) {
-      debug1(t,"Generic");
+      debug1(visitor,t,"Generic");
       visitor->visitGenericDef(t);
-      debug2(t,"Generic");
+      debug2(visitor,t,"Generic");
    }
 
    for (auto v : t->GenericDomain) {
@@ -1115,9 +1115,9 @@ static void visitUnit(MetaModelTreeVisitor *visitor, Unit *t)
 
    visitExtendableME(visitor,t);
    if (visitor->visitUnitOverride()) {
-      debug1(t,"Unit");
+      debug1(visitor,t,"Unit");
       visitor->visitUnit(t);
-      debug2(t,"Unit");
+      debug2(visitor,t,"Unit");
    }
 
    for (auto v : t->Num) {
@@ -1142,9 +1142,9 @@ static void visitMetaBasketDef(MetaModelTreeVisitor *visitor, MetaBasketDef *t)
 
    visitExtendableME(visitor,t);
    if (visitor->visitMetaBasketDefOverride()) {
-      debug1(t,"MetaBasketDef");
+      debug1(visitor,t,"MetaBasketDef");
       visitor->visitMetaBasketDef(t);
-      debug2(t,"MetaBaksetDef");
+      debug2(visitor,t,"MetaBaksetDef");
    }
 
 }
@@ -1166,9 +1166,9 @@ static void visitMetaObjectDef(MetaModelTreeVisitor *visitor, MetaObjectDef *t)
 
    visitMetaElement(visitor,t);
    if (visitor->visitMetaObjectDefOverride()) {
-      debug1(t,"MetaObjectDef");
+      debug1(visitor,t,"MetaObjectDef");
       visitor->visitMetaObjectDef(t);
-      debug2(t,"MetaObjectDef");
+      debug2(visitor,t,"MetaObjectDef");
    }
 
    for (auto v : t->MetaBasketDef) {
@@ -1188,9 +1188,9 @@ static void visitBooleanType(MetaModelTreeVisitor *visitor, BooleanType *t)
    visitDomainType(visitor,t);
 
    if (visitor->visitBooleanTypeOverride()) {
-      debug1(t,"BooleanType");
+      debug1(visitor,t,"BooleanType");
       visitor->visitBooleanType(t);
-      debug2(t,"BooleanType");
+      debug2(visitor,t,"BooleanType");
    }
 
 }
@@ -1207,9 +1207,9 @@ static void visitTextType(MetaModelTreeVisitor *visitor, TextType *t)
 
    visitDomainType(visitor,t);
    if (visitor->visitTextTypeOverride()) {
-      debug1(t,"TextType");
+      debug1(visitor,t,"TextType");
       visitor->visitTextType(t);
-      debug2(t,"TextType");
+      debug2(visitor,t,"TextType");
    }
 
 }
@@ -1225,9 +1225,9 @@ static void visitBlackboxType(MetaModelTreeVisitor *visitor, BlackboxType *t)
 
    visitDomainType(visitor,t);
    if (visitor->visitBlackboxTypeOverride()) {
-      debug1(t,"BlackboxType");
+      debug1(visitor,t,"BlackboxType");
       visitor->visitBlackboxType(t);
-      debug2(t,"BlackboxType");
+      debug2(visitor,t,"BlackboxType");
    }
 
 }
@@ -1252,14 +1252,14 @@ static void visitNumType(MetaModelTreeVisitor *visitor, NumType *t)
 
    visitDomainType(visitor,t);
    if (visitor->visitNumTypeOverride()) {
-      debug1(t,"NumType");
+      debug1(visitor,t,"NumType");
       try {
          visitor->visitNumType(t);
       }
       catch (string e){
-         accept_exception(e,"ignoreVisit"); // for NumType, why??, to do !!!
+         accept_exception(visitor->logger(),e,"ignoreVisit"); // for NumType, why??, to do !!!
       }
-      debug2(t,"NumType");
+      debug2(visitor,t,"NumType");
    }
 
 }
@@ -1285,22 +1285,22 @@ static void visitCoordType(MetaModelTreeVisitor *visitor, CoordType *t)
 
    visitDomainType(visitor,t);
    if (visitor->visitCoordTypeOverride()) {
-      debug1(t,"CoordType");
+      debug1(visitor,t,"CoordType");
       visitor->visitCoordType(t);
-      debug2(t,"CoordType");
+      debug2(visitor,t,"CoordType");
    }
    
    for (auto nt : t->Axis) {
       visitNumType(visitor,nt);
    }
 
-   for (auto s : get_all_axisspecs()) {
+   for (auto s : visitor->store().axisSpecs()) {
       if (s->CoordType != t) {
          continue;
       }
-      debug1(s,"AxisSpec");
+      debug1(visitor,s,"AxisSpec");
       visitor->visitAxisSpec(s);
-      debug2(s,"AxisSpec");
+      debug2(visitor,s,"AxisSpec");
    }
 
 }
@@ -1318,9 +1318,9 @@ static void visitFormattedType(MetaModelTreeVisitor *visitor, FormattedType *t)
 
    visitNumType(visitor,t);
    if (visitor->visitFormattedTypeOverride()) {
-      debug1(t,"FormattedType");
+      debug1(visitor,t,"FormattedType");
       visitor->visitFormattedType(t);
-      debug2(t,"FormattedType");
+      debug2(visitor,t,"FormattedType");
    }
    
 }
@@ -1337,9 +1337,9 @@ static void visitAnyOIDType(MetaModelTreeVisitor *visitor, AnyOIDType *t)
 
    visitDomainType(visitor,t);
    if (visitor->visitAnyOIDTypeOverride()) {
-      debug1(t,"AnyOIDType");
+      debug1(visitor,t,"AnyOIDType");
       visitor->visitAnyOIDType(t);
-      debug2(t,"AnyOIDType");
+      debug2(visitor,t,"AnyOIDType");
    }
 
    for (auto v : t->Class) {
@@ -1365,9 +1365,9 @@ static void visitFunctionDef(MetaModelTreeVisitor *visitor, FunctionDef *t)
    
    visitMetaElement(visitor,t);
    if (visitor->visitFunctionDefOverride()) {
-      debug1(t,"FunctionDef");
+      debug1(visitor,t,"FunctionDef");
       visitor->visitFunctionDef(t);
-      debug2(t,"FunctionDef");
+      debug2(visitor,t,"FunctionDef");
    }
 
    for (auto v : t->Argument) {
@@ -1392,9 +1392,9 @@ static void visitArgument(MetaModelTreeVisitor *visitor, Argument *t)
 
    visitMetaElement(visitor,t);
    if (visitor->visitArgumentOverride()) {
-      debug1(t,"Argument");
+      debug1(visitor,t,"Argument");
       visitor->visitArgument(t);
-      debug2(t,"Argument");
+      debug2(visitor,t,"Argument");
    }
 
 }
@@ -1409,9 +1409,9 @@ static void visitClassRefType(MetaModelTreeVisitor *visitor, ClassRefType *t)
 
    visitClassRelatedType(visitor,t);
    if (visitor->visitClassRefTypeOverride()) {
-      debug1(t,"ClassRefType");
+      debug1(visitor,t,"ClassRefType");
       visitor->visitClassRefType(t);
-      debug2(t,"ClassRefType");
+      debug2(visitor,t,"ClassRefType");
    }
 
 }
@@ -1427,9 +1427,9 @@ static void visitObjectType(MetaModelTreeVisitor *visitor, ObjectType *t)
 
    visitClassRelatedType(visitor,t);
    if (visitor->visitObjectTypeOverride()) {
-      debug1(t,"ObjectType");
+      debug1(visitor,t,"ObjectType");
       visitor->visitObjectType(t);
-      debug2(t,"ObjecType");
+      debug2(visitor,t,"ObjecType");
    }
 
 }
@@ -1446,9 +1446,9 @@ static void visitAttributeRefType(MetaModelTreeVisitor *visitor, AttributeRefTyp
 
    visitDomainType(visitor,t);
    if (visitor->visitAttributeRefTypeOverride()) {
-      debug1(t,"AttributeRef");
+      debug1(visitor,t,"AttributeRef");
       visitor->visitAttributeRefType(t);
-      debug2(t,"AttributeRef");
+      debug2(visitor,t,"AttributeRef");
    }
 
 }
@@ -1468,9 +1468,9 @@ static void visitEnumType(MetaModelTreeVisitor *visitor, EnumType *t)
 
    visitDomainType(visitor,t);
    if (visitor->visitEnumTypeOverride()) {
-      debug1(t,"EnumType");
+      debug1(visitor,t,"EnumType");
       visitor->visitEnumType(t);
-      debug2(t,"EnumType");
+      debug2(visitor,t,"EnumType");
    }
 
    visitEnumNode(visitor,t->TopNode);
@@ -1499,9 +1499,9 @@ static void visitEnumNode(MetaModelTreeVisitor *visitor, EnumNode *t)
 
    visitExtendableME(visitor,t);
    if (visitor->visitEnumNodeOverride()) {
-      debug1(t,"EnumNode");
+      debug1(visitor,t,"EnumNode");
       visitor->visitEnumNode(t);
-      debug2(t,"EnumNode");
+      debug2(visitor,t,"EnumNode");
    }
 
    for (auto v : t->Node) {
@@ -1522,9 +1522,9 @@ static void visitEnumTreeValueType(MetaModelTreeVisitor *visitor, EnumTreeValueT
 
    visitDomainType(visitor,t);
    if (visitor->visitEnumTreeValueTypeOverride()) {
-      debug1(t,"EnumTreeValue");
+      debug1(visitor,t,"EnumTreeValue");
       visitor->visitEnumTreeValueType(t);
-      debug2(t,"EnumTreeValue");
+      debug2(visitor,t,"EnumTreeValue");
    }
 
 }
@@ -1542,9 +1542,9 @@ static void visitLineForm(MetaModelTreeVisitor *visitor, LineForm *t)
 
    visitMetaElement(visitor,t);
    if (visitor->visitLineFormOverride()) {
-      debug1(t,"LineForm");
+      debug1(visitor,t,"LineForm");
       visitor->visitLineForm(t);
-      debug2(t,"LineForm");
+      debug2(visitor,t,"LineForm");
    }
 
 }
@@ -1566,9 +1566,9 @@ static void visitLineType(MetaModelTreeVisitor *visitor, LineType *t)
 
    visitDomainType(visitor,t);
    if (visitor->visitLineTypeOverride())  {
-      debug1(t,"LineType");
+      debug1(visitor,t,"LineType");
       visitor->visitLineType(t);
-      debug2(t,"LineType");
+      debug2(visitor,t,"LineType");
    }
 
 }
@@ -1596,9 +1596,9 @@ static void visitView(MetaModelTreeVisitor *visitor, View *t)
 
    visitClass(visitor,t);
    if (visitor->visitViewOverride()) {
-      debug1(t,"View");
+      debug1(visitor,t,"View");
       visitor->visitView(t);
-      debug2(t,"View");
+      debug2(visitor,t,"View");
    }
 
    for (auto v : t->FormationParameter) {
@@ -1627,9 +1627,9 @@ static void visitRenamedBaseView(MetaModelTreeVisitor *visitor, RenamedBaseView 
 
    visitExtendableME(visitor,t);
    if (visitor->visitRenamedBaseViewOverride()) {
-      debug1(t,"RenamedBaseView");
+      debug1(visitor,t,"RenamedBaseView");
       visitor->visitRenamedBaseView(t);
-      debug2(t,"RenamedBaseView");
+      debug2(visitor,t,"RenamedBaseView");
    }
 
 }
@@ -1646,9 +1646,9 @@ static void visitUnaryExpr(MetaModelTreeVisitor *visitor, UnaryExpr *t)
 
    visitExpression(visitor,t);
    if (visitor->visitUnaryExprOverride()) {
-      debug1(t,"UnaryExpr");
+      debug1(visitor,t,"UnaryExpr");
       visitor->visitUnaryExpr(t);
-      debug2(t,"UnaryExpr");
+      debug2(visitor,t,"UnaryExpr");
    }
 
 }
@@ -1668,9 +1668,9 @@ static void visitCompoundExpr(MetaModelTreeVisitor *visitor, CompoundExpr *t)
 
    visitExpression(visitor,t);
    if (visitor->visitCompoundExprOverride()) {
-      debug1(t,"CompoundExpr");
+      debug1(visitor,t,"CompoundExpr");
       visitor->visitCompoundExpr(t);
-      debug2(t,"CompoundExpr");
+      debug2(visitor,t,"CompoundExpr");
    }
 
    for (auto v : t->SubExpressions) {
@@ -1695,9 +1695,9 @@ static void visitPathEl(MetaModelTreeVisitor *visitor, PathEl *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitPathElOverride()) {
-      debug1(t,"PathEl");
+      debug1(visitor,t,"PathEl");
       visitor->visitPathEl(t);
-      debug2(t,"PathEl");
+      debug2(visitor,t,"PathEl");
    }
 
 }
@@ -1714,9 +1714,9 @@ static void visitPathOrInspFactor(MetaModelTreeVisitor *visitor, PathOrInspFacto
 
    visitFactor(visitor,t);
    if (visitor->visitPathOrInspFactorOverride()) {
-      debug1(t,"PathOrInspFactor");
+      debug1(visitor,t,"PathOrInspFactor");
       visitor->visitPathOrInspFactor(t);
-      debug2(t,"PathOrInspFactor");
+      debug2(visitor,t,"PathOrInspFactor");
    }
 
    for (auto v : t->PathEls) {
@@ -1738,9 +1738,9 @@ static void visitEnumAssignment(MetaModelTreeVisitor *visitor, EnumAssignment *t
 
    visitMMObject(visitor,t);
    if (visitor->visitEnumAssignmentOverride()) {
-      debug1(t,"EnumAssignment");
+      debug1(visitor,t,"EnumAssignment");
       visitor->visitEnumAssignment(t);
-      debug2(t,"EnumAssignment");
+      debug2(visitor,t,"EnumAssignment");
    }
 
 }
@@ -1757,9 +1757,9 @@ static void visitEnumMapping(MetaModelTreeVisitor *visitor, EnumMapping *t)
 
    visitFactor(visitor,t);
    if (visitor->visitEnumMappingOverride()) {
-      debug1(t,"EnumMapping");
+      debug1(visitor,t,"EnumMapping");
       visitor->visitEnumMapping(t);
-      debug2(t,"EnumMapping");
+      debug2(visitor,t,"EnumMapping");
    }
 
    for (auto v : t->Cases) {
@@ -1779,9 +1779,9 @@ static void visitClassRef(MetaModelTreeVisitor *visitor, ClassRef *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitClassRefOverride()) {
-      debug1(t,"ClassRef");
+      debug1(visitor,t,"ClassRef");
       visitor->visitClassRef(t);
-      debug2(t,"ClassRef");
+      debug2(visitor,t,"ClassRef");
    }
 
 }
@@ -1800,9 +1800,9 @@ static void visitActualArgument(MetaModelTreeVisitor *visitor, ActualArgument *t
 
    visitMMObject(visitor,t);
    if (visitor->visitActualArgumentOverride()) {
-      debug1(t,"ActualArgument");
+      debug1(visitor,t,"ActualArgument");
       visitor->visitActualArgument(t);
-      debug2(t,"ActualArgument");
+      debug2(visitor,t,"ActualArgument");
    }
 
    visitExpression(visitor,t->Expression);
@@ -1825,9 +1825,9 @@ static void visitFunctionCall(MetaModelTreeVisitor *visitor, FunctionCall *t)
 
    visitFactor(visitor,t);
    if (visitor->visitFunctionCallOverride()) {
-      debug1(t,"FunctionCall");
+      debug1(visitor,t,"FunctionCall");
       visitor->visitFunctionCall(t);
-      debug2(t,"FunctionCall");
+      debug2(visitor,t,"FunctionCall");
    }
 
    for (auto v : t->Arguments) {
@@ -1847,9 +1847,9 @@ static void visitRuntimeParamRef(MetaModelTreeVisitor *visitor, RuntimeParamRef 
 
    visitFactor(visitor,t);
    if (visitor->visitRuntimeParamRefOverride()) {
-      debug1(t,"RuntimeParamRef");
+      debug1(visitor,t,"RuntimeParamRef");
       visitor->visitRuntimeParamRef(t);
-      debug2(t,"RuntimeParamRef");
+      debug2(visitor,t,"RuntimeParamRef");
    }
 
 }
@@ -1866,9 +1866,9 @@ static void visitConstant(MetaModelTreeVisitor *visitor, Constant *t)
 
    visitFactor(visitor,t);
    if (visitor->visitConstantOverride()) {
-      debug1(t,"Constant");
+      debug1(visitor,t,"Constant");
       visitor->visitConstant(t);
-      debug2(t,"Constant");
+      debug2(visitor,t,"Constant");
    }
 
 }
@@ -1884,9 +1884,9 @@ static void visitClassConst(MetaModelTreeVisitor *visitor, ClassConst *t)
 
    visitFactor(visitor,t);
    if (visitor->visitClassConstOverride()) {
-      debug1(t,"ClassConst");
+      debug1(visitor,t,"ClassConst");
       visitor->visitClassConst(t);
-      debug2(t,"ClassConst");
+      debug2(visitor,t,"ClassConst");
    }
 
 }
@@ -1902,9 +1902,9 @@ static void visitAttributeConst(MetaModelTreeVisitor *visitor, AttributeConst *t
 
    visitFactor(visitor,t);
    if (visitor->visitAttributeConstOverride()) {
-      debug1(t,"AttributeConst");
+      debug1(visitor,t,"AttributeConst");
       visitor->visitAttributeConst(t);
-      debug2(t,"AttributeConst");
+      debug2(visitor,t,"AttributeConst");
    }
 
 }
@@ -1920,9 +1920,9 @@ static void visitUnitRef(MetaModelTreeVisitor *visitor, UnitRef *t)
 
    visitFactor(visitor,t);
    if (visitor->visitUnitRefOverride()) {
-      debug1(t,"UnitRef");
+      debug1(visitor,t,"UnitRef");
       visitor->visitUnitRef(t);
-      debug2(t,"UnitRef");
+      debug2(visitor,t,"UnitRef");
    }
 
 }
@@ -1938,9 +1938,9 @@ static void visitUnitFunction(MetaModelTreeVisitor *visitor, UnitFunction *t)
 
    visitFactor(visitor,t);
    if (visitor->visitUnitFunctionOverride()) {
-      debug1(t,"UnitFunction");
+      debug1(visitor,t,"UnitFunction");
       visitor->visitUnitFunction(t);
-      debug2(t,"UnitFunction");
+      debug2(visitor,t,"UnitFunction");
    }
 
 }
@@ -1961,9 +1961,9 @@ static void visitGraphic(MetaModelTreeVisitor *visitor, Graphic *t)
 
    visitExtendableME(visitor,t);
    if (visitor->visitGraphicOverride()) {
-      debug1(t,"Graphic");
+      debug1(visitor,t,"Graphic");
       visitor->visitGraphic(t);
-      debug2(t,"Graphic");
+      debug2(visitor,t,"Graphic");
    }
 
    for (auto v : t->DrawingRule) {
@@ -1984,9 +1984,9 @@ static void visitSignParamAssignment(MetaModelTreeVisitor *visitor, SignParamAss
 
    visitMMObject(visitor,t);
    if (visitor->visitSignParamAssignmentOverride()) {
-      debug1(t,"ParamAssignment");
+      debug1(visitor,t,"ParamAssignment");
       visitor->visitSignParamAssignment(t);
-      debug2(t,"ParamAssignment");
+      debug2(visitor,t,"ParamAssignment");
    }
 
 }
@@ -2003,9 +2003,9 @@ static void visitCondSignParamAssignment(MetaModelTreeVisitor *visitor, CondSign
 
    visitMMObject(visitor,t);
    if (visitor->visitCondSignParamAssignmentOverride()) {
-      debug1(t,"CondSignParamAssignment");
+      debug1(visitor,t,"CondSignParamAssignment");
       visitor->visitCondSignParamAssignment(t);
-      debug2(t,"CondSignParamAssignment");
+      debug2(visitor,t,"CondSignParamAssignment");
    }
 
    for (auto v : t->Assignments) {
@@ -2030,9 +2030,9 @@ static void visitDrawingRule(MetaModelTreeVisitor *visitor, DrawingRule *t)
 
    visitExtendableME(visitor,t);
    if (visitor->visitDrawingRuleOverride()) {
-      debug1(t,"DrawingRule");
+      debug1(visitor,t,"DrawingRule");
       visitor->visitDrawingRule(t);
-      debug2(t,"DrawingRule");
+      debug2(visitor,t,"DrawingRule");
    }
 
    for (auto v : t->Rule) {
@@ -2052,9 +2052,9 @@ static void visitDocTextTranslation(MetaModelTreeVisitor *visitor, DocTextTransl
 
    visitMMObject(visitor,t);
    if (visitor->visitDocTextTranslationOverride()) {
-      debug1(t,"DocTextTranslation");
+      debug1(visitor,t,"DocTextTranslation");
       visitor->visitDocTextTranslation(t);
-      debug2(t,"DocTextTranslation");
+      debug2(visitor,t,"DocTextTranslation");
    }
 
 }
@@ -2072,9 +2072,9 @@ static void visitMETranslation(MetaModelTreeVisitor *visitor, METranslation *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitMETranslationOverride()) {
-      debug1(t,"METranslation");
+      debug1(visitor,t,"METranslation");
       visitor->visitMETranslation(t);
-      debug2(t,"METranslation");
+      debug2(visitor,t,"METranslation");
    }
 
    for (auto v : t->TranslatedDoc) {
@@ -2095,9 +2095,9 @@ static void visitTranslation(MetaModelTreeVisitor *visitor, Translation *t)
 
    visitMMObject(visitor,t);
    if (visitor->visitTranslationOverride()) {
-      debug1(t,"Translation");
+      debug1(visitor,t,"Translation");
       visitor->visitTranslation(t);
-      debug2(t,"Translation");
+      debug2(visitor,t,"Translation");
    }
 
    for (auto v : t->Translations) {
@@ -2117,9 +2117,9 @@ static void visitImport(MetaModelTreeVisitor *visitor, Import *i)
 
    visitMMObject(visitor,i);
    if (visitor->visitImportOverride()) {
-      debug1(i,"Import");
+      debug1(visitor,i,"Import");
       visitor->visitImport(i);
-      debug2(i,"Import");
+      debug2(visitor,i,"Import");
    }
 
 }
@@ -2127,28 +2127,28 @@ static void visitImport(MetaModelTreeVisitor *visitor, Import *i)
 static void preVisitModel(MetaModelTreeVisitor *visitor,Model *m)
 {
    if (visitor->preVisitModelOverride()) {
-      Log.debug(">>> preVisitModel(" + get_path(m) + ")");
+      visitor->logger().debug(">>> preVisitModel(" + get_path(m) + ")");
       try {
          visitor->preVisitModel(m);
       }
       catch (string e){
-         accept_exception(e,"ignoreVisit");
+         accept_exception(visitor->logger(),e,"ignoreVisit");
       }
-      Log.debug("<<< preVisitModel(" + get_path(m) + ")");
+      visitor->logger().debug("<<< preVisitModel(" + get_path(m) + ")");
    }
 }
 
 static void postVisitModel(MetaModelTreeVisitor *visitor,Model *m)
 {
    if (visitor->postVisitModelOverride()) {
-      Log.debug(">>> postVisitModel(" + get_path(m) + ")");
+      visitor->logger().debug(">>> postVisitModel(" + get_path(m) + ")");
       try {
          visitor->postVisitModel(m);
       }
       catch (string e){
-         accept_exception(e,"ignoreVisit");
+         accept_exception(visitor->logger(),e,"ignoreVisit");
       }
-      Log.debug("<<< postVisitModel(" + get_path(m) + ")");
+      visitor->logger().debug("<<< postVisitModel(" + get_path(m) + ")");
    }
 }
 
@@ -2175,24 +2175,24 @@ static void visitModel(MetaModelTreeVisitor *visitor, Model *m)
    preVisitModel(visitor,m);
 
    if (visitor->visitModelOverride()) {
-      debug1(m,"Model");
+      debug1(visitor,m,"Model");
    }
    
    try {
       visitor->visitModel(m);
       visitPackage(visitor,m);
-      for (auto i : get_all_imports()) {
+      for (auto i : visitor->store().imports()) {
          if (i->ImportingP->Name == m->Name) {
             visitImport(visitor,i);
          }
       }      
    }
    catch (string e){
-      accept_exception(e, "ignoreVisit");
+      accept_exception(visitor->logger(),e, "ignoreVisit");
    }
    
    if (visitor->visitModelOverride()) {
-      debug2(m,"Model");
+      debug2(visitor,m,"Model");
    }
 
    postVisitModel(visitor,m);
@@ -2202,28 +2202,28 @@ static void visitModel(MetaModelTreeVisitor *visitor, Model *m)
 static void preVisit(MetaModelTreeVisitor *visitor)
 {
    if (visitor->preVisitOverride()) {
-      Log.debug(">>> preVisit()");
+      visitor->logger().debug(">>> preVisit()");
       try {
          visitor->preVisit();
       }
       catch (string e){
-         accept_exception(e,"ignoreVisit");
+         accept_exception(visitor->logger(),e,"ignoreVisit");
       }
-      Log.debug("<<< preVisit()");
+      visitor->logger().debug("<<< preVisit()");
    }
 }
 
 static void postVisit(MetaModelTreeVisitor *visitor)
 {
    if (visitor->postVisitOverride()) {
-      Log.debug(">>> postVisit()");
+      visitor->logger().debug(">>> postVisit()");
       try {
          visitor->postVisit();
       }
       catch (string e){
-         accept_exception(e, "ignoreVisit");
+         accept_exception(visitor->logger(),e, "ignoreVisit");
       }
-      Log.debug("<<< postVisit()");
+      visitor->logger().debug("<<< postVisit()");
    }
 }
 
@@ -2232,7 +2232,7 @@ static void visitAllModels(MetaModelTreeVisitor *visitor)
 
    preVisit(visitor);
 
-   for (Model *m : get_all_models()) {
+   for (Model *m : visitor->store().models()) {
       visitModel(visitor,m);
    }
 
@@ -2500,7 +2500,7 @@ void metamodel::MetaModelTreeVisitor::visit(MMObject *o,string classname)
       metamodel::visitGenericDef(this,static_cast<GenericDef *>(o));
    }
    else {
-      Log.internal_error("unknown class " + classname,1);
+      logger_.internal_error("unknown class " + classname,1);
    }
 
 }

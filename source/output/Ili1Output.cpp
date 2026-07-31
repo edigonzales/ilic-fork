@@ -9,19 +9,17 @@ using namespace util;
 using namespace metamodel;
 using namespace output;
 
-static bool domainheader_written = false;
-
-
 // public
 
-Ili1Output::Ili1Output(string ili_file)
+Ili1Output::Ili1Output(metamodel::MetaModelStore &store,util::Logger &logger,string ili_file)
+   : MetaModelTreeVisitor(store,logger)
 {
    this->ili_file = ili_file;
 }
 
 void Ili1Output::preVisitModel(Model* m)
 {
-    Log.warning("INTERLIS 1 generation is not fully implemented yet");
+    logger().warning("INTERLIS 1 generation is not fully implemented yet");
 
     ili1.openFile(ili_file);
     ili1.writeln("TRANSFER INTERLIS1;");
@@ -78,8 +76,6 @@ void Ili1Output::postVisitSubModel(SubModel* s)
 // a fix to avoid structure written inside a class
 // pre/postVisitClass is called also for structures as an attribute type 
 // within a class
-
-static bool visitClassFlag = false;
 
 void Ili1Output::preVisitClass(Class* c)
 {
@@ -162,7 +158,7 @@ void Ili1Output::visitAttrOrParam(AttrOrParam *a)
 
            string type = get_type(t, false);
 
-           Log.message(a->AttrParent->Name + "." + a->Name + ":" + type);
+           logger().message(a->AttrParent->Name + "." + a->Name + ":" + type);
 
            if (type.size() > 0) {
                ili1.writeln(a->Name + ": " + type + ";");
@@ -224,7 +220,7 @@ void Ili1Output::visitRole(Role* r)
     }
 
     if (targets.size() <= 0) {
-        Log.warning(r->Association->Name + "." + r->Name + " targets unknown");
+        logger().warning(r->Association->Name + "." + r->Name + " targets unknown");
 
         targets = "targets unknown";
         ili1.writeln("!! " + r->Name + ": " + mandatory + "-> " + targets + ";" + remark);
@@ -321,11 +317,11 @@ string Ili1Output::get_type(DomainType* t, bool domainflag)
     string type = "";
 
     /*
-    Log.message("get_type:");
+    logger().message("get_type:");
     if (t->ElementInPackage != nullptr) {
-        Log.message("t->ElementInPackage->Name=" + t->ElementInPackage->Name);
+        logger().message("t->ElementInPackage->Name=" + t->ElementInPackage->Name);
     };
-    Log.message("t->Name=" + t->Name);
+    logger().message("t->Name=" + t->Name);
     */
 
     // if (t->ElementInPackage != nullptr) {
@@ -407,7 +403,7 @@ string Ili1Output::get_type(DomainType* t, bool domainflag)
             }
         }
         else {
-            Log.warning("unknown type: " + t->getClass());
+            logger().warning("unknown type: " + t->getClass());
         }
     }
 
@@ -421,4 +417,3 @@ string Ili1Output::get_type(DomainType* t, bool domainflag)
 
     return type;
 }
-

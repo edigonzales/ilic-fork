@@ -33,19 +33,4 @@ private:
    std::map<std::string, SourceBuffer> sources_;
 };
 
-SourceManager *activeSourceManager();
-void setActiveSourceManager(SourceManager *manager);
-
-class ActiveSourceManagerScope {
-public:
-   explicit ActiveSourceManagerScope(SourceManager *manager);
-   ~ActiveSourceManagerScope();
-
-   ActiveSourceManagerScope(const ActiveSourceManagerScope &) = delete;
-   ActiveSourceManagerScope &operator=(const ActiveSourceManagerScope &) = delete;
-
-private:
-   SourceManager *previous_;
-};
-
 } // namespace ilic

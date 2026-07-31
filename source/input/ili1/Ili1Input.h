@@ -1,5 +1,8 @@
 #include "antlr4-runtime.h"
 #include "../parser/generated/Ili1ParserBaseVisitor.h"
+#include "../../metamodel/MetaModelBuilder.h"
+#include "../../../include/ilic/SourceManager.h"
+#include "../../util/Logger.h"
 
 #include <string>
 
@@ -7,10 +10,14 @@ using namespace std;
 
 namespace input {
    
-   void parseIli1(string input);
+   void parseIli1(const ilic::SourceBuffer &source,
+      metamodel::MetaModelBuilder &builder,util::Logger &logger);
 
    class Ili1Input : public parser::Ili1ParserBaseVisitor {
    public:
+
+      Ili1Input(metamodel::MetaModelBuilder &builder,util::Logger &logger)
+         : builder_(builder),logger_(logger) {}
 
       antlrcpp::Any visitInterlis1Def(parser::Ili1Parser::Interlis1DefContext *ctx) override;
       antlrcpp::Any visitModelDef(parser::Ili1Parser::ModelDefContext *ctx) override;
@@ -47,6 +54,11 @@ namespace input {
       antlrcpp::Any visitIntersectionDef(parser::Ili1Parser::IntersectionDefContext *ctx) override;
       antlrcpp::Any visitControlPoints(parser::Ili1Parser::ControlPointsContext *ctx) override;
       antlrcpp::Any visitLineAttributes(parser::Ili1Parser::LineAttributesContext *ctx) override;
+
+   private:
+      metamodel::MetaModelBuilder &builder_;
+      util::Logger &logger_;
+      int controlPointCounter_ = 0;
 
    };
 

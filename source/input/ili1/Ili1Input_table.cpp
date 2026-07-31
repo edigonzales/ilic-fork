@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Ili1Input.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
@@ -23,39 +23,39 @@ antlrcpp::Any Ili1Input::visitTableDef(Ili1Parser::TableDefContext *ctx)
    string name1 = ctx->tablename1->getText();
    string name2 = ctx->tablename2->getText();
 
-   debug(ctx,">>> visitTableDef(" + name1 + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitTableDef(" + name1 + ")");
+   logger_.incNestLevel();
 
    if (name1 != name2) {
-      Log.error(
+      logger_.error(
          "classname " + name2 + " must match " + name1,
          ctx->tablename2->getLine()
       );
    }
 
-   Class *c = make_mmobject<Class>();
+   Class *c = builder_.store().make<Class>();
 
    // Class Attributes
    c->Name = name1;
    c->Kind = Class::ClassVal;
-   init_type(c,get_line(ctx));
+   builder_.initType(c,builder_.line(ctx));
    if (ctx->OPTIONAL() != nullptr) {
       c->ili1OptionalTable = true;
    }
    list<metamodel::AttrOrParam *> classattribute;
    c->ClassAttribute = classattribute;
-   add_class(c);
+   builder_.addClass(c);
 
-   push_context(c);
+   builder_.pushContext(*c);
 
    for (auto actx : ctx->attribute()) {
       visitAttribute(actx);
    }
    visitIdentifications(ctx->identifications());
 
-   pop_context();
-   Log.decNestLevel();
-   debug(ctx,"<<< visitTableDef(" + name1 + ")");
+   builder_.popContext();
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitTableDef(" + name1 + ")");
    
    return c;
 
@@ -74,18 +74,18 @@ antlrcpp::Any Ili1Input::visitAttribute(Ili1Parser::AttributeContext *ctx)
    */
 
    string name = ctx->attributename->getText();
-   if (is_reserved_name(name)) {
+   if (builder_.isReservedName(name)) {
       name += "_ILI1";
    }
 
-   debug(ctx,">>> visitAttribute(" + name + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitAttribute(" + name + ")");
+   logger_.incNestLevel();
 
-   AttrOrParam *a = make_mmobject<AttrOrParam>();
-   init_extendableme(a,ctx->attributename->getLine());
+   AttrOrParam *a = builder_.store().make<AttrOrParam>();
+   builder_.initExtendable(a,ctx->attributename->getLine());
    a->Name = name;
    
-   push_context(a);
+   builder_.pushContext(*a);
    DomainType *dt = nullptr;
    if (ctx->type() != nullptr) {
       Type *t = visitType(ctx->type());
@@ -96,14 +96,14 @@ antlrcpp::Any Ili1Input::visitAttribute(Ili1Parser::AttributeContext *ctx)
    }
    else {
       // reference attribute
-      ReferenceType *rt = make_mmobject<ReferenceType>();
-      init_domaintype(rt,ctx->start->getLine());
+      ReferenceType *rt = builder_.store().make<ReferenceType>();
+      builder_.initDomainType(rt,ctx->start->getLine());
       dt = static_cast<DomainType*>(rt);
       rt->External = false;
-      rt->_baseclass = find_class(ctx->tablename->getText(),get_line(ctx));
+      rt->_baseclass = builder_.findClass(ctx->tablename->getText(),builder_.line(ctx));
       a->Type = dt;
    }
-   pop_context();
+   builder_.popContext();
 
    if (ctx->OPTIONAL() == nullptr && dt != nullptr) {
       if (dt != nullptr) {
@@ -116,11 +116,11 @@ antlrcpp::Any Ili1Input::visitAttribute(Ili1Parser::AttributeContext *ctx)
    }
 
    // ASSOCIATION ClassAttr
-   a->AttrParent = get_class_context();
-   get_class_context()->ClassAttribute.push_back(a);
+   a->AttrParent = builder_.currentClass();
+   builder_.currentClass()->ClassAttribute.push_back(a);
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitAttribute(" + name + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitAttribute(" + name + ")");
 
    return a;
 
@@ -134,8 +134,8 @@ antlrcpp::Any Ili1Input::visitIdentifications(Ili1Parser::IdentificationsContext
    | IDENT identification+
    */
 
-   debug(ctx,">>> visitIdentifications()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitIdentifications()");
+   logger_.incNestLevel();
 
    if (ctx->NO() == nullptr) {
       for (auto ictx : ctx->identification()) {
@@ -146,23 +146,23 @@ antlrcpp::Any Ili1Input::visitIdentifications(Ili1Parser::IdentificationsContext
          enum {GlobalU, LocalU} Kind;
          list<PathOrInspFactor *> UniqueDef;
          */
-         UniqueConstraint *c = make_mmobject<UniqueConstraint>();
-         init_constraint(c,get_line(ctx));
+         UniqueConstraint *c = builder_.store().make<UniqueConstraint>();
+         builder_.initConstraint(c,builder_.line(ctx));
          for (auto a : attr_names) {
-            PathEl *pl = make_mmobject<PathEl>();
+            PathEl *pl = builder_.store().make<PathEl>();
             pl->Kind = PathEl::Attribute;
-            pl->Ref = find_attribute(get_class_context(),a);
-            PathOrInspFactor * pf = make_mmobject<PathOrInspFactor>();
+            pl->Ref = builder_.findAttribute(builder_.currentClass(),a);
+            PathOrInspFactor * pf = builder_.store().make<PathOrInspFactor>();
             pf->PathEls.push_back(pl);
             pf->_path = a;
             c->UniqueDef.push_back(pf);
          }
-         get_class_context()->Constraints.push_back(c);
+         builder_.currentClass()->Constraints.push_back(c);
       }
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitIdentifications()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitIdentifications()");
    return nullptr;
 
 }
@@ -174,16 +174,16 @@ antlrcpp::Any Ili1Input::visitIdentification(Ili1Parser::IdentificationContext *
    : NAME (COMMA NAME)* SEMI
    */
 
-   debug(ctx,">>> visitIdentification()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitIdentification()");
+   logger_.incNestLevel();
 
    vector<string> attr_names;
    for (auto n : ctx->NAME()) {
       attr_names.push_back(n->getText());
    }
   
-   Log.decNestLevel();
-   debug(ctx,"<<< visitIdentification()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitIdentification()");
 
    return attr_names;
 

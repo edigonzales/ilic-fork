@@ -10,6 +10,9 @@ using namespace antlr4;
 using namespace lexer;
 
 IliFileLexer::IliFileLexer(CharStream *input) : Lexer(input) {
+  _decisionToDFA.reserve(_atn.getNumberOfDecisions());
+  for (size_t i = 0; i < _atn.getNumberOfDecisions(); ++i)
+    _decisionToDFA.emplace_back(_atn.getDecisionState(i), i);
   _interpreter = new atn::LexerATNSimulator(this, _atn, _decisionToDFA, _sharedContextCache);
 }
 
@@ -53,8 +56,6 @@ const atn::ATN& IliFileLexer::getATN() const {
 
 
 // Static vars and initialization.
-std::vector<dfa::DFA> IliFileLexer::_decisionToDFA;
-atn::PredictionContextCache IliFileLexer::_sharedContextCache;
 
 // We own the ATN which in turn owns the ATN states.
 atn::ATN IliFileLexer::_atn;
@@ -226,11 +227,6 @@ IliFileLexer::Initializer::Initializer() {
   atn::ATNDeserializer deserializer;
   _atn = deserializer.deserialize(_serializedATN);
 
-  size_t count = _atn.getNumberOfDecisions();
-  _decisionToDFA.reserve(count);
-  for (size_t i = 0; i < count; i++) { 
-    _decisionToDFA.emplace_back(_atn.getDecisionState(i), i);
-  }
 }
 
 IliFileLexer::Initializer IliFileLexer::_init;

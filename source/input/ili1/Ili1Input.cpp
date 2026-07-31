@@ -2,7 +2,7 @@
 #include "../parser/IliParserErrorListener.h"
 #include "../parser/generated/Ili1Lexer.cpp"
 #include "../parser/generated/Ili1Parser.cpp"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 #include "../../util/StringUtil.h"
 
@@ -19,8 +19,8 @@ antlrcpp::Any Ili1Input::visitDecimal(Ili1Parser::DecimalContext *ctx)
 	| NUMBER
 	*/
    
-   debug(ctx,">>> visitDecimal()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitDecimal()");
+   logger_.incNestLevel();
    
    string value;
 
@@ -34,42 +34,40 @@ antlrcpp::Any Ili1Input::visitDecimal(Ili1Parser::DecimalContext *ctx)
       value = ctx->NUMBER()->getText();
    }
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitDecimal(" + value + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitDecimal(" + value + ")");
 
    return value;
 
 }
 
-extern string input_file;
-
-void input::parseIli1(string input)
+void input::parseIli1(const ilic::SourceBuffer &source,
+   metamodel::MetaModelBuilder &builder,util::Logger &logger)
 {
 
-   antlr4::ANTLRInputStream inputstream(util::load_filtered_string_from_file(input));
-   input_file = input;
-   Log.setCurrentSource(input);
-   Log.setCategory("parser");
-   int errors = Log.getErrorCount();
+   auto sourceScope = builder.enterSource(source);
+   auto categoryScope = logger.categoryScope("parser");
+   int errors = logger.getErrorCount();
 
-   Log.debug("creating ili1 lexer ...");
+   logger.debug("creating ili1 lexer ...");
+   antlr4::ANTLRInputStream inputstream(source.text);
    lexer::Ili1Lexer ili1lexer(&inputstream);
    antlr4::CommonTokenStream tokens(&ili1lexer);
 
-   Log.debug("creating ili1 parser ...");
-   parser::IliParserErrorListener errorListener;
+   logger.debug("creating ili1 parser ...");
+   parser::IliParserErrorListener errorListener(logger);
    parser::Ili1Parser ili1parser(&tokens);
    ili1parser.removeErrorListeners();
    ili1parser.addErrorListener(&errorListener);
    parser::Ili1Parser::Interlis1DefContext *ili1d = ili1parser.interlis1Def();
    
-   if (Log.getErrorCount() != errors) {
-      Log.info("compiling aborted due to parsing errors");
+   if (logger.getErrorCount() != errors) {
+      logger.info("compiling aborted due to parsing errors");
       return;
    }
 
-   Log.debug("ili1 building meta model ...");
-   input::Ili1Input ili1input;
+   logger.debug("ili1 building meta model ...");
+   input::Ili1Input ili1input(builder,logger);
    ili1input.visit(ili1d);
 
 }
@@ -89,8 +87,8 @@ antlrcpp::Any Ili1Input::visitInterlis1Def(Ili1Parser::Interlis1DefContext *ctx)
    ;
    */
   
-   debug(ctx,">>> visitInterlis1Def()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitInterlis1Def()");
+   logger_.incNestLevel();
 
    if (ctx->domainDefs() != nullptr) {      
       visitDomainDefs(ctx->domainDefs());
@@ -104,8 +102,8 @@ antlrcpp::Any Ili1Input::visitInterlis1Def(Ili1Parser::Interlis1DefContext *ctx)
    m->ili1Format = visitFormatEncoding(ctx->formatEncoding());
    m->ili1Transfername = ctx->transfername->getText();
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitInterlis1Def()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitInterlis1Def()");
 
    return nullptr;
   
@@ -123,11 +121,11 @@ antlrcpp::Any Ili1Input::visitDerivatives(Ili1Parser::DerivativesContext *ctx)
 
    string name1 = ctx->derivativename1->getText();
    string name2 = ctx->derivativename2->getText();
-   debug(ctx,">>> visitDerivatives(" + name1 + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitDerivatives(" + name1 + ")");
+   logger_.incNestLevel();
    
    if (name1 != name2) {
-      Log.error(
+      logger_.error(
          name2 + " must match " + name1,
          ctx->derivativename2->getLine()
       );
@@ -141,8 +139,8 @@ antlrcpp::Any Ili1Input::visitDerivatives(Ili1Parser::DerivativesContext *ctx)
       visitTopicDef(tctx);
    }      
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitDerivatives(" + name1 + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitDerivatives(" + name1 + ")");
 
    return nullptr;
 
@@ -183,17 +181,17 @@ antlrcpp::Any Ili1Input::visitFormatEncoding(Ili1Parser::FormatEncodingContext *
    END DOT
    */
    
-   debug(ctx,">>> visitFormatEncoding()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitFormatEncoding()");
+   logger_.incNestLevel();
    
-   Ili1Format *f = make_mmobject<Ili1Format>();
+   Ili1Format *f = builder_.store().make<Ili1Format>();
    
    if (ctx->FREE() != nullptr) {
-      init_mmobject(f,ctx->FREE()->getSymbol()->getLine());
+      builder_.initObject(f,ctx->FREE()->getSymbol()->getLine());
       f->isFree = true;
    }
    if (ctx->FIX() != nullptr) {
-      init_mmobject(f,ctx->FIX()->getSymbol()->getLine());
+      builder_.initObject(f,ctx->FIX()->getSymbol()->getLine());
       f->LineSize = atoi(ctx->lineSize->getText().c_str());
       f->tidSize = atoi(ctx->tidSize->getText().c_str());
    }
@@ -233,8 +231,8 @@ antlrcpp::Any Ili1Input::visitFormatEncoding(Ili1Parser::FormatEncodingContext *
       f->tidExplanation = ctx->EXPLANATION()->getSymbol()->getText();
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitFormatEncoding()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitFormatEncoding()");
 
    return f;
 
@@ -247,9 +245,9 @@ antlrcpp::Any Ili1Input::visitFont(Ili1Parser::FontContext *ctx)
    : FONT EQUAL expl=EXPLANATION SEMI
    */
    
-   debug(ctx,">>> visitFont()");
+   builder_.debug(ctx,">>> visitFont()");
    string value = ctx->expl->getText();
-   debug(ctx,"<<< visitFont(" + value + ")");
+   builder_.debug(ctx,"<<< visitFont(" + value + ")");
    
    return value;
 
@@ -263,7 +261,7 @@ antlrcpp::Any Ili1Input::visitCode(Ili1Parser::CodeContext *ctx)
    | HEXNUMBER
    */
 
-   debug(ctx,">>> visitCode()");
+   builder_.debug(ctx,">>> visitCode()");
    
    unsigned int code;
 
@@ -274,7 +272,7 @@ antlrcpp::Any Ili1Input::visitCode(Ili1Parser::CodeContext *ctx)
       sscanf(ctx->HEXNUMBER()->getSymbol()->getText().c_str(),"%x", &code);
    }
  
-   debug(ctx,"<<< visitCode(" + to_string(code) + ")");
+   builder_.debug(ctx,"<<< visitCode(" + to_string(code) + ")");
    
    return (char)code;
 

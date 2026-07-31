@@ -10,6 +10,9 @@ using namespace antlr4;
 using namespace lexer;
 
 Ili1Lexer::Ili1Lexer(CharStream *input) : Lexer(input) {
+  _decisionToDFA.reserve(_atn.getNumberOfDecisions());
+  for (size_t i = 0; i < _atn.getNumberOfDecisions(); ++i)
+    _decisionToDFA.emplace_back(_atn.getDecisionState(i), i);
   _interpreter = new atn::LexerATNSimulator(this, _atn, _decisionToDFA, _sharedContextCache);
 }
 
@@ -53,8 +56,6 @@ const atn::ATN& Ili1Lexer::getATN() const {
 
 
 // Static vars and initialization.
-std::vector<dfa::DFA> Ili1Lexer::_decisionToDFA;
-atn::PredictionContextCache Ili1Lexer::_sharedContextCache;
 
 // We own the ATN which in turn owns the ATN states.
 atn::ATN Ili1Lexer::_atn;
@@ -651,11 +652,6 @@ Ili1Lexer::Initializer::Initializer() {
   atn::ATNDeserializer deserializer;
   _atn = deserializer.deserialize(_serializedATN);
 
-  size_t count = _atn.getNumberOfDecisions();
-  _decisionToDFA.reserve(count);
-  for (size_t i = 0; i < count; i++) { 
-    _decisionToDFA.emplace_back(_atn.getDecisionState(i), i);
-  }
 }
 
 Ili1Lexer::Initializer Ili1Lexer::_init;

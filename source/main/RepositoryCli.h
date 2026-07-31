@@ -3,6 +3,8 @@
 #include "ilic/Repository.h"
 
 #include "../util/StringMap.h"
+#include "../util/IliFile.h"
+#include "../util/Logger.h"
 
 #include <memory>
 #include <optional>
@@ -26,7 +28,7 @@ CliRepositoryConfig buildRepositoryConfig(util::StringMap &arguments);
 std::optional<std::string> validateRepositoryCliConfig(util::StringMap &arguments,
    const CliRepositoryConfig &config,bool hasExplicitIliFiles);
 std::unique_ptr<RepositoryManager> createRepositoryManager(const CliRepositoryConfig &config);
-void logRepositoryDiagnostics(const std::vector<Diagnostic> &diagnostics);
-bool loadResolvedRepositoryModels(const RepositoryResult &resolved);
+void logRepositoryDiagnostics(util::Logger &logger,const std::vector<Diagnostic> &diagnostics);
+bool loadResolvedRepositoryModels(util::IliFileCatalog &files,const RepositoryResult &resolved);
 
 } // namespace ilic::cli

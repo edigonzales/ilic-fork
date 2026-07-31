@@ -2,8 +2,6 @@
 #include <algorithm>
 #include <fstream>
 
-#include "Logger.h"
-#include "../../include/ilic/SourceManager.h"
 
 bool util::starts_with(std::string const &value, std::string const &start)
 {
@@ -44,10 +42,6 @@ bool util::compare_case_insensitive(string s1, string s2)
 
 string util::load_string(string fname)
 {
-   if (ilic::activeSourceManager() != nullptr) {
-      const ilic::SourceBuffer *source = ilic::activeSourceManager()->get(fname);
-      if (source != nullptr) return source->text;
-   }
    ifstream in(fname, ios::binary);
    if (!in.is_open()) {
       return "";

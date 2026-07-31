@@ -5,6 +5,8 @@
 #include <vector>
 #include "antlr4-runtime.h"
 #include "../../metamodel/MetaModel.h"
+#include "../../metamodel/MetaModelBuilder.h"
+#include "../../util/Logger.h"
 #include "../parser/generated/Ili2Parser.h"
 
 using namespace std;
@@ -23,8 +25,10 @@ namespace input {
    const string GENERIC   = "GENERIC";
 
    string visitString(antlr4::Token *t);
-   map<string,bool> get_properties(parser::Ili2Parser::PropertiesContext *ctx,vector<string> allowed_properties);
-   void check_references(metamodel::Class *c,string name,int line);
+   map<string,bool> get_properties(util::Logger &logger,
+      parser::Ili2Parser::PropertiesContext *ctx,vector<string> allowed_properties);
+   void check_references(metamodel::MetaModelBuilder &builder,util::Logger &logger,
+      metamodel::Class *c,string name,int line);
    bool check_type_compatibility(string base,string extension);
 
 }

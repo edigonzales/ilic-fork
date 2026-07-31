@@ -2,6 +2,9 @@
 
 #include "antlr4-runtime.h"
 #include "../parser/generated/Ili2ParserBaseVisitor.h"
+#include "../../metamodel/MetaModelBuilder.h"
+#include "../../../include/ilic/SourceManager.h"
+#include "../../util/Logger.h"
 
 #include <string>
 
@@ -9,10 +12,14 @@ using namespace std;
 
 namespace input {
    
-   void parseIli2(string ilifile); 
+   void parseIli2(const ilic::SourceBuffer &source,
+      metamodel::MetaModelBuilder &builder,util::Logger &logger);
 
    class Ili2Input : public parser::Ili2ParserBaseVisitor {
    public:
+
+      Ili2Input(metamodel::MetaModelBuilder &builder,util::Logger &logger)
+         : builder_(builder),logger_(logger) {}
    
       antlrcpp::Any visitInterlis2Def(parser::Ili2Parser::Interlis2DefContext *ctx) override;
       antlrcpp::Any visitModelDef(parser::Ili2Parser::ModelDefContext *ctx) override;
@@ -112,6 +119,11 @@ namespace input {
       antlrcpp::Any visitFunctionCall(parser::Ili2Parser::FunctionCallContext *ctx) override;
       antlrcpp::Any visitFunctionCallArgument(parser::Ili2Parser::FunctionCallArgumentContext *ctx) override;
       antlrcpp::Any visitArgumentType(parser::Ili2Parser::ArgumentTypeContext *ctx) override;
+
+   private:
+      metamodel::MetaModelBuilder &builder_;
+      util::Logger &logger_;
+      metamodel::Type *basetype_ = nullptr;
       
    };
 

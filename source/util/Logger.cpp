@@ -13,6 +13,55 @@ to do !!!
 
 using namespace util;
 
+Logger::SourceScope::SourceScope(Logger &logger,string source)
+   : logger_(&logger), previous_(logger.current_source)
+{
+   logger_->current_source = std::move(source);
+}
+
+Logger::SourceScope::~SourceScope() noexcept
+{
+   if (logger_ != nullptr) logger_->current_source = std::move(previous_);
+}
+
+Logger::SourceScope::SourceScope(SourceScope &&other) noexcept
+   : logger_(other.logger_), previous_(std::move(other.previous_))
+{
+   other.logger_ = nullptr;
+}
+
+Logger::CategoryScope::CategoryScope(Logger &logger,string category)
+   : logger_(&logger), previous_(logger.current_category)
+{
+   logger_->current_category = std::move(category);
+}
+
+Logger::CategoryScope::~CategoryScope() noexcept
+{
+   if (logger_ != nullptr) logger_->current_category = std::move(previous_);
+}
+
+Logger::CategoryScope::CategoryScope(CategoryScope &&other) noexcept
+   : logger_(other.logger_), previous_(std::move(other.previous_))
+{
+   other.logger_ = nullptr;
+}
+
+Logger::IndentScope::IndentScope(Logger &logger) : logger_(&logger)
+{
+   logger_->incNestLevel();
+}
+
+Logger::IndentScope::~IndentScope() noexcept
+{
+   if (logger_ != nullptr) logger_->decNestLevel();
+}
+
+Logger::IndentScope::IndentScope(IndentScope &&other) noexcept : logger_(other.logger_)
+{
+   other.logger_ = nullptr;
+}
+
 //-------------------------------------------------------------
 // private interface
 //-------------------------------------------------------------
@@ -48,8 +97,6 @@ string Logger::ident()
 // public interface
 //-------------------------------------------------------------
 
-Logger Log;
-
 // general
 
 void Logger::reset()
@@ -66,14 +113,13 @@ void Logger::reset()
    warnings_as_errors = false;
    current_source.clear();
    current_category = "compiler";
-   abort_with_exception = false;
    diagnostics.clear();
    events.clear();
 }
 
 void Logger::setCurrentSource(string uri) { current_source = std::move(uri); }
 void Logger::setCategory(string category) { current_category = std::move(category); }
-void Logger::setAbortWithException(bool state) { abort_with_exception = state; }
+void Logger::setAbortWithException(bool) {}
 const string &Logger::getCurrentSource() const { return current_source; }
 void Logger::setLogSink(ilic::LogSink sink) { log_sink = std::move(sink); }
 void Logger::setDiagnosticSink(ilic::DiagnosticSink sink) { diagnostic_sink = std::move(sink); }
@@ -346,20 +392,17 @@ int Logger::getErrorCount()
 void Logger::internal_error(string message)
 {
    this->messageNoIdent("int: " + message);
-   if (abort_with_exception) throw CompilerAbort(message,1);
-   exit(1);
+   throw CompilerAbort(std::move(message),1);
 }
 
 void Logger::internal_error(string message,int error_code)
 {
    this->messageNoIdent("int: " + message);
-   if (abort_with_exception) throw CompilerAbort(message,error_code);
-   exit(error_code);
+   throw CompilerAbort(std::move(message),error_code);
 }
 
 void Logger::internal_error(string message,exception e,int error_code)
 {
    this->messageNoIdent("int: " + message + " (" + string(e.what()) + ")");
-   if (abort_with_exception) throw CompilerAbort(message + " (" + string(e.what()) + ")",error_code);
-   exit(error_code);
+   throw CompilerAbort(std::move(message) + " (" + string(e.what()) + ")",error_code);
 }

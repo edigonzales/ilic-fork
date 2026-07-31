@@ -8,6 +8,7 @@
 #include "Recognizer.h"
 #include "atn/ATN.h"
 #include "atn/ATNState.h"
+#include <atomic>
 
 namespace antlr4 {
 namespace atn {
@@ -36,7 +37,7 @@ namespace atn {
     static const size_t INITIAL_HASH = 1;
 
   public:
-    static size_t globalNodeCount;
+    static std::atomic<size_t> globalNodeCount;
     const size_t id;
 
     /// <summary>
@@ -251,4 +252,3 @@ namespace atn {
 
 } // namespace atn
 } // namespace antlr4
-

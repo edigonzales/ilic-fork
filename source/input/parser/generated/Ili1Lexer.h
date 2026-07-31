@@ -45,8 +45,8 @@ public:
   virtual const antlr4::atn::ATN& getATN() const override;
 
 private:
-  static std::vector<antlr4::dfa::DFA> _decisionToDFA;
-  static antlr4::atn::PredictionContextCache _sharedContextCache;
+  std::vector<antlr4::dfa::DFA> _decisionToDFA;
+  antlr4::atn::PredictionContextCache _sharedContextCache;
   static std::vector<std::string> _ruleNames;
   static std::vector<std::string> _tokenNames;
   static std::vector<std::string> _channelNames;

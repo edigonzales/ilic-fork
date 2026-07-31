@@ -8,7 +8,8 @@ namespace output {
    class XsdOutput : public metamodel::MetaModelTreeVisitor {
    public:
 
-      XsdOutput(string ilifile,string iliversion,string ilic_version);
+      XsdOutput(metamodel::MetaModelStore &store,util::Logger &logger,
+         string ilifile,string iliversion,string ilic_version);
 
       void preVisit(void) override;
       void postVisit(void) override;

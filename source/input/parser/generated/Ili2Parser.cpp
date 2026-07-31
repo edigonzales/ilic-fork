@@ -12,6 +12,9 @@ using namespace parser;
 using namespace antlr4;
 
 Ili2Parser::Ili2Parser(TokenStream *input) : Parser(input) {
+  _decisionToDFA.reserve(_atn.getNumberOfDecisions());
+  for (size_t i = 0; i < _atn.getNumberOfDecisions(); ++i)
+    _decisionToDFA.emplace_back(_atn.getDecisionState(i), i);
   _interpreter = new atn::ParserATNSimulator(this, _atn, _decisionToDFA, _sharedContextCache);
 }
 
@@ -13123,8 +13126,6 @@ bool Ili2Parser::operator2Sempred(Operator2Context *_localctx, size_t predicateI
 }
 
 // Static vars and initialization.
-std::vector<dfa::DFA> Ili2Parser::_decisionToDFA;
-atn::PredictionContextCache Ili2Parser::_sharedContextCache;
 
 // We own the ATN which in turn owns the ATN states.
 atn::ATN Ili2Parser::_atn;
@@ -14603,11 +14604,6 @@ Ili2Parser::Initializer::Initializer() {
   atn::ATNDeserializer deserializer;
   _atn = deserializer.deserialize(_serializedATN);
 
-  size_t count = _atn.getNumberOfDecisions();
-  _decisionToDFA.reserve(count);
-  for (size_t i = 0; i < count; i++) { 
-    _decisionToDFA.emplace_back(_atn.getDecisionState(i), i);
-  }
 }
 
 Ili2Parser::Initializer Ili2Parser::_init;

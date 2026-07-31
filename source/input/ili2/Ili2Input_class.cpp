@@ -3,7 +3,7 @@
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
 #include "../../metamodel/DiagnosticUtil.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/StringUtil.h"
 #include "../../util/Logger.h"
 
@@ -54,7 +54,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
      classOrStructureDef
      END classname2=NAME SEMI
    */
-   
+
    /*
    class Class : public Type {
       // MetaElement.Name := StructureName, ClassName,
@@ -107,50 +107,50 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    }
 
    if (name1 != name2) {
-      Log.error(DiagnosticId::NameEndMismatch,
+      logger_.error(DiagnosticId::NameEndMismatch,
          "classname " + name2 + " must match " + name1,
-         get_line(ctx->classname2)
+         builder_.line(ctx->classname2)
       );
    }
 
-   debug(ctx,">>> visitClassDef(" + name1 + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitClassDef(" + name1 + ")");
+   logger_.incNestLevel();
 
    // init Class
-   Class *c = make_mmobject<Class>();
+   Class *c = builder_.store().make<Class>();
    c->Kind = Class::ClassVal;
-   init_type(c,get_line(ctx->classname1));
-   set_selection_source(c,ctx->classname1);
-   set_end_selection_source(c,ctx->classname2);
+   builder_.initType(c,builder_.line(ctx->classname1));
+   builder_.setSelectionSource(c,ctx->classname1);
+   builder_.setEndSelectionSource(c,ctx->classname2);
 
    // MetaElement Attributes
    c->Name = name1;
 
    // ExtendableME Attributes
-   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED}));
+   map<string,bool> properties = get_properties(logger_,ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED}));
    c->Abstract = properties[ABSTRACT];
-   if (get_package_context()->getClass() == "Model" && !c->Abstract) {
-      Log.error(DiagnosticId::ClassAbstractModelContextRequired,
-         "a class in model context has to be defined ABSTRACT",get_line(ctx));
+   if (builder_.currentPackage()->getClass() == "Model" && !c->Abstract) {
+      logger_.error(DiagnosticId::ClassAbstractModelContextRequired,
+         "a class in model context has to be defined ABSTRACT",builder_.line(ctx));
    }
    c->Final = properties[FINAL];
    c->Extended = properties[EXTENDED];
 
    // EXTENDED
    if (c->Extended) {
-      set_reference_source(c,"inheritance",ctx->classname1);
-      DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
+      builder_.setReferenceSource(c,"inheritance",ctx->classname1);
+      DataUnit* u = builder_.findDataUnit(get_path(builder_.currentPackage()),c->_line);
       if (u->Super == nullptr) {
-         Log.error(DiagnosticId::InheritanceExtendedTopicRequired,
+         logger_.error(DiagnosticId::InheritanceExtendedTopicRequired,
             "EXTENDED can only by used in extended topics",diagnostic_range(c));
       }
       else {
-         Class *s = find_class_or_structure(name1,c->_line);
+         Class *s = builder_.findClassOrStructure(name1,c->_line);
          c->Super = s;
          if (s != nullptr) {
             s->Sub.push_back(c);
             if (s->Final) {
-               Log.error(DiagnosticId::InheritanceFinalBase,
+               logger_.error(DiagnosticId::InheritanceFinalBase,
                   "class " + name1 + " can not extend FINAL base class " +
                      get_path(s),diagnostic_range(c));
             }
@@ -160,13 +160,13 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
 
    // EXTENDS
    if (ctx->classbase != nullptr) {
-      set_reference_source(c,"inheritance",ctx->classbase);
-      Class *s = find_class_or_structure(ctx->classbase->getText(),get_line(ctx->classbase));
+      builder_.setReferenceSource(c,"inheritance",ctx->classbase);
+      Class *s = builder_.findClassOrStructure(ctx->classbase->getText(),builder_.line(ctx->classbase));
       c->Super = s;
       if (s != nullptr) {
          s->Sub.push_back(c);
          if (s->Final) {
-            Log.error(DiagnosticId::InheritanceFinalBase,
+            logger_.error(DiagnosticId::InheritanceFinalBase,
                "class " + name1 + " can not extend FINAL base class " +
                   get_path(s),diagnostic_range(c));
          }
@@ -177,7 +177,7 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    // metamodel::AttrOrParam *LTParent;
 
    if (ctx->classoid != nullptr) {
-      c->Oid = find_domaintype(ctx->classoid->getText(),get_line(ctx->classoid));
+      c->Oid = builder_.findDomainType(ctx->classoid->getText(),builder_.line(ctx->classoid));
       // DomainType *Oid; // RESTRICTION(TextType; NumType; AnyOIDType), to do !!!
    }
    else if (ctx->NO()) {
@@ -187,11 +187,11 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
    // role from ASSOCIATION DerivedAssoc
    // View *View;
 
-   add_class(c);
-   push_context(c);
+   builder_.addClass(c);
+   builder_.pushContext(*c);
 
    /* classOrStructureDef
-   : ATTRIBUTE? 
+   : ATTRIBUTE?
      attributeDef*
      constraintDef*
      (PARAMETER parameterDef*)?
@@ -210,12 +210,12 @@ antlrcpp::Any Ili2Input::visitClassDef(Ili2Parser::ClassDefContext *ctx)
       visitParameterDef(pctx);
    }
 
-   check_references(c,"",0);
-   pop_context();
+   check_references(builder_,logger_,c,"",0);
+   builder_.popContext();
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitClassDef(" + name1 + ")");
-   
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitClassDef(" + name1 + ")");
+
    return c;
 
 }
@@ -233,47 +233,47 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
    string name1 = ctx->structurename1->getText();
    string name2 = ctx->structurename2->getText();
 
-   debug(ctx,">>> visitStructureDef(" + name1 + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitStructureDef(" + name1 + ")");
+   logger_.incNestLevel();
 
    if (name1 != name2) {
-      Log.error(DiagnosticId::NameEndMismatch,
+      logger_.error(DiagnosticId::NameEndMismatch,
          "structurename " + name2 + " must match " + name1,
          ctx->structurename2->getLine()
       );
    }
 
    // init Class
-   Class *c = make_mmobject<Class>();
+   Class *c = builder_.store().make<Class>();
    c->Kind = Class::Structure;
-   init_type(c,ctx->structurename1->getLine());
-   set_selection_source(c,ctx->structurename1);
-   set_end_selection_source(c,ctx->structurename2);
+   builder_.initType(c,ctx->structurename1->getLine());
+   builder_.setSelectionSource(c,ctx->structurename1);
+   builder_.setEndSelectionSource(c,ctx->structurename2);
 
    // MetaElement Attributes
    c->Name = name1;
 
    // ExtendableME Attributes
-   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED}));
+   map<string,bool> properties = get_properties(logger_,ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED}));
    c->Abstract = properties[ABSTRACT];
    c->Final = properties[FINAL];
    c->Extended = properties[EXTENDED];
 
    // EXTENDED
    if (c->Extended) {
-      set_reference_source(c,"inheritance",ctx->structurename1);
-      DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
+      builder_.setReferenceSource(c,"inheritance",ctx->structurename1);
+      DataUnit* u = builder_.findDataUnit(get_path(builder_.currentPackage()),c->_line);
       if (u->Super == nullptr) {
-         Log.error(DiagnosticId::InheritanceExtendedTopicRequired,
+         logger_.error(DiagnosticId::InheritanceExtendedTopicRequired,
             "EXTENDED can only by used in extended topics",diagnostic_range(c));
       }
       else {
-         Class *s = find_structure(name1,c->_line);
+         Class *s = builder_.findStructure(name1,c->_line);
          c->Super = s;
          if (s != nullptr) {
             s->Sub.push_back(c);
             if (s->Final) {
-               Log.error(DiagnosticId::InheritanceFinalBase,
+               logger_.error(DiagnosticId::InheritanceFinalBase,
                   "structure " + name1 +
                      " can not extend FINAL base structure " + get_path(s),
                   diagnostic_range(c));
@@ -284,13 +284,13 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
 
    // EXTENDS
    if (ctx->structurebase != nullptr) {
-      set_reference_source(c,"inheritance",ctx->structurebase);
-      Class *s = find_structure(ctx->structurebase->getText(),get_line(ctx->structurebase));
+      builder_.setReferenceSource(c,"inheritance",ctx->structurebase);
+      Class *s = builder_.findStructure(ctx->structurebase->getText(),builder_.line(ctx->structurebase));
       c->Super = s;
       if (s != nullptr) {
          s->Sub.push_back(c);
          if (s->Final) {
-            Log.error(DiagnosticId::InheritanceFinalBase,
+            logger_.error(DiagnosticId::InheritanceFinalBase,
                "structure " + name1 +
                   " can not extend FINAL base structure " + get_path(s),
                diagnostic_range(c));
@@ -304,11 +304,11 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
    // role from ASSOCIATION DerivedAssoc
    // View *View;
 
-   add_class(c);
-   push_context(c);
+   builder_.addClass(c);
+   builder_.pushContext(*c);
 
    /* classOrStructureDef
-   : ATTRIBUTE? 
+   : ATTRIBUTE?
      attributeDef*
      constraintDef*
      (PARAMETER parameterDef*)?
@@ -327,31 +327,31 @@ antlrcpp::Any Ili2Input::visitStructureDef(Ili2Parser::StructureDefContext *ctx)
       visitParameterDef(pctx);
    }
 
-   check_references(c,"",0);
-   pop_context();
+   check_references(builder_,logger_,c,"",0);
+   builder_.popContext();
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitStructureDef(" + name1 + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitStructureDef(" + name1 + ")");
 
    return c;
 
 }
 
-static Type* any_to_type(antlrcpp::Any any) 
+static Type* anyToType(antlrcpp::Any any)
 {
-   
+
    try {
       return any.as<TextType *>();
    }
    catch (exception e) {
    }
-   
+
    try {
       return any.as<NumType *>();
    }
    catch (exception e) {
    }
-   
+
    try {
       return any.as<BooleanType *>();
    }
@@ -402,17 +402,13 @@ static Type* any_to_type(antlrcpp::Any any)
    catch (exception e) {
    }
 
-   Log.error(DiagnosticId::CompilerUnsupportedType,"any_to_type: unsupported type",-1);
    return nullptr;
-
 }
 
 static void check_type_restriction(Type *base_type,Type *extended_type, string name, int line)
 {
 
    if (!extended_type->isSubClassOf(base_type->getClass())) {
-      Log.error(DiagnosticId::AttributeIncompatibleExtension,
-         "type of attribute " + name + " must have same type as baseclass attr",line);
       return;
    }
 
@@ -424,12 +420,8 @@ static void check_type_restriction(Type *base_type,Type *extended_type, string n
       double min_e = atoi(e->Min.c_str());
       double max_e = atoi(e->Max.c_str());
       if (min_e < min_b) {
-         Log.error(DiagnosticId::AttributeExtensionNumericRange,
-            "numeric range of " + name + " must be a subrange of baseclass type",line);
       }
       else if (max_e > max_b) {
-         Log.error(DiagnosticId::AttributeExtensionNumericRange,
-            "numeric range of " + name + " must be a subrange of baseclass type",line);
       }
       return;
    }
@@ -437,7 +429,7 @@ static void check_type_restriction(Type *base_type,Type *extended_type, string n
    // other type, to do !!!
 
 }
-   
+
 antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefContext * ctx)
 {
 
@@ -464,53 +456,53 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    */
 
    string name = ctx->attributname->getText();
-      
-   debug(ctx,">>> visitAttributeDef(" + name + ")");
-   Log.incNestLevel();
 
-   if (find_role(get_class_context(),name) != nullptr) {
-      Log.error(DiagnosticId::AssociationAttributeNameConflict,
-         "there is already a role with name " + name,get_line(ctx));
+   builder_.debug(ctx,">>> visitAttributeDef(" + name + ")");
+   logger_.incNestLevel();
+
+   if (builder_.findRole(builder_.currentClass(),name) != nullptr) {
+      logger_.error(DiagnosticId::AssociationAttributeNameConflict,
+         "there is already a role with name " + name,builder_.line(ctx));
    }
-   AttrOrParam *aa = find_attribute(get_class_context(),name);
-   if (aa != nullptr && aa->AttrParent == get_class_context()) {
-      Log.error(DiagnosticId::AttributeDuplicate,
-         "there is already an attribute with name " + name,get_line(ctx));
+   AttrOrParam *aa = builder_.findAttribute(builder_.currentClass(),name);
+   if (aa != nullptr && aa->AttrParent == builder_.currentClass()) {
+      logger_.error(DiagnosticId::AttributeDuplicate,
+         "there is already an attribute with name " + name,builder_.line(ctx));
    }
 
    // init AttrOrParam
-   AttrOrParam *a = make_mmobject<AttrOrParam>();
-   init_extendableme(a, ctx->attributname->getLine());
-   set_selection_source(a,ctx->attributname);
+   AttrOrParam *a = builder_.store().make<AttrOrParam>();
+   builder_.initExtendable(a, ctx->attributname->getLine());
+   builder_.setSelectionSource(a,ctx->attributname);
 
    // MetaElement attributes
    a->Name = name;
-   
+
    // ExtendableME attributes
-   
+
    map <string,bool> properties;
-   properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED,TRANSIENT}));
+   properties = get_properties(logger_,ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED,TRANSIENT}));
    a->Abstract = properties[ABSTRACT];
    a->Final = properties[FINAL];
    a->Extended = properties[EXTENDED];
    if (a->Extended) {
-      set_reference_source(a,"inheritance",ctx->attributname);
-      Class *c = get_class_context();
+      builder_.setReferenceSource(a,"inheritance",ctx->attributname);
+      Class *c = builder_.currentClass();
       if (c->Super == nullptr) {
-         Log.error(DiagnosticId::InheritanceExtendedDeclarationRequired,
+         logger_.error(DiagnosticId::InheritanceExtendedDeclarationRequired,
             "EXTENDED can only be used in extended classes, structures, or associations",
             diagnostic_range(a));
       }
       else {
          Class* s = static_cast<Class*>(c->Super);
-         aa = find_attribute(s, a->Name);
+         aa = builder_.findAttribute(s, a->Name);
          if (aa == nullptr) {
-            Log.error(DiagnosticId::AttributeBaseNotFound,
+            logger_.error(DiagnosticId::AttributeBaseNotFound,
                "base attribute of " + name + " not found in " + get_path(s),
                diagnostic_range(a));
          }
          else if (aa->Final) {
-            Log.error(DiagnosticId::AttributeBaseFinal,
+            logger_.error(DiagnosticId::AttributeBaseFinal,
                "base attribute of " + name + " is FINAL",diagnostic_range(a),
                related_information(aa,"Final base attribute is declared here"));
          }
@@ -519,18 +511,18 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
       }
    }
 
-   push_context(a);
+   builder_.pushContext(*a);
    a->Type = visitAttrTypeDef(ctx->attrTypeDef());
-   set_reference_source(a,"type",attr_type_def_token(ctx->attrTypeDef()));
+   builder_.setReferenceSource(a,"type",attr_type_def_token(ctx->attrTypeDef()));
    a->TypeExplicitlyDefined = ctx->attrTypeDef()->attrType() != nullptr ||
                               ctx->attrTypeDef()->bagOrListType() != nullptr;
-   pop_context();
+   builder_.popContext();
 
-   if (aa != nullptr && aa->AttrParent != get_class_context()) {
+   if (aa != nullptr && aa->AttrParent != builder_.currentClass()) {
       // Type compatibility belongs to the semantic checker, which can report
       // the named declarations and their exact source ranges.
       if (!properties[EXTENDED]) {
-         Log.error(DiagnosticId::AttributeExtendedRequired,
+         logger_.error(DiagnosticId::AttributeExtendedRequired,
             "attribute " + a->Name + " must be declared EXTENDED",diagnostic_range(a),
             related_information(aa,"Inherited attribute is declared here"));
       }
@@ -552,13 +544,13 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
    a->Transient = properties[TRANSIENT];
 
    // ASSOCIATION ClassAttr
-   a->AttrParent = get_class_context();
-   get_class_context()->ClassAttribute.push_back(a);
+   a->AttrParent = builder_.currentClass();
+   builder_.currentClass()->ClassAttribute.push_back(a);
 
    // RefHB 2.3 3.8: an abstract transient attribute may defer its factor to a
    // concrete extension. This matches ili2c's attributeDef validation.
    if (a->Transient && !a->Abstract && ctx->factor().empty()) {
-      Log.error(DiagnosticId::TransientAttributeFactorRequired,
+      logger_.error(DiagnosticId::TransientAttributeFactorRequired,
          "TRANSIENT attribute " + name + " requires an assignment of a factor",
          diagnostic_range(a));
    }
@@ -568,9 +560,9 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
          a->Derivates.push_back(factor);
       }
    }
-   
-   Log.decNestLevel();
-   debug(ctx,"<<< visitAttributeDef(" + name + ")");
+
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitAttributeDef(" + name + ")");
 
    return a;
 
@@ -578,18 +570,18 @@ antlrcpp::Any Ili2Input::visitAttributeDef(parser::Ili2Parser::AttributeDefConte
 
 antlrcpp::Any Ili2Input::visitAttrTypeDef(parser::Ili2Parser::AttrTypeDefContext *ctx)
 {
-   
+
    /* attrTypeDef
    : MANDATORY attrType?
    | attrType
    | bagOrListType
    */
 
-   debug(ctx,">>> visitAttrTypeDef()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitAttrTypeDef()");
+   logger_.incNestLevel();
 
    Type *t = nullptr;
-   
+
    if (ctx->attrType() != nullptr) {
       t = visitAttrType(ctx->attrType());
       if (t != nullptr && ctx->MANDATORY() != nullptr) {
@@ -604,40 +596,40 @@ antlrcpp::Any Ili2Input::visitAttrTypeDef(parser::Ili2Parser::AttrTypeDefContext
                t = dt;
             }
             catch (exception e) {
-               Log.internal_error("unable to cast to DomainType, line=" + to_string(ctx->start->getLine()), e, 1);
+               logger_.internal_error("unable to cast to DomainType, line=" + to_string(ctx->start->getLine()), e, 1);
             }
          }
       }
    }
    else if (ctx->MANDATORY() != nullptr) {
-      AttrOrParam *a = static_cast<AttrOrParam *>(get_context());
+      AttrOrParam *a = static_cast<AttrOrParam *>(builder_.current());
       if (a->Extending != nullptr) {
-         DomainType* dt = static_cast<DomainType*>((a->Extending->Type)->clone());
+         DomainType* dt = static_cast<DomainType*>(builder_.clone(*a->Extending->Type));
          dt->Mandatory = true;
          t = dt;
       }
       else {
-         Log.error(DiagnosticId::AttributeMandatoryExtensionRequired,
-            "MANDATORY restriction only allowed on EXTENDED attributes",get_line(ctx));
+         logger_.error(DiagnosticId::AttributeMandatoryExtensionRequired,
+            "MANDATORY restriction only allowed on EXTENDED attributes",builder_.line(ctx));
       }
    }
    else {
       MultiValue *m = visitBagOrListType(ctx->bagOrListType());
       t = m;
    }
-   
+
    if (t != nullptr) {
       t->Name = "TYPE";
-      //t->LTParent = dynamic_cast<AttrOrParam *>(get_context());
-      t->_attr = dynamic_cast<AttrOrParam *>(get_context());
+      //t->LTParent = dynamic_cast<AttrOrParam *>(builder_.current());
+      t->_attr = dynamic_cast<AttrOrParam *>(builder_.current());
    }
 
-   Log.decNestLevel();
+   logger_.decNestLevel();
    if (t != nullptr) {
-      debug(ctx,"<<< visitAttrTypeDef() " + t->Name + ":" + t->getClass());
+      builder_.debug(ctx,"<<< visitAttrTypeDef() " + t->Name + ":" + t->getClass());
    }
    else {
-      debug(ctx,"<<< visitAttrTypeDef() ???");
+      builder_.debug(ctx,"<<< visitAttrTypeDef() ???");
    }
 
    return t;
@@ -646,42 +638,42 @@ antlrcpp::Any Ili2Input::visitAttrTypeDef(parser::Ili2Parser::AttrTypeDefContext
 
 antlrcpp::Any Ili2Input::visitParameterDef(parser::Ili2Parser::ParameterDefContext *ctx)
 {
-   
-   /* parameterDef 
+
+   /* parameterDef
    : parameterName=NAME
      properties? // ABSTRACT,EXTENDED,FINAL
      COLON (attrTypeDef | METAOBJECT (OF path)?) SEMI
    */
-   
+
    string name = ctx->parameterName->getText();
-   debug(ctx,">>> visitParameterDef(" + name + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitParameterDef(" + name + ")");
+   logger_.incNestLevel();
 
    // init AttrOrParam
-   AttrOrParam *a = make_mmobject<AttrOrParam>();
-   init_extendableme(a, ctx->parameterName->getLine());
-   set_selection_source(a,ctx->parameterName);
+   AttrOrParam *a = builder_.store().make<AttrOrParam>();
+   builder_.initExtendable(a, ctx->parameterName->getLine());
+   builder_.setSelectionSource(a,ctx->parameterName);
 
    // MetaElement attributes
    a->Name = name;
-   
+
    // ExtendableME attributes
    if (ctx->properties() != nullptr) {
-      map <string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED,TRANSIENT}));
+      map <string,bool> properties = get_properties(logger_,ctx->properties(),vector<string>({ABSTRACT,FINAL,EXTENDED,TRANSIENT}));
       a->Abstract = properties[ABSTRACT];
       a->Final = properties[FINAL];
       a->Extended = properties[EXTENDED];
       if (properties[EXTENDED]) {
-         set_reference_source(a,"inheritance",ctx->parameterName);
-         Class *c = get_class_context();
+         builder_.setReferenceSource(a,"inheritance",ctx->parameterName);
+         Class *c = builder_.currentClass();
          if (c->Super == nullptr) {
-            Log.error(DiagnosticId::InheritanceExtendedDeclarationRequired,
+            logger_.error(DiagnosticId::InheritanceExtendedDeclarationRequired,
                "EXTENDED can only be used in extended classes, structures, or associations",
                diagnostic_range(a));
          }
          else {
             Class* s = static_cast<Class*>(c->Super);
-            AttrOrParam *aa = metamodel::find_parameter(s,name,get_line(ctx));
+            AttrOrParam *aa = builder_.findParameter(s,name,builder_.line(ctx));
             if (aa != nullptr) {
                //check_type_restriction(aa->Type, a->Type, name, ctx->attributname->getLine());
                a->Extending = aa;
@@ -690,17 +682,17 @@ antlrcpp::Any Ili2Input::visitParameterDef(parser::Ili2Parser::ParameterDefConte
       }
    }
 
-   push_context(a);
+   builder_.pushContext(*a);
    a->Type = visitAttrTypeDef(ctx->attrTypeDef());
-   set_reference_source(a,"type",attr_type_def_token(ctx->attrTypeDef()));
-   pop_context();
+   builder_.setReferenceSource(a,"type",attr_type_def_token(ctx->attrTypeDef()));
+   builder_.popContext();
 
    // ASSOCIATION ClassParam
-   a->ParamParent = get_class_context();
-   get_class_context()->ClassParameter.push_back(a);
-   
-   Log.decNestLevel();
-   debug(ctx,"<<< visitParameterDef(" + name + ")");
+   a->ParamParent = builder_.currentClass();
+   builder_.currentClass()->ClassParameter.push_back(a);
+
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitParameterDef(" + name + ")");
 
    return nullptr;
 
@@ -734,17 +726,17 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
       metamodel::AttrOrParam *_attr = nullptr;
    */
 
-   debug(ctx,">>> visitAttrType()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitAttrType()");
+   logger_.incNestLevel();
 
    Type *t = nullptr;
 
    if (ctx->path()) {
-      Type *tt = find_type(visitPath(ctx->path()),get_line(ctx));
+      Type *tt = builder_.findType(visitPath(ctx->path()),builder_.line(ctx));
       if (tt != nullptr) {
          if (tt->getClass() == "Class") {
-            MultiValue *mv = make_mmobject<MultiValue>();
-            init_type(mv,get_line(ctx));
+            MultiValue *mv = builder_.store().make<MultiValue>();
+            builder_.initType(mv,builder_.line(ctx));
             mv->Multiplicity.Min = 0;
             mv->Multiplicity.Max = 1;
             mv->BaseType = tt;
@@ -752,7 +744,7 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
             t = mv;
          }
          else {
-            t = static_cast<Type *>(tt->clone());
+            t = static_cast<Type *>(builder_.clone(*tt));
             t->Super = tt;
          }
       }
@@ -767,8 +759,8 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
    }
    else if (ctx->restrictedRef() != nullptr) {
       RestrictedRef* r = visitRestrictedRef(ctx->restrictedRef());
-      MultiValue* mv = make_mmobject<MultiValue>();
-      init_type(mv, get_line(ctx));
+      MultiValue* mv = builder_.store().make<MultiValue>();
+      builder_.initType(mv, builder_.line(ctx));
       mv->Multiplicity.Min = 0;
       mv->Multiplicity.Max = 1;
       mv->BaseType = r->_baseclass;
@@ -781,23 +773,23 @@ antlrcpp::Any Ili2Input::visitAttrType(parser::Ili2Parser::AttrTypeContext * ctx
 
    if (t != nullptr) {
       try {
-         if (get_context()->getClass() == "FunctionDef") {
-            t->LFTParent = dynamic_cast<FunctionDef*>(get_context());
+         if (builder_.current()->getClass() == "FunctionDef") {
+            t->LFTParent = dynamic_cast<FunctionDef*>(builder_.current());
          }
          else {
-            t->LTParent = dynamic_cast<AttrOrParam*>(get_context());
+            t->LTParent = dynamic_cast<AttrOrParam*>(builder_.current());
          }
       }
       catch (exception e) {
-         Log.internal_error("LTParent: " + string(e.what()),1);
+         logger_.internal_error("LTParent: " + string(e.what()),1);
       }
       t->ElementInPackage = nullptr;
-      Log.decNestLevel();
-      debug(ctx,"<<< visitAttrType() " + t->Name + ":" + t->getClass());
+      logger_.decNestLevel();
+      builder_.debug(ctx,"<<< visitAttrType() " + t->Name + ":" + t->getClass());
    }
    else {
-      Log.decNestLevel();
-      debug(ctx,"<<< visitAttrType() ???");
+      logger_.decNestLevel();
+      builder_.debug(ctx,"<<< visitAttrType() ???");
    }
 
    return t;
@@ -810,7 +802,7 @@ antlrcpp::Any Ili2Input::visitReferenceAttr(parser::Ili2Parser::ReferenceAttrCon
    /* referenceAttr
    : REFERENCE TO (LPAREN EXTERNAL RPAREN)? restrictedRef
    */
-   
+
    /* class ClassRelatedType : public DomainType { // ABSTRACT
    */
 
@@ -821,40 +813,40 @@ antlrcpp::Any Ili2Input::visitReferenceAttr(parser::Ili2Parser::ReferenceAttrCon
       virtual string getBaseClass() { return "ClassRelatedType"; };
    */
 
-   debug(ctx,">>> visitReferenceAttr()");
-   Log.incNestLevel();
-      
-   ReferenceType *t = make_mmobject<ReferenceType>();
-   init_domaintype(t,ctx->start->getLine());
-   
+   builder_.debug(ctx,">>> visitReferenceAttr()");
+   logger_.incNestLevel();
+
+   ReferenceType *t = builder_.store().make<ReferenceType>();
+   builder_.initDomainType(t,ctx->start->getLine());
+
    if (ctx->EXTERNAL() != nullptr) {
       t->External = true;
    }
-   
-   Class *c = static_cast<Class *>(get_class_context());
+
+   Class *c = static_cast<Class *>(builder_.currentClass());
    if (c->Kind != Class::Structure) {
-      if (ili23) {
-         Log.error(DiagnosticId::ReferenceStructureContextRequired,
-            "reference to is only allowed in structures",get_line(ctx));
+      if (builder_.isIli23()) {
+         logger_.error(DiagnosticId::ReferenceStructureContextRequired,
+            "reference to is only allowed in structures",builder_.line(ctx));
       }
    }
-   
+
    RestrictedRef *r = visitRestrictedRef(ctx->restrictedRef());
-   
+
    if (r != nullptr && r->_baseclass != nullptr) {
       t->_classrestriction = r->_classrestriction;
       if (r->_baseclass != nullptr) {
          t->_baseclass = r->_baseclass;
          if (t->_baseclass->Kind == Class::Structure) {
-            Log.error(DiagnosticId::ReferenceClassOrAssociationRequired,
+            logger_.error(DiagnosticId::ReferenceClassOrAssociationRequired,
                "target of reference type must be a class or association, found structure",
-               get_line(ctx));
+               builder_.line(ctx));
          }
       }
    }
-   
-   Log.decNestLevel();
-   debug(ctx,"<<< visitReferenceAttr()");
+
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitReferenceAttr()");
    return t;
 
 }

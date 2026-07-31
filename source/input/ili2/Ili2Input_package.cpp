@@ -3,15 +3,13 @@
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
 #include "../../metamodel/DiagnosticUtil.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
 using namespace parser;
 using namespace metamodel;
 using namespace util;
-
-extern string input_file;
 
 antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
 {
@@ -50,23 +48,23 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
       name2 = "INTERLIS";
    }
 
-   debug(ctx,">>> visitModelDef(" + name1 + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitModelDef(" + name1 + ")");
+   logger_.incNestLevel();
    if (name1 != name2) {
-      Log.error(DiagnosticId::NameEndMismatch,
+      logger_.error(DiagnosticId::NameEndMismatch,
          "modelname " + name2 + " must match " + name1,
          ctx->modelname2->getLine()
       );
    }
    
-   Model *m = make_mmobject<Model>();
-   init_package(m,get_line(ctx));
-   set_selection_source(m,ctx->modelname1);
-   set_end_selection_source(m,ctx->modelname2);
+   Model *m = builder_.store().make<Model>();
+   builder_.initPackage(m,builder_.line(ctx));
+   builder_.setSelectionSource(m,ctx->modelname1);
+   builder_.setEndSelectionSource(m,ctx->modelname2);
 
    // Model Attributes
    m->Name = name1;
-   m->iliVersion = iliversion;
+   m->iliVersion = builder_.languageVersionName();
    if (ctx->contracted != nullptr) {
       m->Contracted = true;
    }
@@ -99,7 +97,7 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
       m->_translationOfVersion = visitString(ctx->translationOfVersion);
    }
 
-   if (ili24) {
+   if (builder_.isIli24()) {
       if (ctx->NOINCREMENTALTRANSFER() != nullptr) {
          m->NoIncrementalTransfer = true; // 2.4
       }
@@ -108,14 +106,14 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
       }
       if (ctx->xmlns != nullptr) {
          m->xmlns = ctx->xmlns->getText(); // 2.4
-         debug(ctx,"xmlns is " + m->xmlns);
+         builder_.debug(ctx,"xmlns is " + m->xmlns);
       }
    }
 
-   m->_ilifile = input_file;
-   add_model(m);
-   add_package(m);
-   push_context(m);
+   m->_ilifile = builder_.currentSourceUri();
+   builder_.addModel(m);
+   builder_.addPackage(m);
+   builder_.pushContext(*m);
 
    visitChildren(ctx);
 
@@ -140,9 +138,9 @@ antlrcpp::Any Ili2Input::visitModelDef(Ili2Parser::ModelDefContext *ctx)
    }
 */
 
-   pop_context();
-   Log.decNestLevel();
-   debug(ctx,"<<< visitModelDef(" + ctx->modelname1->getText() + ")");
+   builder_.popContext();
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitModelDef(" + ctx->modelname1->getText() + ")");
 
    return nullptr;
 
@@ -158,20 +156,20 @@ antlrcpp::Any Ili2Input::visitImporting(parser::Ili2Parser::ImportingContext *ct
    : UNQUALIFIED? (INTERLIS | NAME)
    */
 
-   debug(ctx,"visitImportDef()");
-   Import *i = make_mmobject<Import>();
-   i->ImportingP = get_package_context();
+   builder_.debug(ctx,"visitImportDef()");
+   Import *i = builder_.store().make<Import>();
+   i->ImportingP = builder_.currentPackage();
 
    if (ctx->INTERLIS() != nullptr) {
-      i->ImportedP = find_model(ctx->INTERLIS()->getText(), get_line(ctx));
+      i->ImportedP = builder_.findModel(ctx->INTERLIS()->getText(), builder_.line(ctx));
    }
    else {
-      i->ImportedP = find_model(ctx->NAME()->getText(), get_line(ctx));
+      i->ImportedP = builder_.findModel(ctx->NAME()->getText(), builder_.line(ctx));
    }
    if (ctx->UNQUALIFIED() != nullptr) {
       i->_unqualified = true;
    }
-   add_import(i);
+   builder_.addImport(i);
 
    return nullptr;
 
@@ -240,48 +238,48 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    string name1 = ctx->topicname1->getText();
    string name2 = ctx->topicname2->getText();
 
-   debug(ctx,">>> visitTopicDef(" + name1 + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitTopicDef(" + name1 + ")");
+   logger_.incNestLevel();
 
    if (name1 != name2) {
-      Log.error(DiagnosticId::NameEndMismatch,
+      logger_.error(DiagnosticId::NameEndMismatch,
          "topicname " + name2 + " must match " + name1,
-         get_line(ctx->topicname2)
+         builder_.line(ctx->topicname2)
       );
    }
 
    // init topic
-   SubModel *s = make_mmobject<SubModel>();
-   init_package(s,get_line(ctx->topicname1));
-   set_selection_source(s,ctx->topicname1);
-   set_end_selection_source(s,ctx->topicname2);
+   SubModel *s = builder_.store().make<SubModel>();
+   builder_.initPackage(s,builder_.line(ctx->topicname1));
+   builder_.setSelectionSource(s,ctx->topicname1);
+   builder_.setEndSelectionSource(s,ctx->topicname2);
    s->Name = name1;
-   add_package(s);
-   push_context(s);
+   builder_.addPackage(s);
+   builder_.pushContext(*s);
 
    // init dataunit
-   DataUnit *d = make_mmobject<DataUnit>();
-   init_extendableme(d,get_line(ctx->topicname1));
+   DataUnit *d = builder_.store().make<DataUnit>();
+   builder_.initExtendable(d,builder_.line(ctx->topicname1));
    d->Name = "BASKET";
-   add_dataunit(d);
+   builder_.addDataUnit(d);
    s->_dataunit = d;
 
    // ExtendableME Attributes
-   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,FINAL}));
+   map<string,bool> properties = get_properties(logger_,ctx->properties(),vector<string>({ABSTRACT,FINAL}));
    d->Abstract = properties[ABSTRACT];
    d->Final = properties[FINAL];
 
    if (ctx->topicbase != nullptr) {
-      set_reference_source(s,"inheritance",ctx->topicbase);
-      SubModel *ss = find_topic(visitPath(ctx->topicbase), get_line(ctx->topicbase));
+      builder_.setReferenceSource(s,"inheritance",ctx->topicbase);
+      SubModel *ss = builder_.findTopic(visitPath(ctx->topicbase), builder_.line(ctx->topicbase));
       s->_super = ss;
       if (ss != nullptr) {
          if (ss->_dataunit->Final) {
-            Log.error(DiagnosticId::InheritanceFinalBase,
+            logger_.error(DiagnosticId::InheritanceFinalBase,
                "topic " + name1 + " can not extend FINAL topic " +
                   get_path(s->_super),diagnostic_range(s));
          }
-         d->Super = find_dataunit(get_path(ss),get_line(ctx->topicbase));
+         d->Super = builder_.findDataUnit(get_path(ss),builder_.line(ctx->topicbase));
          if (d->Super != nullptr) {
             s->_super->_sub.push_back(s);
             d->Super->Sub.push_back(d);
@@ -295,10 +293,10 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    }
    // role from ASSOCIATION MetaDataUnit, to do !!!
    if (ctx->basketOid != nullptr) {
-      d->Oid = find_domaintype(ctx->basketOid->getText(),get_line(ctx->basketOid));
+      d->Oid = builder_.findDomainType(ctx->basketOid->getText(),builder_.line(ctx->basketOid));
    }
    if (ctx->topicOid != nullptr) {
-      d->TopicOid = find_domaintype(ctx->topicOid->getText(),get_line(ctx->topicOid));
+      d->TopicOid = builder_.findDomainType(ctx->topicOid->getText(),builder_.line(ctx->topicOid));
    }
 
    if (ctx->DEPENDS().size() > 0) {
@@ -309,13 +307,13 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
       */
       for (auto p : ctx->topicPath()) {
          string path = visitPath(p->path());
-         DataUnit *du = find_dataunit(path,get_line(ctx));
+         DataUnit *du = builder_.findDataUnit(path,builder_.line(ctx));
          if (du != nullptr) {
-            Dependency *dd = make_mmobject<Dependency>();
-            init_mmobject(dd,p->start->getLine());
+            Dependency *dd = builder_.store().make<Dependency>();
+            builder_.initObject(dd,p->start->getLine());
             dd->Using = d;
             dd->Dependent = du;
-            add_dependency(dd);
+            builder_.addDependency(dd);
          }
       }
    }
@@ -323,7 +321,7 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    if (ctx->deferredGenerics() != nullptr) {
       for (auto path : ctx->deferredGenerics()->path()) {
          string name = visitPath(path);
-         s->DeferredGenerics.push_back({name,find_domaintype(name,get_line(path)),get_line(path)});
+         s->DeferredGenerics.push_back({name,builder_.findDomainType(name,builder_.line(path)),builder_.line(path)});
       }
    }
 
@@ -338,10 +336,10 @@ antlrcpp::Any Ili2Input::visitTopicDef(Ili2Parser::TopicDefContext *ctx)
    // viewDef
    // graphicDef
    visitChildren(ctx);
-   pop_context();
+   builder_.popContext();
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitTopicDef(" + name1 + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitTopicDef(" + name1 + ")");
 
    return nullptr;
 

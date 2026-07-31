@@ -2,7 +2,7 @@
 
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
@@ -53,19 +53,19 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
    */
    
    string name = ctx->functioname->getText();
-   debug(ctx,">>> visitFunctionDef(" + name + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitFunctionDef(" + name + ")");
+   logger_.incNestLevel();
 
-   FunctionDef *f = make_mmobject<FunctionDef>();
-   init_metaelement(f,ctx->start->getLine());
-   set_selection_source(f,ctx->functioname);
+   FunctionDef *f = builder_.store().make<FunctionDef>();
+   builder_.initMetaElement(f,ctx->start->getLine());
+   builder_.setSelectionSource(f,ctx->functioname);
 
    // MetaElement attributes
    f->Name = name;
-   add_function(f);
+   builder_.addFunction(f);
    
-   if (ili23 && !get_model_context()->Contracted) {
-      Log.error(DiagnosticId::FunctionContractedModelRequired,
+   if (builder_.isIli23() && !builder_.currentModel()->Contracted) {
+      logger_.error(DiagnosticId::FunctionContractedModelRequired,
          "functions can only be defined in contracted models",0);
    }
    
@@ -74,15 +74,15 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
       f->Explanation = ctx->EXPLANATION()->getText();
    }
    
-   push_context(f);
+   builder_.pushContext(*f);
 
    for (auto pctx : ctx->functionDefParam()) {
-      Argument *a = make_mmobject<Argument>();
-      init_metaelement(a,ctx->start->getLine());
-      set_selection_source(a,pctx->NAME()->getSymbol());
+      Argument *a = builder_.store().make<Argument>();
+      builder_.initMetaElement(a,ctx->start->getLine());
+      builder_.setSelectionSource(a,pctx->NAME()->getSymbol());
       a->Name = pctx->NAME()->getText();
-      debug(ctx,">>> visitArgument " + a->Name);
-      Log.incNestLevel();
+      builder_.debug(ctx,">>> visitArgument " + a->Name);
+      logger_.incNestLevel();
       a->Kind = Argument::TypeVal; // to do !!!
       a->Type = visitArgumentType(pctx->argumentType());
       a->Type->Name = a->Name;
@@ -91,28 +91,28 @@ antlrcpp::Any Ili2Input::visitFunctionDef(parser::Ili2Parser::FunctionDefContext
       }
       a->Function = f;
       f->Argument.push_back(a);
-      Log.decNestLevel();
-      debug(ctx,"<<< visitArgument " + a->Name);
+      logger_.decNestLevel();
+      builder_.debug(ctx,"<<< visitArgument " + a->Name);
    }
 
-   if (ili23 && f->Argument.size() == 0) {
-      Log.error(DiagnosticId::FunctionDefinitionArgumentRequired,
+   if (builder_.isIli23() && f->Argument.size() == 0) {
+      logger_.error(DiagnosticId::FunctionDefinitionArgumentRequired,
          "function definition of " + name + "() needs at least one argument",
-         get_line(ctx));
+         builder_.line(ctx));
    }
 
    // f->LocalType ???
-   debug(ctx,">>> visitResultType");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitResultType");
+   logger_.incNestLevel();
    Type *t = visitArgumentType(ctx->result);
    f->ResultType = t;
-   Log.decNestLevel();
-   debug(ctx,"<<< visitResultType");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitResultType");
 
-   pop_context();
+   builder_.popContext();
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitFunctionDef(" + name + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitFunctionDef(" + name + ")");
    return f;
 
 }
@@ -133,15 +133,15 @@ antlrcpp::Any Ili2Input::visitFunctionCall(parser::Ili2Parser::FunctionCallConte
    */
 
    string name = visitPath(ctx->path());
-   debug(ctx,">>> visitFunctionCall(" + name + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitFunctionCall(" + name + ")");
+   logger_.incNestLevel();
 
-   FunctionCall *c = make_mmobject<FunctionCall>();
-   init_factor(c,get_line(ctx));
+   FunctionCall *c = builder_.store().make<FunctionCall>();
+   builder_.initFactor(c,builder_.line(ctx));
    
-   c->Function = find_function(name,get_line(ctx));
+   c->Function = builder_.findFunction(name,builder_.line(ctx));
    if (c->Function != nullptr && c->Function->ResultType != nullptr) {
-      c->_type = get_type_string(c->Function->ResultType);
+      c->_type = builder_.typeString(c->Function->ResultType);
    }
    else {
       c->_type = "???";
@@ -153,9 +153,9 @@ antlrcpp::Any Ili2Input::visitFunctionCall(parser::Ili2Parser::FunctionCallConte
    
    if (c->Function != nullptr) {
       if (c->Arguments.size() != c->Function->Argument.size()) {
-         Log.error(DiagnosticId::FunctionCallArgumentCount,
+         logger_.error(DiagnosticId::FunctionCallArgumentCount,
             "function call of " + name + "() needs " +
-               to_string(c->Function->Argument.size()) + " arguments",get_line(ctx));
+               to_string(c->Function->Argument.size()) + " arguments",builder_.line(ctx));
       }
       else {
          auto argp = c->Function->Argument.begin();
@@ -170,18 +170,18 @@ antlrcpp::Any Ili2Input::visitFunctionCall(parser::Ili2Parser::FunctionCallConte
                continue;
             }
             if (!check_type_compatibility(formal->Type->getClass(),a->Expression->_type)) {
-               Log.error(DiagnosticId::FunctionArgumentTypeMismatch,
+               logger_.error(DiagnosticId::FunctionArgumentTypeMismatch,
                   "incompatible type for " + name + "() argument " + formal->Name +
                   " (" + a->Expression->_type + "<>" + formal->Type->getClass() + ")",
-                  get_line(ctx)
+                  builder_.line(ctx)
                );
             }
          }
       }
    }
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitFunctionCall(" + name + ":" + c->_type + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitFunctionCall(" + name + ":" + c->_type + ")");
    return c;
 
 }
@@ -203,10 +203,10 @@ antlrcpp::Any Ili2Input::visitFunctionCallArgument(parser::Ili2Parser::FunctionC
      | ALL (LPAREN restrictedRef | path RPAREN)* )
    */
 
-   debug(ctx,"visitFunctionCallArgument()");
+   builder_.debug(ctx,"visitFunctionCallArgument()");
 
-   ActualArgument *a = make_mmobject<ActualArgument>();
-   init_mmobject(a,ctx->start->getLine());
+   ActualArgument *a = builder_.store().make<ActualArgument>();
+   builder_.initObject(a,ctx->start->getLine());
 
    if (ctx->expression() != nullptr) {
       a->Kind = ActualArgument::ExpressionVal;
@@ -231,8 +231,8 @@ antlrcpp::Any Ili2Input::visitArgumentType(parser::Ili2Parser::ArgumentTypeConte
 	| ENUMTREEVAL
    */
 
-   debug(ctx,">>> visitArgumentType()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitArgumentType()");
+   logger_.incNestLevel();
    
    Type *t = nullptr;
 
@@ -242,44 +242,44 @@ antlrcpp::Any Ili2Input::visitArgumentType(parser::Ili2Parser::ArgumentTypeConte
    else if (ctx->OBJECT() != nullptr) {
       if (ctx->restrictedRef() != nullptr) {
          RestrictedRef *r = visitRestrictedRef(ctx->restrictedRef());
-         ObjectType *o = make_mmobject<ObjectType>();
+         ObjectType *o = builder_.store().make<ObjectType>();
          o->Multiple = false;
          o->_baseclass = r->_baseclass;
          t = o;
       }
       else {
          // viewRef, to do !!!
-         Log.internal_error("visitArgumentType(): viewRef not implemented",1);
+         logger_.internal_error("visitArgumentType(): viewRef not implemented",1);
       }
    }
    else if (ctx->OBJECTS() != nullptr) {
       if (ctx->restrictedRef() != nullptr) {
          RestrictedRef* r = visitRestrictedRef(ctx->restrictedRef());
-         ObjectType* o = make_mmobject<ObjectType>();
+         ObjectType* o = builder_.store().make<ObjectType>();
          o->Multiple = true;
          o->_baseclass = r->_baseclass;
          t = o;
       }
       else {
          // viewRef, to do !!!
-         Log.internal_error("visitArgumentType(): viewRef not implemented",1);
+         logger_.internal_error("visitArgumentType(): viewRef not implemented",1);
       }
    }
    else if (ctx->ENUMVAL() != nullptr) {
-      EnumTreeValueType *tt = make_mmobject<EnumTreeValueType>();
+      EnumTreeValueType *tt = builder_.store().make<EnumTreeValueType>();
       // tt->ET = find_enumtreevalue(); to do !!!
       t = tt;
    }
    else if (ctx->ENUMTREEVAL() != nullptr) {
-      EnumTreeValueType *tt = make_mmobject<EnumTreeValueType>();
+      EnumTreeValueType *tt = builder_.store().make<EnumTreeValueType>();
       // tt->ET = find_enumtreevalue(); to do !!!
       t = tt;
    }
    
-   //t->LFTParent = dynamic_cast<FunctionDef *>(get_context());
+   //t->LFTParent = dynamic_cast<FunctionDef *>(builder_.current());
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitArgumentType()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitArgumentType()");
    return t;
 
 }

@@ -12,6 +12,9 @@ using namespace parser;
 using namespace antlr4;
 
 Ili1Parser::Ili1Parser(TokenStream *input) : Parser(input) {
+  _decisionToDFA.reserve(_atn.getNumberOfDecisions());
+  for (size_t i = 0; i < _atn.getNumberOfDecisions(); ++i)
+    _decisionToDFA.emplace_back(_atn.getDecisionState(i), i);
   _interpreter = new atn::ParserATNSimulator(this, _atn, _decisionToDFA, _sharedContextCache);
 }
 
@@ -3308,8 +3311,6 @@ Ili1Parser::DecimalContext* Ili1Parser::decimal() {
 }
 
 // Static vars and initialization.
-std::vector<dfa::DFA> Ili1Parser::_decisionToDFA;
-atn::PredictionContextCache Ili1Parser::_sharedContextCache;
 
 // We own the ATN which in turn owns the ATN states.
 atn::ATN Ili1Parser::_atn;
@@ -3676,11 +3677,6 @@ Ili1Parser::Initializer::Initializer() {
   atn::ATNDeserializer deserializer;
   _atn = deserializer.deserialize(_serializedATN);
 
-  size_t count = _atn.getNumberOfDecisions();
-  _decisionToDFA.reserve(count);
-  for (size_t i = 0; i < count; i++) { 
-    _decisionToDFA.emplace_back(_atn.getDecisionState(i), i);
-  }
 }
 
 Ili1Parser::Initializer Ili1Parser::_init;

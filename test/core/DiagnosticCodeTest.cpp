@@ -22,7 +22,6 @@ void require_explicit_semantic_diagnostic_ids()
    }
    files.push_back(root / "source/input/parser/IliParserErrorListener.cpp");
    files.push_back(root / "source/metamodel/MetaModel.cpp");
-   files.push_back(root / "source/metamodel/MetaModelInput.cpp");
    files.push_back(root / "source/metamodel/SemanticChecker.cpp");
    files.push_back(root / "source/metamodel/TranslationChecker.cpp");
    files.push_back(root / "source/core/Compiler.cpp");
@@ -69,8 +68,9 @@ int main()
    }
    ILIC_REQUIRE(!codes.empty());
 
-   Log.reset();
-   Log.displayErrors(false);
+   util::Logger logger;
+   logger.reset();
+   logger.displayErrors(false);
    ilic::SourceRange range;
    range.valid = true;
    range.uri = "memory:///range.ili";
@@ -80,20 +80,20 @@ int main()
    range.end.character = 12;
    ilic::SourceRange relatedRange = range;
    relatedRange.uri = "memory:///base.ili";
-   Log.error(
+   logger.error(
       util::DiagnosticId::TranslationCoordDimensionMismatch,
       "precisely ranged diagnostic",
       range,
       {{relatedRange,"Base declaration"}}
    );
-   ILIC_REQUIRE(Log.getDiagnostics().size() == 1);
-   const auto &diagnostic = Log.getDiagnostics().front();
+   ILIC_REQUIRE(logger.getDiagnostics().size() == 1);
+   const auto &diagnostic = logger.getDiagnostics().front();
    ILIC_REQUIRE(diagnostic.relatedInformation.size() == 1);
    ILIC_REQUIRE(diagnostic.code == "ILIC-TRANSLATION-COORD-DIMENSION-MISMATCH");
    ILIC_REQUIRE(diagnostic.range.uri == "memory:///range.ili");
    ILIC_REQUIRE(diagnostic.range.start.line == 4);
    ILIC_REQUIRE(diagnostic.range.end.character == 12);
    ILIC_REQUIRE(diagnostic.relatedInformation.front().range.uri == "memory:///base.ili");
-   Log.reset();
+   logger.reset();
    return 0;
 }

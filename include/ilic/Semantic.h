@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+namespace metamodel { class MetaModelStore; }
+
 namespace ilic {
 
 struct SemanticSymbol {
@@ -154,6 +156,7 @@ struct CompilationAnalysisResult {
 SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
    const CompilationRequest &request,const CompilationResult &compilation,
    const std::vector<std::string> &compilationSourceUris = {},
-   std::vector<SyntaxSnapshot> *syntaxSnapshots = nullptr);
+   std::vector<SyntaxSnapshot> *syntaxSnapshots = nullptr,
+   const metamodel::MetaModelStore *metaModels = nullptr);
 
 } // namespace ilic

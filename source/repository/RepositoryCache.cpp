@@ -3,10 +3,10 @@
 #include "Md5.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
-#include <random>
 #include <system_error>
 
 #ifdef _WIN32
@@ -31,8 +31,8 @@ std::uint64_t processId()
 std::string uniqueSuffix()
 {
    static std::atomic<std::uint64_t> sequence{0};
-   static thread_local std::mt19937_64 random(std::random_device{}());
-   return std::to_string(processId()) + '.' + std::to_string(random()) + '.'
+   const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+   return std::to_string(processId()) + '.' + std::to_string(timestamp) + '.'
       + std::to_string(sequence.fetch_add(1,std::memory_order_relaxed));
 }
 

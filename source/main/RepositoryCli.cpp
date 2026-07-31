@@ -95,25 +95,25 @@ std::unique_ptr<RepositoryManager> createRepositoryManager(const CliRepositoryCo
    return std::make_unique<RepositoryManager>(std::move(options));
 }
 
-void logRepositoryDiagnostics(const std::vector<Diagnostic> &diagnostics)
+void logRepositoryDiagnostics(util::Logger &logger,const std::vector<Diagnostic> &diagnostics)
 {
    for (const auto &diagnostic : diagnostics) {
       const std::string message = diagnostic.code.empty() ? diagnostic.message
          : diagnostic.code + ": " + diagnostic.message;
       switch (diagnostic.severity) {
-      case DiagnosticSeverity::Error: Log.error(message); break;
-      case DiagnosticSeverity::Warning: Log.warning(message); break;
-      case DiagnosticSeverity::Information: Log.info(message); break;
-      case DiagnosticSeverity::Hint: Log.debug(message); break;
+      case DiagnosticSeverity::Error: logger.error(message); break;
+      case DiagnosticSeverity::Warning: logger.warning(message); break;
+      case DiagnosticSeverity::Information: logger.info(message); break;
+      case DiagnosticSeverity::Hint: logger.debug(message); break;
       }
    }
 }
 
-bool loadResolvedRepositoryModels(const RepositoryResult &resolved)
+bool loadResolvedRepositoryModels(util::IliFileCatalog &files,const RepositoryResult &resolved)
 {
    bool success = true;
    for (const auto &model : resolved.models)
-      success = util::load_ilifiles_by_file(model.localPath.string()) != nullptr && success;
+      success = files.loadByFile(model.localPath.string()) != nullptr && success;
    return success;
 }
 

@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "MetaModel.h"
-#include "MetaModelInput.h"
+#include "MetaModelStore.h"
 #include "DiagnosticUtil.h"
 #include "../util/Logger.h"
 
@@ -197,7 +197,7 @@ bool is_enum_literal(Expression *expression)
           constant->ResolvedType.DeclaredType == nullptr;
 }
 
-bool validate_enum_literal(Expression *expression,const Descriptor &target,bool allowNodes)
+bool validate_enum_literal(Logger &logger,Expression *expression,const Descriptor &target,bool allowNodes)
 {
    auto constant = dynamic_cast<Constant *>(literal_expression(expression));
    EnumType *type = enumeration_type(target);
@@ -215,7 +215,7 @@ bool validate_enum_literal(Expression *expression,const Descriptor &target,bool 
       });
    }
    if (!found) {
-      Log.error(DiagnosticId::EnumerationValueInvalid,
+      logger.error(DiagnosticId::EnumerationValueInvalid,
          "enumeration value #" + constant->Value + " is not valid for the compared domain",
          diagnostic_range(expression));
       return false;
@@ -289,7 +289,7 @@ bool is_text_literal(Expression *expression,string *value = nullptr)
    return true;
 }
 
-bool validate_formatted_literal(Expression *literal,const Descriptor &formatted)
+bool validate_formatted_literal(Logger &logger,Expression *literal,const Descriptor &formatted)
 {
    string value;
    if (!is_text_literal(literal,&value)) {
@@ -297,7 +297,7 @@ bool validate_formatted_literal(Expression *literal,const Descriptor &formatted)
    }
    auto type = dynamic_cast<FormattedType *>(formatted.DeclaredType);
    if (type == nullptr || !validate_standard_formatted_value(type,value)) {
-      Log.error(DiagnosticId::TypeFormattedValueOutOfRange,
+      logger.error(DiagnosticId::TypeFormattedValueOutOfRange,
          "formatted value \"" + value + "\" is outside the domain format or range",
          diagnostic_range(literal));
       return false;
@@ -375,12 +375,12 @@ SubModel *containing_topic(MetaElement *element)
    return nullptr;
 }
 
-bool model_imports_directly(Model *source,Model *target)
+bool model_imports_directly(const MetaModelStore &store,Model *source,Model *target)
 {
    if (source == nullptr || target == nullptr || source == target || target->Name == "INTERLIS") {
       return true;
    }
-   for (Import *import : get_all_imports()) {
+   for (Import *import : store.imports()) {
       if (import != nullptr && import->ImportingP == source && import->ImportedP == target) {
          return true;
       }
@@ -388,12 +388,12 @@ bool model_imports_directly(Model *source,Model *target)
    return false;
 }
 
-bool topic_has_dependency(SubModel *source,SubModel *target)
+bool topic_has_dependency(const MetaModelStore &store,SubModel *source,SubModel *target)
 {
    if (source == nullptr || target == nullptr || package_is_same_or_extension(source,target)) {
       return true;
    }
-   for (Dependency *dependency : get_all_dependencies()) {
+   for (Dependency *dependency : store.dependencies()) {
       if (dependency != nullptr && dependency->Using == source->_dataunit &&
           dependency->Dependent == target->_dataunit) {
          return true;
@@ -487,7 +487,7 @@ bool declared_type_is_same_or_extension(Type *candidate,Type *base)
    return false;
 }
 
-bool validate_unique_enum_nodes(EnumNode *parent,const string &prefix)
+bool validate_unique_enum_nodes(Logger &logger,EnumNode *parent,const string &prefix)
 {
    if (parent == nullptr) {
       return true;
@@ -500,18 +500,18 @@ bool validate_unique_enum_nodes(EnumNode *parent,const string &prefix)
       }
       string path = prefix.empty() ? node->Name : prefix + "." + node->Name;
       if (!siblings.insert(node->Name).second) {
-         Log.error(DiagnosticId::EnumerationDuplicateElement,
+         logger.error(DiagnosticId::EnumerationDuplicateElement,
             "duplicate enumeration element " + path,diagnostic_range(node));
          valid = false;
       }
-      if (!validate_unique_enum_nodes(node,path)) {
+      if (!validate_unique_enum_nodes(logger,node,path)) {
          valid = false;
       }
    }
    return valid;
 }
 
-void validate_enum_extension_nodes(EnumNode *parent,const string &prefix,
+void validate_enum_extension_nodes(Logger &logger,EnumNode *parent,const string &prefix,
                                    const set<string> &baseValues)
 {
    if (parent == nullptr) {
@@ -523,10 +523,10 @@ void validate_enum_extension_nodes(EnumNode *parent,const string &prefix,
       }
       string path = prefix.empty() ? node->Name : prefix + "." + node->Name;
       if (baseValues.find(path) != baseValues.end() && node->Node.empty() && !node->Final) {
-         Log.error(DiagnosticId::EnumerationExtensionDuplicate,
+         logger.error(DiagnosticId::EnumerationExtensionDuplicate,
             "enumeration extension duplicates element " + path,diagnostic_range(node));
       }
-      validate_enum_extension_nodes(node,path,baseValues);
+      validate_enum_extension_nodes(logger,node,path,baseValues);
    }
 }
 
@@ -651,10 +651,10 @@ GenericDef *generic_definition_in(Model *model,DomainType *generic)
    return nullptr;
 }
 
-vector<Model *> directly_imported_models(Model *model)
+vector<Model *> directly_imported_models(const MetaModelStore &store,Model *model)
 {
    vector<Model *> result;
-   for (Import *import : get_all_imports()) {
+   for (Import *import : store.imports()) {
       if (import != nullptr && import->ImportingP == model) {
          if (auto imported = dynamic_cast<Model *>(import->ImportedP)) {
             result.push_back(imported);
@@ -665,7 +665,7 @@ vector<Model *> directly_imported_models(Model *model)
    return result;
 }
 
-GenericDef *generic_definition_in_imports(Model *model,DomainType *generic,
+GenericDef *generic_definition_in_imports(const MetaModelStore &store,Model *model,DomainType *generic,
                                           unordered_set<Model *> &visited)
 {
    if (model == nullptr || !visited.insert(model).second) {
@@ -673,24 +673,24 @@ GenericDef *generic_definition_in_imports(Model *model,DomainType *generic,
    }
    // RefHB 3.8 makes contexts transitively visible; ili2c resolves the most
    // recently declared import first and stops at the first effective mapping.
-   for (Model *imported : directly_imported_models(model)) {
+   for (Model *imported : directly_imported_models(store,model)) {
       if (GenericDef *definition = generic_definition_in(imported,generic)) {
          return definition;
       }
-      if (GenericDef *definition = generic_definition_in_imports(imported,generic,visited)) {
+      if (GenericDef *definition = generic_definition_in_imports(store,imported,generic,visited)) {
          return definition;
       }
    }
    return nullptr;
 }
 
-GenericDef *visible_generic_definition(Model *model,DomainType *generic)
+GenericDef *visible_generic_definition(const MetaModelStore &store,Model *model,DomainType *generic)
 {
    if (GenericDef *definition = generic_definition_in(model,generic)) {
       return definition;
    }
    unordered_set<Model *> visited;
-   return generic_definition_in_imports(model,generic,visited);
+   return generic_definition_in_imports(store,model,generic,visited);
 }
 
 enum class CoordinateFitError {
@@ -761,6 +761,8 @@ CoordinateFitResult coordinate_type_fit(CoordType *concrete,CoordType *generic)
 
 class Checker {
 public:
+   Checker(const MetaModelStore &store,Logger &logger) : store_(store),logger_(logger) {}
+
    Descriptor evaluate(Expression *expression,DomainType *domain = nullptr)
    {
       if (expression == nullptr) {
@@ -840,7 +842,7 @@ public:
       if (domain != nullptr &&
           (dynamic_cast<ClassRefType *>(canonical_declared_type(domain)) != nullptr ||
            dynamic_cast<AttributeRefType *>(canonical_declared_type(domain)) != nullptr)) {
-         Log.error(DiagnosticId::ConstraintDomainTargetUnsupported,
+         logger_.error(DiagnosticId::ConstraintDomainTargetUnsupported,
             "domain constraints are not supported for CLASS, STRUCTURE, or ATTRIBUTE domains",
             diagnostic_range(constraint));
       }
@@ -855,7 +857,7 @@ public:
          for (ExistenceDef *candidate : existence->ExistsIn) {
             Descriptor available = evaluate(candidate,domain);
             if (!equality_compatible(existence->Attr,required,candidate,available,false)) {
-               Log.error(DiagnosticId::ConstraintExistenceTypeMismatch,
+               logger_.error(DiagnosticId::ConstraintExistenceTypeMismatch,
                   "existence constraint paths have incompatible datatypes",
                   diagnostic_range(constraint));
             }
@@ -869,7 +871,7 @@ public:
          if (unique->PerBasket && unique->Kind == UniqueConstraint::LocalU) {
             // RefHB 2.4 section 3.12 and ili2c uniquenessConstraint: LOCAL is
             // already scoped by its owning object and cannot also be BASKET.
-            Log.error(DiagnosticId::ConstraintUniqueBasketLocal,
+            logger_.error(DiagnosticId::ConstraintUniqueBasketLocal,
                "UNIQUE cannot combine BASKET and LOCAL",diagnostic_range(constraint));
          }
          for (PathOrInspFactor *path : unique->UniqueDef) {
@@ -887,7 +889,7 @@ public:
                if (auto attribute = dynamic_cast<AttrOrParam *>(element->Ref)) {
                   Multiplicity cardinality = attribute_cardinality(attribute->Type);
                   if (cardinality.Max < 0 || cardinality.Max > 1) {
-                     Log.error(DiagnosticId::ConstraintGlobalUniqueMultivalueAttribute,
+                     logger_.error(DiagnosticId::ConstraintGlobalUniqueMultivalueAttribute,
                         "global UNIQUE path contains multivalued attribute " +
                            attribute->Name,diagnostic_range(constraint));
                   }
@@ -902,7 +904,7 @@ public:
                   }
                   Multiplicity cardinality = effective_role_cardinality(role);
                   if (cardinality.Max < 0 || cardinality.Max > 1) {
-                     Log.error(DiagnosticId::ConstraintGlobalUniqueMultivalueRole,
+                     logger_.error(DiagnosticId::ConstraintGlobalUniqueMultivalueRole,
                         "global UNIQUE path contains multivalued role " +
                            role->Name,diagnostic_range(constraint));
                   }
@@ -912,7 +914,7 @@ public:
       }
       else if (auto set = dynamic_cast<SetConstraint *>(constraint)) {
          if (set->ToClass != nullptr && set->ToClass->Kind == Class::Structure) {
-            Log.error(DiagnosticId::ConstraintSetOnStructure,
+            logger_.error(DiagnosticId::ConstraintSetOnStructure,
                "SET CONSTRAINT is not allowed in a STRUCTURE",diagnostic_range(constraint));
          }
          for (Expression *where : set->Where) {
@@ -976,6 +978,8 @@ public:
    }
 
 private:
+   const MetaModelStore &store_;
+   Logger &logger_;
    unordered_set<Expression *> evaluating;
    unordered_set<Expression *> evaluated;
    unordered_set<Constraint *> checkedConstraints;
@@ -996,14 +1000,14 @@ private:
          DomainType *generic = definition->GenericDomain.front();
          auto genericCoordinate = dynamic_cast<CoordType *>(generic);
          if (genericCoordinate == nullptr || !generic->Generic) {
-            Log.error(DiagnosticId::GenericContextDefaultDomainRequired,
+            logger_.error(DiagnosticId::GenericContextDefaultDomainRequired,
                "context " + context->Name + " requires a GENERIC coordinate domain",
                diagnostic_range(definition));
             continue;
          }
 
          unordered_set<Model *> visited;
-         GenericDef *imported = generic_definition_in_imports(model,generic,visited);
+         GenericDef *imported = generic_definition_in_imports(store_,model,generic,visited);
          for (DomainType *concrete : definition->ConcreteDomain) {
             auto concreteCoordinate = dynamic_cast<CoordType *>(concrete);
             CoordinateFitResult fit =
@@ -1021,7 +1025,7 @@ private:
                   "Concrete coordinate domain: " + get_path(concrete));
                append_related(related,generic,
                   "Generic coordinate domain: " + get_path(generic));
-               Log.error(DiagnosticId::GenericCoordRangeMismatch,
+               logger_.error(DiagnosticId::GenericCoordRangeMismatch,
                   "context mapping " + get_path(concrete) + " to " +
                      get_path(generic) + " is outside the generic coordinate " +
                      "range on axis " + to_string(fit.Axis) + ": " + bound +
@@ -1032,7 +1036,7 @@ private:
                continue;
             }
             if (!fit.fits()) {
-               Log.error(DiagnosticId::GenericContextConcreteDomainIncompatible,
+               logger_.error(DiagnosticId::GenericContextConcreteDomainIncompatible,
                   "concrete domain " + (concrete == nullptr ? string("???") : concrete->Name) +
                      " is not a compatible specialization of generic domain " + generic->Name,
                   diagnostic_range(definition));
@@ -1049,7 +1053,7 @@ private:
                }
             }
             if (!allowed) {
-               Log.error(DiagnosticId::GenericContextImportedDomainExtensionRequired,
+               logger_.error(DiagnosticId::GenericContextImportedDomainExtensionRequired,
                   "concrete domain " + concrete->Name +
                      " does not extend a concrete domain from the imported context",
                   diagnostic_range(definition));
@@ -1168,31 +1172,31 @@ private:
          }
          deferred.insert(domain);
          if (!domain->Generic || dynamic_cast<CoordType *>(domain) == nullptr) {
-            Log.error(DiagnosticId::GenericDeferredCoordinateDomainRequired,
+            logger_.error(DiagnosticId::GenericDeferredCoordinateDomainRequired,
                "DEFERRED GENERICS requires a GENERIC coordinate domain",
                diagnostic_range(topic));
          }
-         if (visible_generic_definition(model,domain) == nullptr) {
-            Log.error(DiagnosticId::GenericDeferredContextRequired,
+         if (visible_generic_definition(store_,model,domain) == nullptr) {
+            logger_.error(DiagnosticId::GenericDeferredContextRequired,
                "deferred generic domain " + domain->Name + " has no visible context",
                diagnostic_range(topic));
          }
          if (used.find(domain) == used.end()) {
-            Log.error(DiagnosticId::GenericDeferredDomainUnused,
+            logger_.error(DiagnosticId::GenericDeferredDomainUnused,
                "deferred generic domain " + domain->Name + " is not used by topic " +
                   topic->Name,diagnostic_range(topic));
          }
       }
 
       for (DomainType *domain : used) {
-         GenericDef *definition = visible_generic_definition(model,domain);
+            GenericDef *definition = visible_generic_definition(store_,model,domain);
          if (definition == nullptr) {
-            Log.error(DiagnosticId::GenericDeferredContextRequired,
+            logger_.error(DiagnosticId::GenericDeferredContextRequired,
                "generic domain " + domain->Name + " has no visible context",
                diagnostic_range(topic));
          }
          else if (definition->ConcreteDomain.size() > 1 && deferred.find(domain) == deferred.end()) {
-            Log.error(DiagnosticId::GenericDeferredListingRequired,
+            logger_.error(DiagnosticId::GenericDeferredListingRequired,
                "generic domain " + domain->Name + " must be listed in DEFERRED GENERICS",
                diagnostic_range(topic));
          }
@@ -1203,7 +1207,7 @@ private:
                 const string &message,const MMObject *owner)
    {
       if (descriptor.Kind != Kind::Unknown && descriptor.Kind != expected) {
-         Log.error(id,message,diagnostic_range(owner));
+         logger_.error(id,message,diagnostic_range(owner));
       }
    }
 
@@ -1275,7 +1279,7 @@ private:
          case CompoundExpr_OperationType::Relation_Equal:
          case CompoundExpr_OperationType::Relation_NotEqual:
             if (operands.size() >= 2 && !equality_compatible(operands[0],types[0],operands[1],types[1],true)) {
-               Log.error(DiagnosticId::ExpressionComparisonTypeMismatch,
+               logger_.error(DiagnosticId::ExpressionComparisonTypeMismatch,
                   "incompatible datatypes",diagnostic_range(compound));
             }
             result.Kind = Kind::Boolean;
@@ -1285,7 +1289,7 @@ private:
          case CompoundExpr_OperationType::Relation_Greater:
          case CompoundExpr_OperationType::Relation_GreaterOrEqual:
             if (operands.size() >= 2 && !ordering_compatible(operands[0],types[0],operands[1],types[1])) {
-               Log.error(DiagnosticId::ExpressionOrderingTypeMismatch,
+               logger_.error(DiagnosticId::ExpressionOrderingTypeMismatch,
                   "incompatible datatypes for ordering comparison",
                   diagnostic_range(compound));
             }
@@ -1307,18 +1311,18 @@ private:
       }
       if (left.Kind == Kind::Formatted && right.Kind == Kind::Text) {
          return is_text_literal(rightExpression) &&
-                (!reportLiteral || validate_formatted_literal(rightExpression,left));
+               (!reportLiteral || validate_formatted_literal(logger_,rightExpression,left));
       }
       if (left.Kind == Kind::Text && right.Kind == Kind::Formatted) {
          return is_text_literal(leftExpression) &&
-                (!reportLiteral || validate_formatted_literal(leftExpression,right));
+                (!reportLiteral || validate_formatted_literal(logger_,leftExpression,right));
       }
       if ((left.Kind == Kind::Enumeration || left.Kind == Kind::EnumTreeValue) && is_enum_literal(rightExpression)) {
-         return validate_enum_literal(rightExpression,left,left.Kind == Kind::EnumTreeValue);
+         return validate_enum_literal(logger_,rightExpression,left,left.Kind == Kind::EnumTreeValue);
       }
       if (is_enum_literal(leftExpression) &&
           (right.Kind == Kind::Enumeration || right.Kind == Kind::EnumTreeValue)) {
-         return validate_enum_literal(leftExpression,right,right.Kind == Kind::EnumTreeValue);
+         return validate_enum_literal(logger_,leftExpression,right,right.Kind == Kind::EnumTreeValue);
       }
       if (left.Kind != right.Kind) {
          return false;
@@ -1361,21 +1365,21 @@ private:
          return true;
       }
       if (left.Kind == Kind::Formatted && right.Kind == Kind::Text) {
-         return is_text_literal(rightExpression) && validate_formatted_literal(rightExpression,left);
+         return is_text_literal(rightExpression) && validate_formatted_literal(logger_,rightExpression,left);
       }
       if (left.Kind == Kind::Text && right.Kind == Kind::Formatted) {
-         return is_text_literal(leftExpression) && validate_formatted_literal(leftExpression,right);
+         return is_text_literal(leftExpression) && validate_formatted_literal(logger_,leftExpression,right);
       }
 
       Descriptor enumType;
       if ((left.Kind == Kind::Enumeration || left.Kind == Kind::EnumTreeValue) && is_enum_literal(rightExpression)) {
          enumType = left;
-         if (!validate_enum_literal(rightExpression,left,left.Kind == Kind::EnumTreeValue)) return false;
+         if (!validate_enum_literal(logger_,rightExpression,left,left.Kind == Kind::EnumTreeValue)) return false;
       }
       else if (is_enum_literal(leftExpression) &&
                (right.Kind == Kind::Enumeration || right.Kind == Kind::EnumTreeValue)) {
          enumType = right;
-         if (!validate_enum_literal(leftExpression,right,right.Kind == Kind::EnumTreeValue)) return false;
+         if (!validate_enum_literal(logger_,leftExpression,right,right.Kind == Kind::EnumTreeValue)) return false;
       }
       else if ((left.Kind == Kind::Enumeration || left.Kind == Kind::EnumTreeValue) &&
                left.Kind == right.Kind && same_declared_type(left,right)) {
@@ -1405,7 +1409,7 @@ private:
                                 expected.Viewable->Name == "ANYSTRUCTURE" &&
                                 (supplied.Kind == Kind::Object || supplied.Kind == Kind::Structure);
             if (!anyStructure && !equality_compatible(argument->Expression,supplied,nullptr,expected,false)) {
-               Log.error(DiagnosticId::FunctionArgumentTypeMismatch,
+               logger_.error(DiagnosticId::FunctionArgumentTypeMismatch,
                   "incompatible function argument type for " + call->Function->Name,
                   diagnostic_range(argument));
             }
@@ -1471,7 +1475,7 @@ private:
           topic != baseTopic && package_is_same_or_extension(topic,baseTopic)) {
          const string viewablePath = get_path(viewable);
          const string basePath = get_path(base);
-         Log.error(DiagnosticId::ClassExtendedRequired,
+         logger_.error(DiagnosticId::ClassExtendedRequired,
             declaration_kind(viewable) + " " + viewablePath + " in TOPIC " +
                get_path(topic) + " extends same-named " + declaration_kind(base) +
                " " + basePath + " from extended TOPIC " + get_path(baseTopic) +
@@ -1497,7 +1501,7 @@ private:
                continue;
             }
             if (extended_class_chain_contains(viewable,otherBase)) {
-               Log.error(DiagnosticId::ClassSpecializationConflict,
+               logger_.error(DiagnosticId::ClassSpecializationConflict,
                   "class or structure " + viewable->Name +
                      " cannot be EXTENDED because " + other->Name +
                      " specializes the same base",diagnostic_range(viewable));
@@ -1549,7 +1553,7 @@ private:
             }
          }
          if (!concretized) {
-            Log.error(DiagnosticId::ClassAbstractInConcreteTopic,
+            logger_.error(DiagnosticId::ClassAbstractInConcreteTopic,
                "concrete topic " + topic->Name +
                   " contains abstract class " + abstractClass->Name +
                   " without a concrete extension",diagnostic_range(topic));
@@ -1570,7 +1574,7 @@ private:
          if (existing != localNames.end()) {
             MetaElement *first = existing->second;
             const string container = get_path(package);
-            Log.error(DiagnosticId::NamespaceDuplicateDeclaration,
+            logger_.error(DiagnosticId::NamespaceDuplicateDeclaration,
                declaration_kind(element) + " " + element->Name +
                   " duplicates " + declaration_kind(first) + " " + first->Name +
                   " in " + declaration_kind(package) + " " + container,
@@ -1592,7 +1596,7 @@ private:
                continue;
             }
             if (!runtimeParameterNames.insert(parameter->Name).second) {
-               Log.error(DiagnosticId::ModelRuntimeParameterDuplicate,
+               logger_.error(DiagnosticId::ModelRuntimeParameterDuplicate,
                   "duplicate runtime parameter " + parameter->Name + " in model " +
                      model->Name,diagnostic_range(parameter));
             }
@@ -1628,7 +1632,7 @@ private:
          bool sameNameSpecialization = viewable != nullptr &&
             viewable->Super == inherited->second && !viewable->Extended;
          if (!explicitOverride && !sameNameSpecialization) {
-            Log.error(DiagnosticId::NamespaceInheritedDeclarationConflict,
+            logger_.error(DiagnosticId::NamespaceInheritedDeclarationConflict,
                "declaration " + element->Name + " in topic " + topic->Name +
                   " conflicts with an inherited declaration",diagnostic_range(element));
          }
@@ -1644,7 +1648,7 @@ private:
          }
          auto first = names.find(attribute->Name);
          if (first != names.end()) {
-            Log.error(DiagnosticId::NamespaceMemberDuplicate,
+            logger_.error(DiagnosticId::NamespaceMemberDuplicate,
                "duplicate attribute or view-base name " + attribute->Name +
                   " in " + viewable->Name,diagnostic_range(attribute),
                related_information(first->second,
@@ -1663,12 +1667,12 @@ private:
          return;
       }
       if (auto enumeration = dynamic_cast<EnumType *>(type)) {
-         validate_unique_enum_nodes(enumeration->TopNode,"");
+         validate_unique_enum_nodes(logger_,enumeration->TopNode,"");
          if (enumeration->ElementInPackage != nullptr) {
             if (auto base = dynamic_cast<EnumType *>(enumeration->Super)) {
                set<string> baseValues;
                collect_enum_values(base,baseValues);
-               validate_enum_extension_nodes(enumeration->TopNode,"",baseValues);
+               validate_enum_extension_nodes(logger_,enumeration->TopNode,"",baseValues);
             }
          }
       }
@@ -1680,7 +1684,7 @@ private:
                (!axis->Min.empty() ? axis->Min : axis->Max);
             if (!coordinateLimit.empty() &&
                 decimal_accuracy(line->MaxOverlap) != decimal_accuracy(coordinateLimit)) {
-               Log.error(DiagnosticId::TypeLineOverlapPrecision,
+               logger_.error(DiagnosticId::TypeLineOverlapPrecision,
                   "line overlap must use the coordinate domain precision",
                   diagnostic_range(line));
             }
@@ -1695,7 +1699,7 @@ private:
          if (dynamic_cast<FormattedType *>(numeric) == nullptr &&
              !numeric->Min.empty() && !numeric->Max.empty() &&
              compare_exact_decimal(numeric->Min,numeric->Max) > 0) {
-            Log.error(DiagnosticId::ValueMinimumExceedsMaximum,
+            logger_.error(DiagnosticId::ValueMinimumExceedsMaximum,
                "minimum value must not exceed maximum value",
                diagnostic_range(numeric));
          }
@@ -1723,12 +1727,12 @@ private:
       Multiplicity baseCardinality = attribute_cardinality(base->Type);
       Multiplicity cardinality = attribute_cardinality(attribute->Type);
       if (!cardinality_is_subset(cardinality,baseCardinality)) {
-         Log.error(DiagnosticId::AttributeCardinalityExtension,
+         logger_.error(DiagnosticId::AttributeCardinalityExtension,
             "cardinality of extended attribute " + attribute->Name +
                " is not a subset of its base",diagnostic_range(attribute));
       }
       if (attribute->Transient != base->Transient) {
-         Log.error(DiagnosticId::AttributeExtensionTransient,
+         logger_.error(DiagnosticId::AttributeExtensionTransient,
             "TRANSIENT mode of extended attribute " + attribute->Name +
                " differs from its base",diagnostic_range(attribute));
       }
@@ -1745,7 +1749,7 @@ private:
             "Base attribute: " + get_path(base) + " uses " + expectedType);
          append_related(related,baseDeclared,
             "Expected base domain: " + expectedType);
-         Log.error(DiagnosticId::AttributeIncompatibleExtension,
+         logger_.error(DiagnosticId::AttributeIncompatibleExtension,
             "extended attribute " + get_path(attribute) + " uses " + actualType +
                ", but its type must extend " + expectedType,
             diagnostic_range(attribute),
@@ -1757,7 +1761,7 @@ private:
       if (base->Type->getClass() != attribute->Type->getClass()) {
          const string actualType = diagnostic_type_name(attribute->Type);
          const string expectedType = diagnostic_type_name(base->Type);
-         Log.error(DiagnosticId::AttributeIncompatibleExtension,
+         logger_.error(DiagnosticId::AttributeIncompatibleExtension,
             "extended attribute " + get_path(attribute) + " uses " + actualType +
                ", but its type must be compatible with " + expectedType,
             diagnostic_range(attribute),
@@ -1769,13 +1773,13 @@ private:
       if (auto text = dynamic_cast<TextType *>(attribute->Type)) {
          auto baseText = static_cast<TextType *>(base->Type);
          if (text->Kind != baseText->Kind) {
-            Log.error(DiagnosticId::AttributeExtensionTextKind,
+            logger_.error(DiagnosticId::AttributeExtensionTextKind,
                "TEXT and MTEXT kinds may not change in an attribute extension",
                diagnostic_range(attribute));
          }
          if (baseText->MaxLength >= 0 &&
              (text->MaxLength < 0 || text->MaxLength > baseText->MaxLength)) {
-            Log.error(DiagnosticId::AttributeExtensionTextLength,
+            logger_.error(DiagnosticId::AttributeExtensionTextLength,
                "text length of extended attribute exceeds its base",
                diagnostic_range(attribute));
          }
@@ -1786,14 +1790,14 @@ private:
             if (declared->ElementInPackage == nullptr && baseDeclared->ElementInPackage == nullptr) {
                set<string> baseValues;
                collect_enum_values(baseEnumeration,baseValues);
-               validate_enum_extension_nodes(enumeration->TopNode,"",baseValues);
+               validate_enum_extension_nodes(logger_,enumeration->TopNode,"",baseValues);
             }
          }
       }
       if (auto multi = dynamic_cast<MultiValue *>(attribute->Type)) {
          auto baseMulti = static_cast<MultiValue *>(base->Type);
          if (baseMulti->Ordered && !multi->Ordered) {
-            Log.error(DiagnosticId::AttributeExtensionListOrdering,
+            logger_.error(DiagnosticId::AttributeExtensionListOrdering,
                "an extended LIST attribute may not become an unordered BAG",
                diagnostic_range(attribute));
          }
@@ -1801,7 +1805,7 @@ private:
          auto baseTarget = dynamic_cast<Class *>(baseMulti->BaseType);
          if (target != nullptr && baseTarget != nullptr &&
              !class_is_same_or_extension(target,baseTarget)) {
-            Log.error(DiagnosticId::AttributeExtensionStructureTarget,
+            logger_.error(DiagnosticId::AttributeExtensionStructureTarget,
                "structure target of extended attribute does not extend its base",
                diagnostic_range(attribute));
          }
@@ -1811,8 +1815,8 @@ private:
    void require_model_import(Model *source,Model *target,const MMObject *owner,
                              const string &kind)
    {
-      if (!model_imports_directly(source,target)) {
-         Log.error(DiagnosticId::ModelImportRequired,
+      if (!model_imports_directly(store_,source,target)) {
+         logger_.error(DiagnosticId::ModelImportRequired,
             kind + " requires model " + source->Name + " to import " + target->Name,
             diagnostic_range(owner));
       }
@@ -1821,8 +1825,8 @@ private:
    void require_topic_dependency(SubModel *source,SubModel *target,const MMObject *owner,
                                  const string &kind)
    {
-      if (!topic_has_dependency(source,target)) {
-         Log.error(DiagnosticId::TopicDependencyRequired,
+      if (!topic_has_dependency(store_,source,target)) {
+         logger_.error(DiagnosticId::TopicDependencyRequired,
             kind + " requires topic " + source->Name + " to depend on " + target->Name,
             diagnostic_reference_range(owner,"dependency"),
             related_information(target,"Required topic is declared here"));
@@ -1842,7 +1846,7 @@ private:
          if (!roleNames.insert(role->Name).second) {
             const string associationName = association->Name.empty() || association->Name == "???"
                ? "anonymous association" : "association \"" + association->Name + "\"";
-            Log.error(DiagnosticId::AssociationDuplicateRole,
+            logger_.error(DiagnosticId::AssociationDuplicateRole,
                "duplicate role \"" + role->Name + "\" in " + associationName,
                diagnostic_range(role));
          }
@@ -1850,7 +1854,7 @@ private:
             ++aggregateRoles;
          }
          if (role->_baseclass != nullptr && role->_baseclass->Kind == Class::Structure) {
-            Log.error(DiagnosticId::ReferenceClassOrAssociationRequired,
+            logger_.error(DiagnosticId::ReferenceClassOrAssociationRequired,
                "role " + role->Name + " may only reference a class or association",
                diagnostic_range(role));
          }
@@ -1860,14 +1864,14 @@ private:
             dynamic_cast<SubModel *>(role->_baseclass->ElementInPackage);
          if (associationTopic != nullptr && targetTopic != nullptr &&
              !package_is_same_or_extension(associationTopic,targetTopic) && !role->External) {
-            Log.error(DiagnosticId::ReferenceExternalRequired,
+            logger_.error(DiagnosticId::ReferenceExternalRequired,
                "cross-topic role " + role->Name + " requires EXTERNAL",
                diagnostic_range(role));
          }
 
          Multiplicity cardinality = effective_role_cardinality(role);
          if (role->Strongness == Role::Comp && (cardinality.Max < 0 || cardinality.Max > 1)) {
-            Log.error(DiagnosticId::RoleCompositionCardinality,
+            logger_.error(DiagnosticId::RoleCompositionCardinality,
                "composition role " + role->Name +
                   " has maximum cardinality greater than 1",diagnostic_range(role));
          }
@@ -1875,23 +1879,23 @@ private:
          if (auto base = dynamic_cast<Role *>(role->Super)) {
             Multiplicity baseCardinality = effective_role_cardinality(base);
             if (!cardinality_is_subset(cardinality,baseCardinality)) {
-               Log.error(DiagnosticId::RoleCardinalityExtension,
+               logger_.error(DiagnosticId::RoleCardinalityExtension,
                   "cardinality of extended role " + role->Name +
                      " is not a subset of its base",diagnostic_range(role));
             }
             if (role->Strongness < base->Strongness) {
-               Log.error(DiagnosticId::RoleExtensionStrength,
+               logger_.error(DiagnosticId::RoleExtensionStrength,
                   "extended role " + role->Name + " weakens its aggregation strength",
                   diagnostic_range(role));
             }
             if (role->_baseclass != nullptr && base->_baseclass != nullptr &&
                 !class_is_same_or_extension(role->_baseclass,base->_baseclass)) {
-               Log.error(DiagnosticId::RoleExtensionTarget,
+               logger_.error(DiagnosticId::RoleExtensionTarget,
                   "target of extended role " + role->Name +
                      " does not extend its base target",diagnostic_range(role));
             }
             if (base->Ordered && !role->Ordered && cardinality.Max != 1) {
-               Log.error(DiagnosticId::RoleExtensionOrdering,
+               logger_.error(DiagnosticId::RoleExtensionOrdering,
                   "extended role " + role->Name + " removes ordering",
                   diagnostic_range(role));
             }
@@ -1899,12 +1903,12 @@ private:
       }
 
       if (aggregateRoles > 1) {
-         Log.error(DiagnosticId::AssociationMultipleAggregationRoles,
+         logger_.error(DiagnosticId::AssociationMultipleAggregationRoles,
             "an association may have only one aggregation or composition role",
             diagnostic_range(association));
       }
       if (aggregateRoles == 1 && association->Role.size() > 2) {
-         Log.error(DiagnosticId::AssociationAggregationBinary,
+         logger_.error(DiagnosticId::AssociationAggregationBinary,
             "aggregation and composition associations must be binary",
             diagnostic_range(association));
       }
@@ -1923,12 +1927,12 @@ Multiplicity attributeCardinality(Type *type)
    return attribute_cardinality(type);
 }
 
-void check_model_semantics()
+void check_model_semantics(const MetaModelStore &store,Logger &logger)
 {
-   Log.setCategory("semantic");
-   Checker checker;
-   for (Model *model : get_all_models()) {
-      Log.setCurrentSource(model->_ilifile);
+   logger.setCategory("semantic");
+   Checker checker(store,logger);
+   for (Model *model : store.models()) {
+      logger.setCurrentSource(model->_ilifile);
       checker.check_package(model);
    }
 }

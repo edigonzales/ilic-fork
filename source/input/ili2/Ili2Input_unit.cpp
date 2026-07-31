@@ -2,7 +2,7 @@
 
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
@@ -31,13 +31,13 @@ antlrcpp::Any Ili2Input::visitUnitDef(parser::Ili2Parser::UnitDefContext *ctx)
    */
 
    string name = ctx->unitname->getText();
-   debug(ctx,">>> visitUnitDef(" + name + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitUnitDef(" + name + ")");
+   logger_.incNestLevel();
 
    // init Unit
-   Unit *u = make_mmobject<Unit>();
-   init_extendableme(u,ctx->unitname->getLine());
-   set_selection_source(u,ctx->unitshort == nullptr
+   Unit *u = builder_.store().make<Unit>();
+   builder_.initExtendable(u,ctx->unitname->getLine());
+   builder_.setSelectionSource(u,ctx->unitshort == nullptr
       ? ctx->unitname : ctx->unitshort->getStop());
 
    // MetaElement Attributes
@@ -48,15 +48,15 @@ antlrcpp::Any Ili2Input::visitUnitDef(parser::Ili2Parser::UnitDefContext *ctx)
    else {
       u->Name = name;
    }
-   add_unit(u);
+   builder_.addUnit(u);
 
    // ExtendableME Attributes
    if (ctx->ABSTRACT() != nullptr) {
       u->Abstract = true;
    }
    if (ctx->super != nullptr) {
-      set_reference_source(u,"inheritance",ctx->super);
-      u->Super = find_unit(ctx->super->getText(),ctx->super->start->getLine());
+      builder_.setReferenceSource(u,"inheritance",ctx->super);
+      u->Super = builder_.findUnit(ctx->super->getText(),ctx->super->start->getLine());
       if (u->Super != nullptr) {
          u->Super->Sub.push_back(u);
       }
@@ -66,9 +66,9 @@ antlrcpp::Any Ili2Input::visitUnitDef(parser::Ili2Parser::UnitDefContext *ctx)
    u->Kind = Unit::BaseU;
    if (ctx->derivedUnit() != nullptr) {
       u->Kind = Unit::DerivedU;
-      push_context(u);
+      builder_.pushContext(*u);
       u->Definition = visitDerivedUnit(ctx->derivedUnit());
-      pop_context();
+      builder_.popContext();
    }
    else if (ctx->composedUnit() != nullptr) {
       u->Kind = Unit::ComposedU;
@@ -76,8 +76,8 @@ antlrcpp::Any Ili2Input::visitUnitDef(parser::Ili2Parser::UnitDefContext *ctx)
       u->Definition = e;
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitUnitDef(" + name + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitUnitDef(" + name + ")");
    return u;
 
 }
@@ -95,8 +95,8 @@ antlrcpp::Any Ili2Input::visitDerivedUnit(parser::Ili2Parser::DerivedUnitContext
       string _type;
    */
 
-   debug(ctx,">>> visitDerivedUnit()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitDerivedUnit()");
+   logger_.incNestLevel();
    
    Expression *e = nullptr;
    
@@ -109,7 +109,7 @@ antlrcpp::Any Ili2Input::visitDerivedUnit(parser::Ili2Parser::DerivedUnitContext
          }
          else {
 
-            CompoundExpr *ce = make_mmobject<CompoundExpr>();
+            CompoundExpr *ce = builder_.store().make<CompoundExpr>();
             ce->_type = "NumType";
             if (ctx->op->getText() == "*") {
                ce->Operation = CompoundExpr_OperationType::Mult;
@@ -124,7 +124,7 @@ antlrcpp::Any Ili2Input::visitDerivedUnit(parser::Ili2Parser::DerivedUnitContext
 
             /*
             Token *op = ctx->op().begin();
-            CompoundExpression *c = make_mmobject<CompoundExpression>();
+            CompoundExpression *c = builder_.store().make<CompoundExpression>();
             c->SubExpressions.push_back(e);
             c->SubExpressions.push_back(visitDecConst(d));
             c->_type = "NumType";
@@ -148,12 +148,12 @@ antlrcpp::Any Ili2Input::visitDerivedUnit(parser::Ili2Parser::DerivedUnitContext
    }
 
    if (ctx->unitref != nullptr) {
-      Unit *u = static_cast<Unit *>(get_context());
-      u->Super = find_unit(ctx->unitref->getText(),ctx->unitref->start->getLine());
+      Unit *u = static_cast<Unit *>(builder_.current());
+      u->Super = builder_.findUnit(ctx->unitref->getText(),ctx->unitref->start->getLine());
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitDerivedUnit()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitDerivedUnit()");
 
    return e;
    
@@ -172,13 +172,13 @@ antlrcpp::Any Ili2Input::visitComposedUnit(parser::Ili2Parser::ComposedUnitConte
       string _type;
    */
 
-   debug(ctx,">>> visitComposedUnit()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitComposedUnit()");
+   logger_.incNestLevel();
    
    Expression* e = visitComposedUnitExpr(ctx->composedUnitExpr());
       
-   Log.decNestLevel();
-   debug(ctx,"<<< visitComposedUnit()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitComposedUnit()");
 
    return e;
    
@@ -193,35 +193,35 @@ antlrcpp::Any Ili2Input::visitComposedUnitExpr(parser::Ili2Parser::ComposedUnitE
       | composedUnitExpr SLASH path
    */
 
-   debug(ctx, ">>> visitComposedUnitExpr()");
+   builder_.debug(ctx, ">>> visitComposedUnitExpr()");
 
    Expression* e = nullptr;
 
    if (ctx->STAR() != nullptr) {
-      CompoundExpr* ce = make_mmobject<CompoundExpr>();
+      CompoundExpr* ce = builder_.store().make<CompoundExpr>();
       ce->Operation = CompoundExpr_OperationType::Mult;
       ce->SubExpressions.push_back(visitComposedUnitExpr(ctx->composedUnitExpr()));
-      UnitRef* r = make_mmobject<UnitRef>();
-      r->Unit = find_unit(visitPath(ctx->path()), get_line(ctx));
+      UnitRef* r = builder_.store().make<UnitRef>();
+      r->Unit = builder_.findUnit(visitPath(ctx->path()), builder_.line(ctx));
       ce->SubExpressions.push_back(r);
       e = ce;
    }
    else if (ctx->SLASH() != nullptr) {
-      CompoundExpr* ce = make_mmobject<CompoundExpr>();
+      CompoundExpr* ce = builder_.store().make<CompoundExpr>();
       ce->Operation = CompoundExpr_OperationType::Div;
       ce->SubExpressions.push_back(visitComposedUnitExpr(ctx->composedUnitExpr()));
-      UnitRef * r = make_mmobject<UnitRef>();
-      r->Unit = find_unit(visitPath(ctx->path()), get_line(ctx));
+      UnitRef * r = builder_.store().make<UnitRef>();
+      r->Unit = builder_.findUnit(visitPath(ctx->path()), builder_.line(ctx));
       ce->SubExpressions.push_back(r);
       e = ce;
    }
    else {
-      UnitRef* r = make_mmobject<UnitRef>();
-      r->Unit = find_unit(visitPath(ctx->path()), get_line(ctx));
+      UnitRef* r = builder_.store().make<UnitRef>();
+      r->Unit = builder_.findUnit(visitPath(ctx->path()), builder_.line(ctx));
       e = r;
    }
 
-   debug(ctx, "<<< visitComposedUnitExpr()");
+   builder_.debug(ctx, "<<< visitComposedUnitExpr()");
 
    return e;
 

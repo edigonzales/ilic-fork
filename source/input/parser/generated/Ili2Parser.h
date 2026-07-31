@@ -2589,8 +2589,8 @@ public:
   bool operator2Sempred(Operator2Context *_localctx, size_t predicateIndex);
 
 private:
-  static std::vector<antlr4::dfa::DFA> _decisionToDFA;
-  static antlr4::atn::PredictionContextCache _sharedContextCache;
+  std::vector<antlr4::dfa::DFA> _decisionToDFA;
+  antlr4::atn::PredictionContextCache _sharedContextCache;
   static std::vector<std::string> _ruleNames;
   static std::vector<std::string> _tokenNames;
 

@@ -24,9 +24,6 @@ void write_expression(TextWriter *tw,Expression *e)
       return; // shound not be null (ie. functions), to do !!!
    }
 
-   Log.debug(">>> write_expression " + e->getClass());
-   Log.incNestLevel();
-
    if (e->getClass() == "Constant") {
       /* struct Constant : public Factor {
       public:
@@ -46,7 +43,6 @@ void write_expression(TextWriter *tw,Expression *e)
             tw->write(0,"#");
             break;
          default:
-            Log.internal_error("write_constantexpression(): unknown Kind id " + to_string(c->Kind));
             break;
       }
       tw->write(0,c->Value);
@@ -160,7 +156,6 @@ void write_expression(TextWriter *tw,Expression *e)
          case UnaryExpr::None:
             break;
          default:
-            Log.internal_error("write_unaryexpression(): unknown Operation id " + to_string(u->Operation));
             break;
       }
       if (u->SubExpression != nullptr) {
@@ -221,7 +216,7 @@ void write_expression(TextWriter *tw,Expression *e)
                   tw->write(0," > ");
                   break;
                default:
-                  Log.internal_error("write_compoundexpr(): unknowwn Operation id " + to_string(c->Operation));
+                  break;
             }
          }
          write_expression(tw,s);
@@ -229,11 +224,7 @@ void write_expression(TextWriter *tw,Expression *e)
       }
    }
    else {
-      Log.internal_error("write_expression: " + e->getClass() + " unknown",1);
    }
-
-   Log.decNestLevel();
-   Log.debug("<<< write_expression " + e->getClass());
 
 }
 

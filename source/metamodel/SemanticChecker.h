@@ -1,6 +1,10 @@
 #pragma once
 
+#include "../util/Logger.h"
+
 namespace metamodel {
+
+   class MetaModelStore;
 
    class Role;
    class Type;
@@ -12,6 +16,6 @@ namespace metamodel {
 
    // Runs after every input model has been loaded and before translation
    // linking and output generation.
-   void check_model_semantics();
+   void check_model_semantics(const MetaModelStore &store,util::Logger &logger);
 
 }

@@ -4,8 +4,6 @@
 
 namespace ilic {
 namespace {
-thread_local SourceManager *currentSourceManager = nullptr;
-
 std::size_t utf16Width(const unsigned char *bytes, std::size_t remaining, std::size_t &consumed)
 {
    consumed = 1;
@@ -73,12 +71,5 @@ SourcePosition SourceManager::position(const std::string &uri, std::size_t byteO
    }
    return result;
 }
-
-SourceManager *activeSourceManager() { return currentSourceManager; }
-void setActiveSourceManager(SourceManager *manager) { currentSourceManager = manager; }
-
-ActiveSourceManagerScope::ActiveSourceManagerScope(SourceManager *manager)
-   : previous_(activeSourceManager()) { setActiveSourceManager(manager); }
-ActiveSourceManagerScope::~ActiveSourceManagerScope() { setActiveSourceManager(previous_); }
 
 } // namespace ilic

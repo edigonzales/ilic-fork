@@ -12,7 +12,8 @@ namespace output {
    class ImdOutput : public metamodel::MetaModelTreeVisitor {
    public:
 
-      ImdOutput(string xtf_file,string version);
+      ImdOutput(metamodel::MetaModelStore &store,util::Logger &logger,
+         string xtf_file,string version);
 
       void preVisit(void) override;
       void postVisit(void) override;

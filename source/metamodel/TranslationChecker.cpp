@@ -9,6 +9,7 @@
 
 #include "DiagnosticUtil.h"
 #include "MetaModel.h"
+#include "MetaModelStore.h"
 #include "../util/Logger.h"
 
 using namespace std;
@@ -25,11 +26,13 @@ template<typename T> vector<T *> as_vector(const list<T *> &values)
 
 class Checker {
 public:
+   Checker(const MetaModelStore &store,Logger &logger) : store_(store),logger_(logger) {}
+
    void run()
    {
       validate_model_graph();
-      for (Model *model : get_all_models()) {
-         Log.setCurrentSource(model->_ilifile);
+      for (Model *model : store_.models()) {
+         logger_.setCurrentSource(model->_ilifile);
          if (!model->_translationOfName.empty() && model->_translationOf == nullptr) {
             Model *base = find_model(model->_translationOfName);
             if (base != nullptr && base != model && !in_cycle(model)) {
@@ -37,8 +40,8 @@ public:
             }
          }
       }
-      for (Model *model : get_all_models()) {
-         Log.setCurrentSource(model->_ilifile);
+      for (Model *model : store_.models()) {
+         logger_.setCurrentSource(model->_ilifile);
          if (model->_translationOf != nullptr) {
             compare_element(model,model->_translationOf);
          }
@@ -46,6 +49,8 @@ public:
    }
 
 private:
+   const MetaModelStore &store_;
+   Logger &logger_;
    set<Model *> cyclic_models;
    set<MetaElement *> compared_elements;
    set<MetaElement *> specialized_mismatches;
@@ -53,7 +58,7 @@ private:
 
    Model *find_model(const string &name)
    {
-      for (Model *model : get_all_models()) {
+      for (Model *model : store_.models()) {
          if (model->Name == name) {
             return model;
          }
@@ -68,27 +73,27 @@ private:
 
    void validate_model_graph()
    {
-      for (Model *model : get_all_models()) {
-         Log.setCurrentSource(model->_ilifile);
+      for (Model *model : store_.models()) {
+         logger_.setCurrentSource(model->_ilifile);
          if (model->_translationOfName.empty()) {
             continue;
          }
          Model *base = find_model(model->_translationOfName);
          if (base == nullptr) {
-            Log.error(DiagnosticId::TranslationModelBaseNotFound,
+            logger_.error(DiagnosticId::TranslationModelBaseNotFound,
                "translation base model " + model->_translationOfName + " not found",
                diagnostic_range(model));
          }
          else if (base == model) {
-            Log.error(DiagnosticId::TranslationModelSelfReference,
+            logger_.error(DiagnosticId::TranslationModelSelfReference,
                "model " + model->Name + " cannot be a translation of itself",
                diagnostic_range(model));
             cyclic_models.insert(model);
          }
       }
 
-      for (Model *start : get_all_models()) {
-         Log.setCurrentSource(start->_ilifile);
+      for (Model *start : store_.models()) {
+         logger_.setCurrentSource(start->_ilifile);
          vector<Model *> chain;
          Model *current = start;
          while (current != nullptr && !current->_translationOfName.empty()) {
@@ -97,7 +102,7 @@ private:
                for (auto it = found; it != chain.end(); ++it) {
                   cyclic_models.insert(*it);
                }
-               Log.error(DiagnosticId::TranslationModelCycle,
+               logger_.error(DiagnosticId::TranslationModelCycle,
                   "cycle in TRANSLATION OF chain at model " + current->Name,
                   diagnostic_range(current));
                break;
@@ -152,7 +157,7 @@ private:
             "Corresponding base declaration: " + label(base));
       const ilic::SourceRange primary = diagnostic_range(
          diagnostic_owner(translated != nullptr ? translated : base));
-      Log.error(id,
+      logger_.error(id,
          "translated declaration \"" + label(translated) + "\" does not match \""
             + label(base) + "\" for " + property,
          primary,std::move(relatedInformation));
@@ -211,7 +216,7 @@ private:
          "Actual domain declaration: " + actualName);
       append_related(related,expectedDomain,
          "Expected domain declaration: " + expectedName);
-      Log.error(DiagnosticId::TranslationDomainReferenceMismatch,
+      logger_.error(DiagnosticId::TranslationDomainReferenceMismatch,
          "translated attribute " + label(translatedAttribute) + " uses " +
             actualName + ", but " + label(baseAttribute) + " uses " +
             expectedName,
@@ -254,7 +259,7 @@ private:
          vector<ilic::RelatedInformation> related;
          append_related(related,expected,
             "Corresponding base coordinate domain: " + label(expected));
-         Log.error(DiagnosticId::TranslationCoordDimensionMismatch,
+         logger_.error(DiagnosticId::TranslationCoordDimensionMismatch,
             "translated coordinate domain " + label(actual) + " has " +
                to_string(actual->Axis.size()) + " dimensions, but " +
                label(expected) + " has " +
@@ -288,7 +293,7 @@ private:
       append_related(related,baseAttribute,
          "Corresponding base attribute: " + label(baseAttribute) +
             " declares a final enumeration");
-      Log.error(DiagnosticId::TranslationEnumFinalMismatch,
+      logger_.error(DiagnosticId::TranslationEnumFinalMismatch,
          "translated attribute " + label(translatedAttribute) +
             " extends the enumeration with " + additions + ", but " +
             label(baseAttribute) + " requires a final enumeration",
@@ -308,7 +313,7 @@ private:
          "Actual derivation view: " + label(translated->View));
       append_related(related,base->View,
          "Expected derivation view: " + label(base->View));
-      Log.error(DiagnosticId::TranslationDerivedAssociationMismatch,
+      logger_.error(DiagnosticId::TranslationDerivedAssociationMismatch,
          "translated association " + label(translated) + " is derived from " +
             label(translated->View) + ", but the translation of " +
             label(base) + " must be derived from " + label(base->View) +
@@ -1100,7 +1105,7 @@ private:
    {
       list<Model *> actual;
       list<Model *> expected;
-      for (Import *import : get_all_imports()) {
+      for (Import *import : store_.imports()) {
          if (import->ImportingP == translated && import->ImportedP != nullptr && import->ImportedP->Name != "INTERLIS") actual.push_back(static_cast<Model *>(import->ImportedP));
          if (import->ImportingP == base && import->ImportedP != nullptr && import->ImportedP->Name != "INTERLIS") expected.push_back(static_cast<Model *>(import->ImportedP));
       }
@@ -1112,7 +1117,7 @@ private:
    {
       list<DataUnit *> actual;
       list<DataUnit *> expected;
-      for (Dependency *dependency : get_all_dependencies()) {
+      for (Dependency *dependency : store_.dependencies()) {
          if (translated->_dataunit != nullptr && dependency->Using == translated->_dataunit) actual.push_back(dependency->Dependent);
          if (base->_dataunit != nullptr && dependency->Using == base->_dataunit) expected.push_back(dependency->Dependent);
       }
@@ -1123,10 +1128,10 @@ private:
 
 }
 
-void check_model_translations()
+void check_model_translations(const MetaModelStore &store,Logger &logger)
 {
-   Log.setCategory("semantic");
-   Checker().run();
+   logger.setCategory("semantic");
+   Checker(store,logger).run();
 }
 
 }

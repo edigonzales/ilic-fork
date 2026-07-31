@@ -12,7 +12,8 @@ namespace output {
    class GmlOutput : public metamodel::MetaModelTreeVisitor {
    public:
 
-      GmlOutput(string ilifile, string iliversion, string ilic_version);
+      GmlOutput(metamodel::MetaModelStore &store,util::Logger &logger,
+         string ilifile, string iliversion, string ilic_version);
 
       void preVisit() override;
    

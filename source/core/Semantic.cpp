@@ -1,7 +1,7 @@
 #include "../../include/ilic/Semantic.h"
 
 #include "../metamodel/MetaModel.h"
-#include "../metamodel/MetaModelInput.h"
+#include "../metamodel/MetaModelStore.h"
 #include "../metamodel/SemanticChecker.h"
 
 #include <algorithm>
@@ -699,7 +699,8 @@ private:
 SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
    const CompilationRequest &request,const CompilationResult &compilation,
    const std::vector<std::string> &compilationSourceUris,
-   std::vector<SyntaxSnapshot> *syntaxSnapshots)
+   std::vector<SyntaxSnapshot> *syntaxSnapshots,
+   const metamodel::MetaModelStore *metaModels)
 {
    SemanticSnapshot snapshot;
    snapshot.success = compilation.success;
@@ -736,7 +737,8 @@ SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
    if (compilation.success) {
       const std::set<std::string> diagramRootFiles(request.roots.begin(),request.roots.end());
       SnapshotBuilder builder(snapshot,diagramRootFiles);
-      for (auto *model : metamodel::get_all_models()) builder.addModel(model);
+      if (metaModels != nullptr)
+         for (auto *model : metaModels->models()) builder.addModel(model);
       builder.finishReferences();
 
       std::map<std::string,const SemanticSymbol *> modelSymbols;

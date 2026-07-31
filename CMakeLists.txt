@@ -14,9 +14,14 @@ option(ILIC_ENABLE_SANITIZERS
     "Enable AddressSanitizer and UndefinedBehaviorSanitizer for project targets"
     OFF
 )
+option(ILIC_ENABLE_THREAD_SANITIZER
+    "Enable ThreadSanitizer for native project targets"
+    OFF
+)
 include(cmake/IlicStaticDistribution.cmake)
 include(cmake/IlicSanitizers.cmake)
 ilic_configure_sanitizers()
+ilic_configure_thread_sanitizer()
 
 file(GLOB_RECURSE ANTLR_RUNTIME_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/include/*.cpp"
@@ -35,6 +40,8 @@ target_include_directories(antlr4-runtime
 
 set(ILIC_CORE_SOURCES
     source/core/Compiler.cpp
+    source/core/CompilerContext.cpp
+    source/core/CompilationSourceStore.cpp
     source/core/Formatter.cpp
     source/core/SourceManager.cpp
     source/core/Syntax.cpp
@@ -63,7 +70,8 @@ set(ILIC_CORE_SOURCES
     source/input/parser/IliParserErrorListener.cpp
 
     source/metamodel/MetaModel.cpp
-    source/metamodel/MetaModelInput.cpp
+    source/metamodel/MetaModelStore.cpp
+    source/metamodel/MetaModelBuilder.cpp
     source/metamodel/MetaModelOutput.cpp
     source/metamodel/MetaModelTreeVisitor.cpp
     source/metamodel/SemanticChecker.cpp
@@ -210,6 +218,17 @@ if(BUILD_TESTING)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_no_cassert_in_tests.cmake"
     )
 
+    add_test(
+        NAME ilic_no_mutable_compiler_globals
+        COMMAND "${CMAKE_COMMAND}"
+            -E env PYTHONPATH="${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+            python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-core-global-state.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    set_tests_properties(ilic_no_mutable_compiler_globals PROPERTIES
+        LABELS "architecture"
+    )
+
     add_executable(ilic_docs_cpp_example docs/examples/cpp-session.cpp)
     target_link_libraries(ilic_docs_cpp_example PRIVATE ilic-core)
     add_test(NAME ilic_docs_cpp_example COMMAND ilic_docs_cpp_example)
@@ -239,9 +258,21 @@ if(BUILD_TESTING)
     add_executable(ilic_capi_test test/abi/CapiTest.cpp)
     target_link_libraries(ilic_capi_test PRIVATE ilic-capi ilic::test-support)
     add_test(NAME ilic_capi COMMAND ilic_capi_test)
+    add_executable(ilic_capi_concurrency_test test/abi/CapiConcurrencyTest.cpp)
+    target_link_libraries(ilic_capi_concurrency_test PRIVATE ilic-capi ilic::test-support)
+    add_test(NAME ilic_capi_concurrency COMMAND ilic_capi_concurrency_test)
+    set_tests_properties(ilic_capi_concurrency PROPERTIES
+        LABELS "concurrency;capi;lifetime"
+    )
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_core_session COMMAND ilic_core_session_test)
+    add_executable(ilic_compiler_concurrency_test test/core/CompilerConcurrencyTest.cpp)
+    target_link_libraries(ilic_compiler_concurrency_test PRIVATE ilic-core ilic::test-support)
+    add_test(NAME ilic_compiler_concurrency COMMAND ilic_compiler_concurrency_test)
+    set_tests_properties(ilic_compiler_concurrency PROPERTIES
+        LABELS "concurrency;lifetime;core"
+    )
     add_executable(ilic_diagnostic_code_test test/core/DiagnosticCodeTest.cpp)
     target_include_directories(ilic_diagnostic_code_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/source/util")

@@ -41,7 +41,8 @@ bool input::check_type_compatibility(string t1,string t2)
 
 }
 
-map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ctx,vector<string> allowed_properties)
+map<string,bool> input::get_properties(util::Logger &logger,
+   parser::Ili2Parser::PropertiesContext *ctx,vector<string> allowed_properties)
 {
 
    map<string,bool> properties;
@@ -63,12 +64,12 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[ABSTRACT] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+            logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + ABSTRACT + " not allowed",line);
       }
    }
    else if (ctx->ABSTRACT().size() > 1) {
-      Log.warning("multiple declarations of " + ABSTRACT,line);
+      logger.warning("multiple declarations of " + ABSTRACT,line);
       properties[ABSTRACT] = true;
    }
 
@@ -84,12 +85,12 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[EXTENDED] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+         logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + EXTENDED + " not allowed",line);
       }
    }
    else if (EXTENDED.size() > 1) {
-      Log.warning("multiple declarations of " + EXTENDED,line);
+      logger.warning("multiple declarations of " + EXTENDED,line);
       properties[EXTENDED] = true;
    }
 
@@ -105,12 +106,12 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[FINAL] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+         logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + FINAL + " not allowed",line);
       }
    }
    else if (ctx->FINAL().size() > 1) {
-      Log.warning("multiple declarations of " + FINAL,line);
+      logger.warning("multiple declarations of " + FINAL,line);
       properties[FINAL] = true;
    }
 
@@ -126,12 +127,12 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[TRANSIENT] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+         logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + TRANSIENT + " not allowed",line);
       }
    }
    else if (ctx->TRANSIENT().size() > 1) {
-      Log.warning("multiple declarations of " + TRANSIENT,line);
+      logger.warning("multiple declarations of " + TRANSIENT,line);
       properties[TRANSIENT] = true;
    }
 
@@ -147,12 +148,12 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[OID] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+         logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + OID + " not allowed",line);
       }
    }
    else if (ctx->OID().size() > 1) {
-      Log.warning("multiple declarations of " + OID,line);
+      logger.warning("multiple declarations of " + OID,line);
       properties[OID] = true;
    }
 
@@ -168,12 +169,12 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[HIDING] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+         logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + HIDING + " not allowed",line);
       }
    }
    else if (ctx->HIDING().size() > 1) {
-      Log.warning("multiple declarations of " + HIDING,line);
+      logger.warning("multiple declarations of " + HIDING,line);
       properties[HIDING] = true;
    }
 
@@ -189,12 +190,12 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[ORDERED] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+         logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + ORDERED + " not allowed",line);
       }
    }
    else if (ctx->ORDERED().size() > 1) {
-      Log.warning("multiple declarations of " + ORDERED,line);
+      logger.warning("multiple declarations of " + ORDERED,line);
       properties[ORDERED] = true;
    }
 
@@ -210,12 +211,12 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[EXTERNAL] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+         logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + EXTERNAL + " not allowed",line);
       }
    }
    else if (ctx->EXTERNAL().size() > 1) {
-      Log.warning("multiple declarations of " + EXTERNAL,line);
+      logger.warning("multiple declarations of " + EXTERNAL,line);
       properties[EXTERNAL] = true;
    }
 
@@ -228,17 +229,17 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
          properties[GENERIC] = true;
       }
       else {
-         Log.error(DiagnosticId::PropertyNotAllowed,
+         logger.error(DiagnosticId::PropertyNotAllowed,
             "property " + GENERIC + " not allowed",line);
       }
    }
    else {
-      Log.warning("multiple declarations of " + GENERIC,line);
+      logger.warning("multiple declarations of " + GENERIC,line);
       properties[GENERIC] = true;
    }
    
    if (properties[ABSTRACT] && properties[FINAL]) {
-      Log.error(DiagnosticId::PropertyAbstractFinalConflict,
+      logger.error(DiagnosticId::PropertyAbstractFinalConflict,
          ABSTRACT + " and " + FINAL + " can not be used at the same time",line);
    }
 
@@ -246,14 +247,15 @@ map<string,bool> input::get_properties(parser::Ili2Parser::PropertiesContext *ct
 
 }
 
-void input::check_references(Class *c,string name,int line)
+void input::check_references(metamodel::MetaModelBuilder &builder,
+   util::Logger &logger,Class *c,string name,int line)
 {
    if (c == nullptr) {
       return;
    }
    
-   Log.debug(">>> check_references() " + get_path(c));
-   Log.incNestLevel();
+   builder.debug(nullptr,">>> check_references() " + get_path(c));
+   logger.incNestLevel();
    
    for (auto a: c->ClassAttribute) {
       // Name resolution errors are reported while building the attribute. A
@@ -282,7 +284,7 @@ void input::check_references(Class *c,string name,int line)
             classrestriction = t->_classrestriction;            
          }
          for (auto c: classrestriction) {
-            auto sourceTopic = dynamic_cast<SubModel *>(get_package_context());
+            auto sourceTopic = dynamic_cast<SubModel *>(builder.currentPackage());
             auto targetTopic = c == nullptr ? nullptr :
                dynamic_cast<SubModel *>(c->ElementInPackage);
             bool targetIsBaseTopic = false;
@@ -295,14 +297,14 @@ void input::check_references(Class *c,string name,int line)
             }
             if (sourceTopic != nullptr && targetTopic != nullptr &&
                 !targetIsBaseTopic && !t->External) {
-               Log.error(DiagnosticId::ReferenceExternalRequired,
+               logger.error(DiagnosticId::ReferenceExternalRequired,
                   "reference to other topic must be declared EXTERNAL",l);
                break;
             }
          }
          for (auto c: classrestriction) {
-            if (c != nullptr && !depends_on(c->ElementInPackage)) {
-               Log.error(DiagnosticId::TopicDependencyRequired,
+            if (c != nullptr && !builder.dependsOn(c->ElementInPackage)) {
+               logger.error(DiagnosticId::TopicDependencyRequired,
                   n + " requires topic dependency on " +
                   get_path(t->_baseclass->ElementInPackage),l);
                break;
@@ -313,20 +315,20 @@ void input::check_references(Class *c,string name,int line)
          MultiValue *t = static_cast<MultiValue *>(a->Type);
          if (t->TypeRestriction.size() == 0) {
             if (t->BaseType != nullptr && t->BaseType->getClass() == "Class") {
-               check_references(static_cast<Class *>(t->BaseType),n,l);
+               check_references(builder,logger,static_cast<Class *>(t->BaseType),n,l);
             }
          }
          else {
             for (auto c: t->TypeRestriction) {
                if (c != nullptr && c->getClass() == "Class") {
-                  check_references(static_cast<Class *>(c),n,l);
+                  check_references(builder,logger,static_cast<Class *>(c),n,l);
                }
             }
          }
       }
    }
 
-   Log.decNestLevel();
-   Log.debug("<<< check_references() " + get_path(c));
+   logger.decNestLevel();
+   builder.debug(nullptr,"<<< check_references() " + get_path(c));
 
 }

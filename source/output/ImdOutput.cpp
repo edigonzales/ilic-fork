@@ -23,12 +23,9 @@ static string getMetaModel(string version)
    }
 }   
 
-static void debug(string message)
-{
-   Log.debug("imd: " + message);
-}
-
-ImdOutput::ImdOutput(string xtf_file,string version)
+ImdOutput::ImdOutput(metamodel::MetaModelStore &store,util::Logger &logger,
+   string xtf_file,string version)
+   : MetaModelTreeVisitor(store,logger)
 {
    this->xtf_file = xtf_file;
    this->version = version;
@@ -36,8 +33,8 @@ ImdOutput::ImdOutput(string xtf_file,string version)
 
 void ImdOutput::preVisit(void)
 {
-   Log.warning("imd generation not fully implemented yet");
-   xtf.openFile(xtf_file, get_all_models());
+   logger().warning("imd generation not fully implemented yet");
+   xtf.openFile(xtf_file,list<Model *>(store().models().begin(),store().models().end()));
 }
 
 void ImdOutput::postVisit(void)
@@ -127,7 +124,7 @@ void ImdOutput::visitIli1Format(Ili1Format *t)
          xtf.writeTag("tidKind","TID_EXPLANATION");
          break;
       default:
-         Log.error("unsupported Ili1Format.tidKind value " + to_string(t->tidKind));
+         logger().error("unsupported Ili1Format.tidKind value " + to_string(t->tidKind));
          break;
    }
    xtf.writeTag("tidExplanation", t->tidExplanation);
@@ -172,7 +169,7 @@ void ImdOutput::visitModel(Model *t)
          xtf.writeTag("Kind","SymbologyM");
          break;
       default:
-         Log.error("unsupported Model.Kind value " + to_string(t->Kind));
+         logger().error("unsupported Model.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeTag("Language", t->Language);
@@ -279,7 +276,7 @@ void ImdOutput::visitClass(Class *t)
          xtf.writeTag("Kind","Association");
          break;
       default:
-         Log.error("unsupported Class.Kind value " + to_string(t->Kind));
+         logger().error("unsupported Class.Kind value " + to_string(t->Kind));
          break;
    }
    if (t->Kind == Class::Association) {
@@ -334,7 +331,7 @@ void ImdOutput::visitAttrOrParam(AttrOrParam *t)
          xtf.writeTag("SubdivisionKind","ContSubDiv");
          break;
       default:
-         Log.error("unsupported AttrOrParam.SubdivisionKind value " + to_string(t->SubdivisionKind));
+         logger().error("unsupported AttrOrParam.SubdivisionKind value " + to_string(t->SubdivisionKind));
          break;
    }
    xtf.writeTag("Transient", to_string_bool(t->Transient));
@@ -497,7 +494,7 @@ void ImdOutput::visitRole(Role *t)
          xtf.writeTag("Strongness","Comp");
          break;
       default:
-         Log.error("unsupported Role.Strongness value " + to_string(t->Strongness));
+         logger().error("unsupported Role.Strongness value " + to_string(t->Strongness));
          break;
    }
    xtf.writeTag("Ordered", to_string_bool(t->Ordered));
@@ -730,7 +727,7 @@ void ImdOutput::visitUnit(Unit *t)
          xtf.writeTag("Kind","ComposedU");
          break;
       default:
-         Log.error("unsupported Unit.Kind value " + to_string(t->Kind));
+         logger().error("unsupported Unit.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeReference("Definition", get_path(t->Definition));
@@ -773,7 +770,7 @@ void ImdOutput::visitMetaBasketDef(MetaBasketDef *t)
          xtf.writeTag("Kind","RefSystemB");
          break;
       default:
-         Log.error("unsupported MetaBasketDef.Kind value " + to_string(t->Kind));
+         logger().error("unsupported MetaBasketDef.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeReference("MetaDataTopic", get_path(t->MetaDataTopic));
@@ -897,7 +894,7 @@ void ImdOutput::visitTextType(TextType *t)
          xtf.writeTag("Kind","Uri");
          break;
       default:
-         Log.error("unsupported TextType.Kind value " + to_string(t->Kind));
+         logger().error("unsupported TextType.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeTag("MaxLength", to_string(t->MaxLength));
@@ -949,7 +946,7 @@ void ImdOutput::visitBlackboxType(BlackboxType *t)
          xtf.writeTag("Kind","Xml");
          break;
       default:
-         Log.error("unsupported BlackboxType.Kind value " + to_string(t->Kind));
+         logger().error("unsupported BlackboxType.Kind value " + to_string(t->Kind));
          break;
    }
 
@@ -1225,7 +1222,7 @@ void ImdOutput::visitArgument(Argument *t)
          xtf.writeTag("Kind","EnumTreeVal");
          break;
       default:
-         Log.error("unsupported Argument.Kind value " + to_string(t->Kind));
+         logger().error("unsupported Argument.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeReference("Function", get_path(t->Function));
@@ -1423,7 +1420,7 @@ void ImdOutput::visitEnumType(EnumType *t)
          xtf.writeTag("Order","Circular");
          break;
       default:
-         Log.error("unsupported EnumType.Order value " + to_string(t->Order));
+         logger().error("unsupported EnumType.Order value " + to_string(t->Order));
          break;
    }
 
@@ -1577,7 +1574,7 @@ void ImdOutput::visitLineType(LineType *t)
          xtf.writeTag("Kind","Area");
          break;
       default:
-         Log.error("unsupported LineType.Kind value " + to_string(t->Kind));
+         logger().error("unsupported LineType.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeTag("MaxOverlap", t->MaxOverlap);
@@ -1650,7 +1647,7 @@ void ImdOutput::visitView(View *t)
          xtf.writeTag("Kind","Association");
          break;
       default:
-         Log.error("unsupported Class.Kind value " + to_string(t->Kind));
+         logger().error("unsupported Class.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.openTag("Multiplicity");
@@ -1686,7 +1683,7 @@ void ImdOutput::visitView(View *t)
          xtf.writeTag("FormationKind","Inspection_Area");
          break;
       default:
-         Log.error("unsupported View.FormationKind value " + to_string(t->FormationKind));
+         logger().error("unsupported View.FormationKind value " + to_string(t->FormationKind));
          break;
    }
    if (t->FormationParameter.size() > 0) {
@@ -1754,7 +1751,7 @@ void ImdOutput::visitUnaryExpr(UnaryExpr *t)
          xtf.writeTag("Operation","Defined");
          break;
       default:
-         Log.error("unsupported UnaryExpr.Operation value " + to_string(t->Operation));
+         logger().error("unsupported UnaryExpr.Operation value " + to_string(t->Operation));
          break;
    }
    xtf.writeReference("SubExpression", get_path(t->SubExpression));
@@ -1826,7 +1823,7 @@ void ImdOutput::visitPathEl(PathEl *t)
          xtf.writeTag("Kind","MetaObject");
          break;
       default:
-         Log.error("unsupported PathEl.Kind value " + to_string(t->Kind));
+         logger().error("unsupported PathEl.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeReference("Ref", get_path(t->Ref));
@@ -1839,7 +1836,7 @@ void ImdOutput::visitPathEl(PathEl *t)
          xtf.writeTag("SpecIndex","Last");
          break;
       default:
-         Log.error("unsupported PathEl.SpecIndex value " + to_string(t->SpecIndex));
+         logger().error("unsupported PathEl.SpecIndex value " + to_string(t->SpecIndex));
          break;
    }
 
@@ -1939,7 +1936,7 @@ void ImdOutput::visitActualArgument(ActualArgument *t)
          xtf.writeTag("Kind","AllOf");
          break;
       default:
-         Log.error("unsupported ActualArgument.Kind value " + to_string(t->Kind));
+         logger().error("unsupported ActualArgument.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeReference("Expression", get_path(t->Expression));
@@ -2015,7 +2012,7 @@ void ImdOutput::visitConstant(Constant *t)
          xtf.writeTag("Kind","Enumeration");
          break;
       default:
-         Log.error("unsupported Constant.Kind value " + to_string(t->Kind));
+         logger().error("unsupported Constant.Kind value " + to_string(t->Kind));
          break;
    }
 
@@ -2128,7 +2125,7 @@ void ImdOutput::visitSimpleConstraint(SimpleConstraint *t)
          xtf.writeTag("Kind","HighPercC");
          break;
       default:
-         Log.error("unsupported SimpleConstraint.Kind value " + to_string(t->Kind));
+         logger().error("unsupported SimpleConstraint.Kind value " + to_string(t->Kind));
          break;
    }
    xtf.writeTag("Percentage", to_string(t->Percentage));
@@ -2231,7 +2228,7 @@ void ImdOutput::visitUniqueConstraint(UniqueConstraint *t)
          xtf.writeTag("Kind","LocalU");
          break;
       default:
-         Log.error("unsupported UniqueConstraint.Kind value " + to_string(t->Kind));
+         logger().error("unsupported UniqueConstraint.Kind value " + to_string(t->Kind));
          break;
    }
 

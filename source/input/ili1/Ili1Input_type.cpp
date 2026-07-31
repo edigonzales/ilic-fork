@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Ili1Input.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
@@ -15,15 +15,15 @@ antlrcpp::Any Ili1Input::visitDomainDefs(parser::Ili1Parser::DomainDefsContext *
    : ILIDOMAIN domainDef+
    */
   
-   debug(ctx,">>> visitDomainDefs()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitDomainDefs()");
+   logger_.incNestLevel();
    
    for (auto dctx : ctx->domainDef()) {
       visitDomainDef(dctx);
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitDomainDefs()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitDomainDefs()");
 
    return nullptr;
    
@@ -37,22 +37,22 @@ antlrcpp::Any Ili1Input::visitDomainDef(parser::Ili1Parser::DomainDefContext *ct
    */
    
    string domainname = ctx->domainname->getText();
-   if (is_reserved_name(domainname)) {
+   if (builder_.isReservedName(domainname)) {
       domainname += "_ILI1";
    }
 
-   debug(ctx,">>> visitDomainDef(" + domainname + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitDomainDef(" + domainname + ")");
+   logger_.incNestLevel();
 
    // init DomainType
    Type *t = visitType(ctx->type());
    if (t != nullptr) {
       t->Name = domainname;
-      add_type(t);
+      builder_.addType(t);
    }
          
-   Log.decNestLevel();
-   debug(ctx,"<<< visitDomainDef(" + domainname + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitDomainDef(" + domainname + ")");
    
    return t;
 
@@ -68,8 +68,8 @@ antlrcpp::Any Ili1Input::visitType(parser::Ili1Parser::TypeContext *ctx)
    | name=NAME
    */
 
-   debug(ctx,">>> visitType()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitType()");
+   logger_.incNestLevel();
    
    Type *t = nullptr;
 
@@ -86,19 +86,19 @@ antlrcpp::Any Ili1Input::visitType(parser::Ili1Parser::TypeContext *ctx)
    }
    else {
       string name = ctx->name->getText();
-      if (is_reserved_name(name)) {
+      if (builder_.isReservedName(name)) {
          name += "_ILI1";
       }
-      Type *base = find_type(name,get_line(ctx));
+      Type *base = builder_.findType(name,builder_.line(ctx));
       if (base != nullptr) {
-         t = static_cast<Type *>(base->clone());
-         init_type(t,get_line(ctx->name));
+         t = static_cast<Type *>(builder_.clone(*base));
+         builder_.initType(t,builder_.line(ctx->name));
          t->Super = base;
       }
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitType()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitType()");
 
    return t;
 
@@ -121,8 +121,8 @@ antlrcpp::Any Ili1Input::visitBaseType(parser::Ili1Parser::BaseTypeContext *ctx)
    | vertAlignment
    */
    
-   debug(ctx,">>> visitBaseType()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitBaseType()");
+   logger_.incNestLevel();
    
    Type *t = nullptr;
 
@@ -171,8 +171,8 @@ antlrcpp::Any Ili1Input::visitBaseType(parser::Ili1Parser::BaseTypeContext *ctx)
       t = e;
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitBaseType()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitBaseType()");
 
    return t;
 
@@ -195,18 +195,18 @@ antlrcpp::Any Ili1Input::visitCoord2(parser::Ili1Parser::Coord2Context *ctx)
      emax=decimal nmax=decimal
    */
    
-   debug(ctx,">>> visitCoord2()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitCoord2()");
+   logger_.incNestLevel();
    
-   CoordType *t = make_mmobject<CoordType>();
-   init_domaintype(t,ctx->start->getLine());
+   CoordType *t = builder_.store().make<CoordType>();
+   builder_.initDomainType(t,ctx->start->getLine());
 
    t->NullAxis = 2;
    t->PiHalfAxis = 1;
 
    // C1
-   NumType *n = make_mmobject<NumType>();
-   init_domaintype(n,get_line(ctx->emin));
+   NumType *n = builder_.store().make<NumType>();
+   builder_.initDomainType(n,builder_.line(ctx->emin));
    n->Min = ctx->emin->getText();
    n->Max = ctx->emax->getText();
    n->Name = "C1";
@@ -214,15 +214,15 @@ antlrcpp::Any Ili1Input::visitCoord2(parser::Ili1Parser::Coord2Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   AxisSpec *as = make_mmobject<AxisSpec>();
-   init_mmobject(as,n->_line);
+   AxisSpec *as = builder_.store().make<AxisSpec>();
+   builder_.initObject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
-   add_axisspec(as);
+   builder_.addAxisSpec(as);
 
    // C2
-   n = make_mmobject<NumType>();
-   init_domaintype(n,get_line(ctx->emin));
+   n = builder_.store().make<NumType>();
+   builder_.initDomainType(n,builder_.line(ctx->emin));
    n->Min = ctx->nmin->getText();
    n->Max = ctx->nmax->getText();
    n->Name = "C2";
@@ -230,14 +230,14 @@ antlrcpp::Any Ili1Input::visitCoord2(parser::Ili1Parser::Coord2Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   as = make_mmobject<AxisSpec>();
-   init_mmobject(as,n->_line);
+   as = builder_.store().make<AxisSpec>();
+   builder_.initObject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
-   add_axisspec(as);
+   builder_.addAxisSpec(as);
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitCoord2()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitCoord2()");
    
    return t;
    
@@ -252,18 +252,18 @@ antlrcpp::Any Ili1Input::visitCoord3(parser::Ili1Parser::Coord3Context *ctx)
      emax=decimal nmax=decimal hmax=decimal
    */
 
-   debug(ctx,">>> visitCoord3()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitCoord3()");
+   logger_.incNestLevel();
    
-   CoordType *t = make_mmobject<CoordType>();
-   init_domaintype(t,ctx->start->getLine());
+   CoordType *t = builder_.store().make<CoordType>();
+   builder_.initDomainType(t,ctx->start->getLine());
 
    t->NullAxis = 2;
    t->PiHalfAxis = 1;
 
    // C1
-   NumType *n = make_mmobject<NumType>();
-   init_domaintype(n,get_line(ctx->emin));
+   NumType *n = builder_.store().make<NumType>();
+   builder_.initDomainType(n,builder_.line(ctx->emin));
    n->Min = ctx->emin->getText();
    n->Max = ctx->emax->getText();
    n->Name = "C1";
@@ -271,15 +271,15 @@ antlrcpp::Any Ili1Input::visitCoord3(parser::Ili1Parser::Coord3Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   AxisSpec *as = make_mmobject<AxisSpec>();
-   init_mmobject(as,n->_line);
+   AxisSpec *as = builder_.store().make<AxisSpec>();
+   builder_.initObject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
-   add_axisspec(as);
+   builder_.addAxisSpec(as);
 
    // C2
-   n = make_mmobject<NumType>();
-   init_domaintype(n,get_line(ctx->emin));
+   n = builder_.store().make<NumType>();
+   builder_.initDomainType(n,builder_.line(ctx->emin));
    n->Min = ctx->nmin->getText();
    n->Max = ctx->nmax->getText();
    n->Name = "C2";
@@ -287,15 +287,15 @@ antlrcpp::Any Ili1Input::visitCoord3(parser::Ili1Parser::Coord3Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   as = make_mmobject<AxisSpec>();
-   init_mmobject(as,n->_line);
+   as = builder_.store().make<AxisSpec>();
+   builder_.initObject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
-   add_axisspec(as);
+   builder_.addAxisSpec(as);
 
    // C3
-   n = make_mmobject<NumType>();
-   init_domaintype(n,get_line(ctx->emin));
+   n = builder_.store().make<NumType>();
+   builder_.initDomainType(n,builder_.line(ctx->emin));
    n->Min = ctx->hmin->getText();
    n->Max = ctx->hmax->getText();
    n->Name = "C3";
@@ -303,14 +303,14 @@ antlrcpp::Any Ili1Input::visitCoord3(parser::Ili1Parser::Coord3Context *ctx)
    n->_other_type = t;
    t->Axis.push_back(n);
 
-   as = make_mmobject<AxisSpec>();
-   init_mmobject(as,n->_line);
+   as = builder_.store().make<AxisSpec>();
+   builder_.initObject(as,n->_line);
    as->CoordType = t;
    as->Axis = n;
-   add_axisspec(as);
+   builder_.addAxisSpec(as);
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitCoord3()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitCoord3()");
    
    return t;
    
@@ -338,15 +338,15 @@ antlrcpp::Any Ili1Input::visitNumericRange(parser::Ili1Parser::NumericRangeConte
      RBRACE
    */
 
-   debug(ctx,">>> visitNumericRange()");
+   builder_.debug(ctx,">>> visitNumericRange()");
    
-   NumType *t = make_mmobject<NumType>();
-   init_domaintype(t,ctx->start->getLine());
+   NumType *t = builder_.store().make<NumType>();
+   builder_.initDomainType(t,ctx->start->getLine());
    
    t->Min = ctx->min->getText();
    t->Max = ctx->max->getText();
    
-   debug(ctx,"<<< visitNumericRange()");
+   builder_.debug(ctx,"<<< visitNumericRange()");
    
    return t;
    
@@ -370,16 +370,16 @@ antlrcpp::Any Ili1Input::visitDim1Type(parser::Ili1Parser::Dim1TypeContext *ctx)
    : DIM1 min=decimal max=decimal
    */
 
-   debug(ctx,">>> visitDim1Context()");
+   builder_.debug(ctx,">>> visitDim1Context()");
 
-   NumType *t = make_mmobject<NumType>();
-   init_domaintype(t,ctx->start->getLine());
+   NumType *t = builder_.store().make<NumType>();
+   builder_.initDomainType(t,ctx->start->getLine());
    
    t->Min = ctx->min->getText();
    t->Max = ctx->max->getText();
-   t->Unit = find_unit("INTERLIS.m",get_line(ctx));
+   t->Unit = builder_.findUnit("INTERLIS.m",builder_.line(ctx));
    
-   debug(ctx,"<<< visitDim1Context()");
+   builder_.debug(ctx,"<<< visitDim1Context()");
 
    return t;
    
@@ -403,16 +403,16 @@ antlrcpp::Any Ili1Input::visitDim2Type(parser::Ili1Parser::Dim2TypeContext *ctx)
    : DIM2 min = decimal max=decimal
    */
    
-   debug(ctx,">>> visitDim2Type()");
+   builder_.debug(ctx,">>> visitDim2Type()");
 
-   NumType *t = make_mmobject<NumType>();
-   init_domaintype(t,ctx->start->getLine());
+   NumType *t = builder_.store().make<NumType>();
+   builder_.initDomainType(t,ctx->start->getLine());
    
    t->Min = ctx->min->getText();
    t->Max = ctx->max->getText();
-   t->Unit = find_unit(get_model_context()->Name + ".m2",get_line(ctx));
+   t->Unit = builder_.findUnit(builder_.currentModel()->Name + ".m2",builder_.line(ctx));
    
-   debug(ctx,"<<< visitDim2Type()");
+   builder_.debug(ctx,"<<< visitDim2Type()");
 
    return t;
       
@@ -436,25 +436,25 @@ antlrcpp::Any Ili1Input::visitAngleType(parser::Ili1Parser::AngleTypeContext *ct
    : (RADIANS | DEGREES | GRADS) min=decimal max=decimal
    */
    
-   debug(ctx,">>> visitAngleType()");
+   builder_.debug(ctx,">>> visitAngleType()");
 
-   NumType *t = make_mmobject<NumType>();
-   init_domaintype(t,get_line(ctx));
+   NumType *t = builder_.store().make<NumType>();
+   builder_.initDomainType(t,builder_.line(ctx));
    
    t->Min = ctx->min->getText();
    t->Max = ctx->max->getText();
 
    if (ctx->RADIANS() != nullptr) {
-      t->Unit = find_unit("INTERLIS.rad",get_line(ctx));
+      t->Unit = builder_.findUnit("INTERLIS.rad",builder_.line(ctx));
    }
    else if (ctx->DEGREES() != nullptr) {
-      t->Unit = find_unit(get_model_context()->Name + ".dgr",get_line(ctx));
+      t->Unit = builder_.findUnit(builder_.currentModel()->Name + ".dgr",builder_.line(ctx));
    }
    else if (ctx->GRADS() != nullptr) {
-      t->Unit = find_unit(get_model_context()->Name + ".grd",get_line(ctx));
+      t->Unit = builder_.findUnit(builder_.currentModel()->Name + ".grd",builder_.line(ctx));
    }
    
-   debug(ctx,"<<< visitAngleType()");
+   builder_.debug(ctx,"<<< visitAngleType()");
 
    return t;
    
@@ -473,16 +473,16 @@ antlrcpp::Any Ili1Input::visitTextType(parser::Ili1Parser::TextTypeContext *ctx)
    : TEXT STAR numchars=POSNUMBER
    */
 
-   debug(ctx,">>> visitTextType()");
+   builder_.debug(ctx,">>> visitTextType()");
    
-   TextType *t = make_mmobject<TextType>();
-   init_domaintype(t,ctx->start->getLine());
+   TextType *t = builder_.store().make<TextType>();
+   builder_.initDomainType(t,ctx->start->getLine());
 
    t->Kind = TextType::Text;
    
    t->MaxLength = atoi(ctx->numchars->getText().c_str());
    
-   debug(ctx,"<<< visitAngleType()");
+   builder_.debug(ctx,"<<< visitAngleType()");
 
    return t;
    
@@ -495,15 +495,15 @@ antlrcpp::Any Ili1Input::visitDateType(parser::Ili1Parser::DateTypeContext *ctx)
    : date=DATE
    */
 
-   debug(ctx,">>> visitDateType()");
+   builder_.debug(ctx,">>> visitDateType()");
 
-   Type *base = find_type("INTERLIS.INTERLIS_1_DATE",get_line(ctx));
+   Type *base = builder_.findType("INTERLIS.INTERLIS_1_DATE",builder_.line(ctx));
 
-   TextType *t = static_cast<TextType *>(base->clone());
-   init_domaintype(t,get_line(ctx));
+   TextType *t = static_cast<TextType *>(builder_.clone(*base));
+   builder_.initDomainType(t,builder_.line(ctx));
    t->Super = base;
 
-   debug(ctx,"<<< visitDateType()");
+   builder_.debug(ctx,"<<< visitDateType()");
 
    return t;
    
@@ -516,32 +516,32 @@ antlrcpp::Any Ili1Input::visitEnumerationType(parser::Ili1Parser::EnumerationTyp
    : LPAREN enumElement (COMMA enumElement)* RPAREN
    */
    
-   debug(ctx,">>> visitEnumerationType()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitEnumerationType()");
+   logger_.incNestLevel();
 
-   EnumType *t = make_mmobject<EnumType>();
+   EnumType *t = builder_.store().make<EnumType>();
    
-   init_domaintype(t,ctx->start->getLine());
+   builder_.initDomainType(t,ctx->start->getLine());
    t->Order = EnumType::Unordered;
    
    // TopNode
-   EnumNode* tn = make_mmobject<EnumNode>();
+   EnumNode* tn = builder_.store().make<EnumNode>();
    tn->Name = "TOP";
    tn->EnumType = t;
    tn->Final = false;
    t->TopNode = tn;
    
    // role from ASSOCIATION TopNode
-   push_context(t);
+   builder_.pushContext(*t);
    for (auto ectx : ctx->enumElement()) {
       EnumNode *nn = visitEnumElement(ectx);
       tn->Node.push_back(nn);
       nn->ParentNode = tn;
    }
-   pop_context();
+   builder_.popContext();
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitEnumerationType()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitEnumerationType()");
    return t;
    
 }
@@ -553,23 +553,23 @@ antlrcpp::Any Ili1Input::visitEnumElement(parser::Ili1Parser::EnumElementContext
    : enumelement=NAME enumerationType?
    */
 
-   EnumNode *n = make_mmobject<EnumNode>();
+   EnumNode *n = builder_.store().make<EnumNode>();
    n->Name = ctx->enumelement->getText();
 
-   debug(ctx,">>> visitEnumElement(" + n->Name + ")");
+   builder_.debug(ctx,">>> visitEnumElement(" + n->Name + ")");
 
    // list <EnumNode *> Node;
    if (ctx->enumerationType() != nullptr) {
-      Log.incNestLevel();
+      logger_.incNestLevel();
       for (auto ectx : ctx->enumerationType()->enumElement()) {
          EnumNode *nn = visitEnumElement(ectx);
          n->Node.push_back(nn);
          nn->ParentNode = n;
       }
-      Log.decNestLevel();
+      logger_.decNestLevel();
    }
 
-   debug(ctx,"<<< visitEnumElement(" + n->Name + ")");
+   builder_.debug(ctx,"<<< visitEnumElement(" + n->Name + ")");
 
    return n;
    
@@ -582,15 +582,15 @@ antlrcpp::Any Ili1Input::visitHorizAlignment(parser::Ili1Parser::HorizAlignmentC
    : HALIGNMENT
    */
    
-   debug(ctx,">>> visitHorizAlignment()");
+   builder_.debug(ctx,">>> visitHorizAlignment()");
 
-   Type *base = find_type("INTERLIS.HALIGNMENT",get_line(ctx));
+   Type *base = builder_.findType("INTERLIS.HALIGNMENT",builder_.line(ctx));
 
-   EnumType *t = static_cast<EnumType *>(base->clone());
-   init_domaintype(t,get_line(ctx));
+   EnumType *t = static_cast<EnumType *>(builder_.clone(*base));
+   builder_.initDomainType(t,builder_.line(ctx));
    t->Super = base;
 
-   debug(ctx,"<<< visitHorizAlignment()");
+   builder_.debug(ctx,"<<< visitHorizAlignment()");
 
    return t;
    
@@ -603,15 +603,15 @@ antlrcpp::Any Ili1Input::visitVertAlignment(parser::Ili1Parser::VertAlignmentCon
    : VALIGNMENT
    */
 
-   debug(ctx,">>> visitVertAlignment()");
+   builder_.debug(ctx,">>> visitVertAlignment()");
 
-   Type *base = find_type("INTERLIS.VALIGNMENT",get_line(ctx));
+   Type *base = builder_.findType("INTERLIS.VALIGNMENT",builder_.line(ctx));
 
-   EnumType *t = static_cast<EnumType *>(base->clone());
-   init_domaintype(t,get_line(ctx));
+   EnumType *t = static_cast<EnumType *>(builder_.clone(*base));
+   builder_.initDomainType(t,builder_.line(ctx));
    t->Super = base;
 
-   debug(ctx,"<<< visitVertAlignment()");
+   builder_.debug(ctx,"<<< visitVertAlignment()");
 
    return t;
    
@@ -638,10 +638,10 @@ antlrcpp::Any Ili1Input::visitLineType(parser::Ili1Parser::LineTypeContext *ctx)
       Class *LAStructure;
    */
 
-   debug(ctx,">>> visitLineType()");
+   builder_.debug(ctx,">>> visitLineType()");
    
-   LineType *t = make_mmobject<LineType>();
-   init_domaintype(t,ctx->start->getLine());
+   LineType *t = builder_.store().make<LineType>();
+   builder_.initDomainType(t,ctx->start->getLine());
    t->Kind = LineType::Polyline;
 
    if (ctx->form() != nullptr) {
@@ -649,11 +649,11 @@ antlrcpp::Any Ili1Input::visitLineType(parser::Ili1Parser::LineTypeContext *ctx)
       t->LineForm = f;
    }
    
-   push_context(t);
+   builder_.pushContext(*t);
    t->CoordType = visitControlPoints(ctx->controlPoints());
-   pop_context();
+   builder_.popContext();
    
-   debug(ctx,"<<< visitLineType()");
+   builder_.debug(ctx,"<<< visitLineType()");
    return t;
    
 }
@@ -670,7 +670,7 @@ antlrcpp::Any Ili1Input::visitForm(parser::Ili1Parser::FormContext *ctx)
    list<LineForm *> lf;
    
    for (auto *t : ctx->lineForm()) {
-      LineForm *f = make_mmobject<LineForm>();
+      LineForm *f = builder_.store().make<LineForm>();
       f->Name = t->getText();
       lf.push_back(f);
    }
@@ -689,10 +689,10 @@ antlrcpp::Any Ili1Input::visitAreaType(parser::Ili1Parser::AreaTypeContext *ctx)
      lineAttributes?
    */
 
-   debug(ctx,">>> visitAreaType()");
+   builder_.debug(ctx,">>> visitAreaType()");
 
-   LineType *t = make_mmobject<LineType>();
-   init_domaintype(t,ctx->start->getLine());
+   LineType *t = builder_.store().make<LineType>();
+   builder_.initDomainType(t,ctx->start->getLine());
    if (ctx->SURFACE() != nullptr) {
       t->Kind = LineType::Surface;
    }
@@ -713,15 +713,15 @@ antlrcpp::Any Ili1Input::visitAreaType(parser::Ili1Parser::AreaTypeContext *ctx)
       t->MaxOverlap = "0.1";
    }
 
-   push_context(t);
+   builder_.pushContext(*t);
    t->CoordType = visitControlPoints(ctx->controlPoints());
-   pop_context();
+   builder_.popContext();
 
    if (ctx->lineAttributes() != nullptr) {
       t->LAStructure = visitLineAttributes(ctx->lineAttributes());
    }
 
-   debug(ctx,"<<< visitAreaType()");
+   builder_.debug(ctx,"<<< visitAreaType()");
    return t;
    
 }
@@ -733,17 +733,15 @@ antlrcpp::Any Ili1Input::visitIntersectionDef(parser::Ili1Parser::IntersectionDe
    : WITHOUT OVERLAPS GREATER maxoverlap=decimal
    */
    
-   debug(ctx,">>> visitIntersectionDef()");
+   builder_.debug(ctx,">>> visitIntersectionDef()");
    
    string maxoverlap = ctx->maxoverlap->getText();
    
-   debug(ctx,"<<< visitIntersectionDef(" + maxoverlap + ")");
+   builder_.debug(ctx,"<<< visitIntersectionDef(" + maxoverlap + ")");
    
    return maxoverlap;
    
 }
-
-static int control_point_counter = 0;
 
 antlrcpp::Any Ili1Input::visitControlPoints(parser::Ili1Parser::ControlPointsContext *ctx)
 {
@@ -754,35 +752,35 @@ antlrcpp::Any Ili1Input::visitControlPoints(parser::Ili1Parser::ControlPointsCon
      (BASE EXPLANATION)?
    */
    
-   debug(ctx,">>> visitControlPoints()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitControlPoints()");
+   logger_.incNestLevel();
    
    CoordType *c = nullptr;
    
    if (ctx->coord2() != nullptr) {
       c = visitCoord2(ctx->coord2());
-      c->Name = "ControlPoints" + to_string(++control_point_counter);
-      Package* p = get_package_context();
+      c->Name = "ControlPoints" + to_string(++controlPointCounter_);
+      Package* p = builder_.currentPackage();
       c->ElementInPackage = p;
       p->Element.push_front(c);
    }
    else if (ctx->coord3() != nullptr) {
       c = visitCoord3(ctx->coord3());
-      c->Name = "ControlPoints" + to_string(++control_point_counter);
-      Package* p = get_package_context();
+      c->Name = "ControlPoints" + to_string(++controlPointCounter_);
+      Package* p = builder_.currentPackage();
       c->ElementInPackage = p;
       p->Element.push_front(c);
    }
    else {
       string name = ctx->NAME()->getText();
-      if (is_reserved_name(name)) {
+      if (builder_.isReservedName(name)) {
          name += "_ILI1";
       }
-      c = dynamic_cast<CoordType *>(find_type(name,get_line(ctx)));
+      c = dynamic_cast<CoordType *>(builder_.findType(name,builder_.line(ctx)));
    }
       
-   Log.decNestLevel();
-   debug(ctx,"<<< visitControlPoints()");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitControlPoints()");
    return c;
    
 }
@@ -797,24 +795,26 @@ antlrcpp::Any Ili1Input::visitLineAttributes(parser::Ili1Parser::LineAttributesC
      END
    */
 
-   string name = get_class_context()->Name + "_" + get_context()->Name + "_LineAttrib";
-   debug(ctx,">>> visitLineAttributes(" + name + ")");
+   auto *current = dynamic_cast<MetaElement *>(builder_.current());
+   string name = builder_.currentClass()->Name + "_" +
+      (current == nullptr ? string() : current->Name) + "_LineAttrib";
+   builder_.debug(ctx,">>> visitLineAttributes(" + name + ")");
    
-   Log.incNestLevel();
+   logger_.incNestLevel();
 
-   Class *c = make_mmobject<Class>();
+   Class *c = builder_.store().make<Class>();
 
    // Class Attributes
    c->Name = name;
    c->Kind = Class::Structure;
-   init_type(c,get_line(ctx));
-   add_class(c);
+   builder_.initType(c,builder_.line(ctx));
+   builder_.addClass(c);
 
    // because we are in class context, we have to set ElementInPackage manually
-   c->ElementInPackage = get_package_context();
-   c->ElementInPackage->Element.insert(get_package_context()->Element.begin(),c);
+   c->ElementInPackage = builder_.currentPackage();
+   c->ElementInPackage->Element.insert(builder_.currentPackage()->Element.begin(),c);
 
-   push_context(c);
+   builder_.pushContext(*c);
 
    for (auto actx : ctx->attribute()) {
       visitAttribute(actx);
@@ -824,10 +824,10 @@ antlrcpp::Any Ili1Input::visitLineAttributes(parser::Ili1Parser::LineAttributesC
       visitIdentifications(ctx->identifications());
    }
 
-   pop_context();
-   Log.decNestLevel();
+   builder_.popContext();
+   logger_.decNestLevel();
    
-   debug(ctx,"<<< visitLineAttributes()");
+   builder_.debug(ctx,"<<< visitLineAttributes()");
 
    return c;
    

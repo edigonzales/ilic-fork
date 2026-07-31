@@ -8,6 +8,7 @@
 #include "../util/Logger.h"
 
 #include <climits>
+#include <algorithm>
 #include <regex>
 #include <unordered_map>
 
@@ -15,7 +16,9 @@ using namespace util;
 using namespace metamodel;
 using namespace output;
 
-XsdOutput::XsdOutput(string xsd_file,string iliversion, string ilic_version) {
+XsdOutput::XsdOutput(metamodel::MetaModelStore &store,util::Logger &logger,
+   string xsd_file,string iliversion, string ilic_version)
+   : MetaModelTreeVisitor(store,logger) {
    this->xsd_file = xsd_file;
    this->iliversion = iliversion;
    this->ilic_version = ilic_version;
@@ -38,27 +41,27 @@ void XsdOutput::preVisit(void) {
       ">"
    );
 
-   Log.debug("write annotations");
+   logger().debug("write annotations");
    writeAnnotations();
    
-   Log.debug("write fix types 1");
+   logger().debug("write fix types 1");
    writeFixTypes1();
 
-   Log.debug("write alias tables");
+   logger().debug("write alias tables");
    writeAliasTables();
 
-   Log.debug("write fix types 2");
+   logger().debug("write fix types 2");
    writeFixTypes2();
 
-   Log.debug("write datasection");
+   logger().debug("write datasection");
    writeDatasection();
 }
 
 void XsdOutput::postVisit() {
-   Log.debug("write interlis reference types");
+   logger().debug("write interlis reference types");
    writeInterlisReferenceTypes();
 
-   Log.debug("write header section");
+   logger().debug("write header section");
    writeHeadersection();
 
    xsd.writelnDecNestLevel("</xsd:schema>");
@@ -450,8 +453,8 @@ void XsdOutput::writeAnnotations() {
       + ilic_version + "</xsd:appinfo>"
    );
 
-   list<Model*> allModels = get_all_models();
-   allModels.sort([](const Model* a, const Model* b) { return a->Name < b->Name; });
+   vector<Model*> allModels(store().models().begin(),store().models().end());
+   std::sort(allModels.begin(),allModels.end(),[](const Model* a, const Model* b) { return a->Name < b->Name; });
 
    for (Model *m : allModels) {
       if (m->Name == "INTERLIS") {
@@ -492,7 +495,7 @@ void XsdOutput::writeFixTypes1() {
 }
 
 void XsdOutput::writeAliasTables() {
-   //Log.warning("writeAliasTables not implemented yet");
+   //logger().warning("writeAliasTables not implemented yet");
 }
 
 void XsdOutput::writeFixTypes2() {
@@ -510,10 +513,10 @@ void XsdOutput::writeFixTypes2() {
 
    bool addAliasTable = false;
 
-   if(get_all_models().size() > 0) {
-      Model *m = get_all_models().back();
+   if(store().models().size() > 0) {
+      Model *m = store().models().back();
 
-      //Log.warning("ili2c.ili23xsd.addAliasTableDefault not implemented yet");
+      //logger().warning("ili2c.ili23xsd.addAliasTableDefault not implemented yet");
       for (MetaAttribute* ma : m->MetaAttribute) {
          if (ma->Name == "ili2c.ili23xsd.addAliasTableDefault") {
             if (ma->Value == "true") {
@@ -577,8 +580,8 @@ void XsdOutput::writeDatasection() {
 
    xsd.incNestLevel();
 
-   list<Model*> allModels = get_all_models();
-   allModels.sort([](const Model* a, const Model* b) { return a->Name < b->Name; });
+   vector<Model*> allModels(store().models().begin(),store().models().end());
+   std::sort(allModels.begin(),allModels.end(),[](const Model* a, const Model* b) { return a->Name < b->Name; });
 
    for (Model *m : allModels) {
       if (m->Name == "INTERLIS" || m->Kind == Model::TypeM) {
@@ -594,7 +597,7 @@ void XsdOutput::writeDatasection() {
             SubModel* subModel = static_cast<SubModel*>(me);
 
             string searchDataUnit = get_path(subModel) + ".BASKET";
-            for (auto *du : get_all_dataunits()) {
+            for (auto *du : store().dataUnits()) {
                string dataunit_path = get_path(du);
 
                if (searchDataUnit == dataunit_path) {

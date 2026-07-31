@@ -8,7 +8,8 @@ namespace output {
    class Ili2Output : public metamodel::MetaModelTreeVisitor {
    public:
 
-      Ili2Output(string ilifile,string model_version);
+      Ili2Output(metamodel::MetaModelStore &store,util::Logger &logger,
+         string ilifile,string model_version);
 
       void preVisit() override;
       void postVisit() override;
@@ -45,6 +46,13 @@ namespace output {
 #undef MMV_VISITOR
 #define MMV_VISITOR Ili2Output
 #include "../metamodel/MetaModelTreeVisitor.inc"
+
+   private:
+      util::TextWriter ili2;
+      string ili_file;
+      string model_version;
+      bool firstClassParam = true;
+      metamodel::Class *currentClass_ = nullptr;
 
    };
 

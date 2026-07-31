@@ -3,6 +3,7 @@
 #include "../util/Logger.h"
 
 #include "MetaModel.h"
+#include "MetaModelStore.h"
 
 #define MMV "mmv"
 
@@ -10,6 +11,17 @@ namespace metamodel {
 
    class MetaModelTreeVisitor {
    public:
+
+      MetaModelTreeVisitor(MetaModelStore &store,util::Logger &logger)
+         : store_(store),logger_(logger) {}
+      virtual ~MetaModelTreeVisitor() = default;
+      MetaModelTreeVisitor(const MetaModelTreeVisitor &) = delete;
+      MetaModelTreeVisitor &operator=(const MetaModelTreeVisitor &) = delete;
+
+      MetaModelStore &store() noexcept { return store_; }
+      const MetaModelStore &store() const noexcept { return store_; }
+      util::Logger &logger() noexcept { return logger_; }
+      const util::Logger &logger() const noexcept { return logger_; }
    
       virtual void preVisit() {};
       virtual void postVisit() {};
@@ -127,6 +139,10 @@ namespace metamodel {
 
 #define MMV_VISITOR MetaModelTreeVisitor
 #include "MetaModelTreeVisitor.inc"
+
+   private:
+      MetaModelStore &store_;
+      util::Logger &logger_;
 
    };
 

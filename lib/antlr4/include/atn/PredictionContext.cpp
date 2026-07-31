@@ -20,12 +20,12 @@ using namespace antlr4::atn;
 
 using namespace antlrcpp;
 
-size_t PredictionContext::globalNodeCount = 0;
+std::atomic<size_t> PredictionContext::globalNodeCount{0};
 const Ref<PredictionContext> PredictionContext::EMPTY = std::make_shared<EmptyPredictionContext>();
 
 //----------------- PredictionContext ----------------------------------------------------------------------------------
 
-PredictionContext::PredictionContext(size_t cachedHashCode) : id(globalNodeCount++), cachedHashCode(cachedHashCode)  {
+PredictionContext::PredictionContext(size_t cachedHashCode) : id(globalNodeCount.fetch_add(1, std::memory_order_relaxed)), cachedHashCode(cachedHashCode)  {
 }
 
 PredictionContext::~PredictionContext() {
@@ -659,4 +659,3 @@ size_t PredictionContextMergeCache::count() const {
     result += entry.second.size();
   return result;
 }
-

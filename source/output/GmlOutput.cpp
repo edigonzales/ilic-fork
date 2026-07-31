@@ -13,7 +13,9 @@ using namespace util;
 using namespace metamodel;
 using namespace output;
 
-GmlOutput::GmlOutput(string gml_output_dir, string iliversion, string ilic_version)
+GmlOutput::GmlOutput(metamodel::MetaModelStore &store,util::Logger &logger,
+   string gml_output_dir, string iliversion, string ilic_version)
+   : MetaModelTreeVisitor(store,logger)
 {
    this->gml_output_dir = gml_output_dir;
    this->iliversion = iliversion;
@@ -22,7 +24,7 @@ GmlOutput::GmlOutput(string gml_output_dir, string iliversion, string ilic_versi
 
 void GmlOutput::preVisit()
 {
-   list<Model*> allModels = get_all_models();
+   vector<Model*> allModels(store().models().begin(),store().models().end());
    set<string> writtenNames;
 
    for (Model* m : allModels) {
@@ -87,7 +89,7 @@ void GmlOutput::preVisitModel(Model* m) {
    gml.writeln("xmlns:INTERLIS=\"http://www.interlis.ch/INTERLIS2.3/GML32/INTERLIS\"");
    gml.writeln("xmlns:ili2c=\"http://www.interlis.ch/ili2c\"");
 
-   for (Import* i : get_all_imports()) {
+   for (Import* i : store().imports()) {
       if (m->Name != i->ImportingP->Name) {
          continue;
       }
@@ -126,7 +128,7 @@ void GmlOutput::preVisitModel(Model* m) {
    // import of base ILIGML schema
    gml.writeln("<xsd:import namespace=\"http://www.interlis.ch/INTERLIS2.3/GML32/INTERLIS\"/>");
 
-   for (Import* i : get_all_imports()) {
+   for (Import* i : store().imports()) {
       if (m->Name != i->ImportingP->Name) {
          continue;
       }
@@ -288,7 +290,7 @@ void GmlOutput::postVisitSubModel(metamodel::SubModel* s) {
    string baseElement = "gml:AbstractFeature";
 
    string searchDataUnit = get_path(s) + ".BASKET";
-   for (auto* du : get_all_dataunits()) {
+   for (auto* du : store().dataUnits()) {
       string dataunit_path = get_path(du);
 
       if (searchDataUnit == dataunit_path) {

@@ -7,6 +7,7 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <memory>
 
 namespace ilic {
 
@@ -57,9 +58,15 @@ class CompilerSession {
 public:
    CompilerSession();
    ~CompilerSession();
+   CompilerSession(const CompilerSession &) = delete;
+   CompilerSession &operator=(const CompilerSession &) = delete;
+   CompilerSession(CompilerSession &&) = delete;
+   CompilerSession &operator=(CompilerSession &&) = delete;
 
    void putSource(std::string uri, std::string utf8, std::uint64_t version = 0);
    bool removeSource(const std::string &uri);
+   // Direct mutable access requires external synchronization with every
+   // other operation on this session.
    SourceManager &sources();
    const SourceManager &sources() const;
    SyntaxSnapshot parse(const std::string &uri);
@@ -68,12 +75,11 @@ public:
    CompilationResult compile(const CompilationRequest &request);
 
 private:
+   struct Impl;
    friend struct CompilerSessionTestAccess;
-   CompilationResult compileUnlocked(const CompilationRequest &request,bool retainMetamodel);
    CompilationAnalysisResult compileAndAnalyzeUnlocked(const CompilationRequest &request);
-   SourceManager sources_;
+   std::unique_ptr<Impl> impl_;
    std::uint64_t compileInvocationCount_ = 0;
-   std::vector<std::string> lastCompilationSourceUris_;
 };
 
 const char *version();

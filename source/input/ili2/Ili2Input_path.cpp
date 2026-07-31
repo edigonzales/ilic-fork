@@ -1,6 +1,6 @@
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
@@ -54,7 +54,7 @@ antlrcpp::Any Ili2Input::visitPath(parser::Ili2Parser::PathContext * ctx)
       
    }
 
-   debug(ctx,"visitPath(" + path + ")");
+   builder_.debug(ctx,"visitPath(" + path + ")");
 
    return path;
 
@@ -75,23 +75,23 @@ antlrcpp::Any Ili2Input::visitRestrictedRef(parser::Ili2Parser::RestrictedRefCon
       list<Type *> TypeRestriction;
    */
 
-   debug(ctx,">>> visitRestrictedRef()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitRestrictedRef()");
+   logger_.incNestLevel();
    
-   RestrictedRef *r = make_mmobject<RestrictedRef>();
-   init_mmobject(r,ctx->start->getLine());
+   RestrictedRef *r = builder_.store().make<RestrictedRef>();
+   builder_.initObject(r,ctx->start->getLine());
    
    if (ctx->typeref != nullptr) {
       string path = visitPath(ctx->typeref);
-      r->_baseclass = find_class_type(path,get_line(ctx->typeref));
+      r->_baseclass = builder_.findClassType(path,builder_.line(ctx->typeref));
    }
    else if (ctx->ANYCLASS() != nullptr) {
       // returns Class / Type
-      r->_baseclass = find_class("ANYCLASS",get_line(ctx->ANYCLASS()->getSymbol()));
+      r->_baseclass = builder_.findClass("ANYCLASS",builder_.line(ctx->ANYCLASS()->getSymbol()));
    }
    else {
       // returns Class / Type
-      r->_baseclass = find_class("ANYSTRUCTURE", get_line(ctx->ANYSTRUCTURE()->getSymbol()));
+      r->_baseclass = builder_.findClass("ANYSTRUCTURE", builder_.line(ctx->ANYSTRUCTURE()->getSymbol()));
    }
    
    if (ctx->restriction() != nullptr) {
@@ -101,21 +101,21 @@ antlrcpp::Any Ili2Input::visitRestrictedRef(parser::Ili2Parser::RestrictedRefCon
    
    for (auto c : r->_classrestriction) {
       if (!c->isSubClassOf(r->_baseclass->getClass())) {
-         Log.error(DiagnosticId::InheritanceTargetRequired,
+         logger_.error(DiagnosticId::InheritanceTargetRequired,
             c->getClass() + " is no extension of " + r->_baseclass->getClass(),
             c->_line);
       }
    }
       
-   Log.decNestLevel();
+   logger_.decNestLevel();
    if (r == nullptr) {
-      debug(ctx,"<<< visitRestrictedRef() returns nullptr");
+      builder_.debug(ctx,"<<< visitRestrictedRef() returns nullptr");
    }
    else if (r->_baseclass == nullptr) {
-      debug(ctx,"<<< visitRestrictedRef() BaseClass is nullptr");
+      builder_.debug(ctx,"<<< visitRestrictedRef() BaseClass is nullptr");
    }
    else {
-      debug(ctx,"<<< visitRestrictedRef() returns " + r->_baseclass->getClass());
+      builder_.debug(ctx,"<<< visitRestrictedRef() returns " + r->_baseclass->getClass());
    }
    return r;
 
@@ -128,19 +128,19 @@ antlrcpp::Any Ili2Input::visitRestriction(parser::Ili2Parser::RestrictionContext
    :  RESTRICTION LPAREN path (COMMA path)* RPAREN)?
    */
 
-   debug(ctx,">>> visitRestriction()");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitRestriction()");
+   logger_.incNestLevel();
    
    list<Class *> r;
    for (auto p : ctx->path()) {
-      Class *c = find_class_or_structure(visitPath(p),get_line(ctx));
+      Class *c = builder_.findClassOrStructure(visitPath(p),builder_.line(ctx));
       if (c != nullptr) {
          r.push_back(c);
       }
    }
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitRestriction(" + to_string(r.size()) + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitRestriction(" + to_string(r.size()) + ")");
 
    return r;
 
@@ -154,7 +154,7 @@ antlrcpp::Any Ili2Input::visitBaseAttrRef(parser::Ili2Parser::BaseAttrRefContext
    | NAME SLASH baseattr=path
    */
 
-   debug(ctx,"visitBaseAttrRef()");
+   builder_.debug(ctx,"visitBaseAttrRef()");
    return nullptr;
 
 }
@@ -166,7 +166,7 @@ antlrcpp::Any Ili2Input::visitMetaObjectRef(parser::Ili2Parser::MetaObjectRefCon
    : (metaDataBasketRef DOT)? metaobjectname=NAME
    */
 
-   debug(ctx,"visitMetaObjectRef()");
+   builder_.debug(ctx,"visitMetaObjectRef()");
    return nullptr;
 
 }
@@ -228,7 +228,8 @@ bool is_defined_in_scope(Class *candidate,Package *scope)
           candidate->ElementInPackage == scope->ElementInPackage;
 }
 
-void find_contextual_attributes(Class *base,Package *scope,const string &name,
+void find_contextual_attributes(MetaModelBuilder &builder,Logger &logger,
+                                Class *base,Package *scope,const string &name,
                                 list<AttrOrParam *> &matches)
 {
    if (base == nullptr) {
@@ -240,33 +241,35 @@ void find_contextual_attributes(Class *base,Package *scope,const string &name,
          continue;
       }
       if (is_defined_in_scope(extendedClass,scope)) {
-         AttrOrParam *attribute = find_attribute(extendedClass,name);
+         AttrOrParam *attribute = builder.findAttribute(extendedClass,name);
          if (attribute != nullptr && attribute->AttrParent == extendedClass) {
             matches.push_back(attribute);
          }
       }
-      find_contextual_attributes(extendedClass,scope,name,matches);
+      find_contextual_attributes(builder,logger,extendedClass,scope,name,matches);
    }
 }
 
-AttrOrParam *find_contextual_attribute(Class *base,Package *scope,const string &name,int line)
+AttrOrParam *find_contextual_attribute(MetaModelBuilder &builder,Logger &logger,
+   Class *base,Package *scope,const string &name,int line)
 {
-   AttrOrParam *attribute = find_attribute(base,name);
+   AttrOrParam *attribute = builder.findAttribute(base,name);
    if (attribute != nullptr) {
       return attribute;
    }
 
    list<AttrOrParam *> matches;
-   find_contextual_attributes(base,scope,name,matches);
+   find_contextual_attributes(builder,logger,base,scope,name,matches);
    if (matches.size() > 1) {
-      Log.error(DiagnosticId::NameAmbiguous,
+      logger.error(DiagnosticId::NameAmbiguous,
          "ambiguous contextual attribute " + name + " from " + get_path(base),line);
       return nullptr;
    }
    return matches.empty() ? nullptr : matches.front();
 }
 
-MetaElement *resolve_through_view_bases(View *view,Package *scope,string name,Class *&target,int line)
+MetaElement *resolve_through_view_bases(MetaModelBuilder &builder,Logger &logger,
+   View *view,Package *scope,string name,Class *&target,int line)
 {
    MetaElement *found = nullptr;
    target = nullptr;
@@ -279,15 +282,15 @@ MetaElement *resolve_through_view_bases(View *view,Package *scope,string name,Cl
          continue;
       }
 
-      MetaElement *candidate = find_role(base,name);
+      MetaElement *candidate = builder.findRole(base,name);
       if (candidate == nullptr) {
-         candidate = find_contextual_attribute(base,scope,name,line);
+         candidate = find_contextual_attribute(builder,logger,base,scope,name,line);
       }
       if (candidate == nullptr) {
          continue;
       }
       if (found != nullptr && found != candidate) {
-         Log.error(DiagnosticId::NameAmbiguous,
+         logger.error(DiagnosticId::NameAmbiguous,
             "ambiguous path element " + name + " in view " + get_path(view),line);
          return nullptr;
       }
@@ -302,10 +305,11 @@ MetaElement *resolve_through_view_bases(View *view,Package *scope,string name,Cl
    return found;
 }
 
-PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResolutionState &state)
+PathEl *resolve_path_element(MetaModelBuilder &builder,Logger &logger,
+   parser::Ili2Parser::PathElContext *ctx,PathResolutionState &state)
 {
-   PathEl *element = make_mmobject<PathEl>();
-   init_mmobject(element,ctx->start->getLine());
+   PathEl *element = builder.store().make<PathEl>();
+   builder.initObject(element,ctx->start->getLine());
 
    if (ctx->THIS() != nullptr) {
       element->Kind = PathEl::This;
@@ -319,8 +323,8 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
       if (state.enclosingView == nullptr ||
           state.enclosingView->FormationKind != View::Inspection_Normal ||
           state.enclosingView->_inspectionParent == nullptr) {
-         Log.error(DiagnosticId::ReferenceParentViewRequired,
-            "PARENT is only valid in a normal inspection view",get_line(ctx));
+         logger.error(DiagnosticId::ReferenceParentViewRequired,
+            "PARENT is only valid in a normal inspection view",builder.line(ctx));
          state.current = nullptr;
       }
       else {
@@ -336,10 +340,10 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
       if (state.enclosingView == nullptr ||
           state.enclosingView->FormationKind != View::Inspection_Area ||
           state.enclosingView->_inspectionParent == nullptr) {
-         Log.error(thatArea ? DiagnosticId::ReferenceThatAreaViewRequired :
+         logger.error(thatArea ? DiagnosticId::ReferenceThatAreaViewRequired :
             DiagnosticId::ReferenceThisAreaViewRequired,
             string(thatArea ? "THATAREA" : "THISAREA") +
-               " is only valid in an area inspection view",get_line(ctx));
+               " is only valid in an area inspection view",builder.line(ctx));
          state.current = nullptr;
       }
       else {
@@ -371,29 +375,29 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
       element->Ref = alias;
       state.current = alias == nullptr ? nullptr : path_target(alias->Type);
       if (alias == nullptr) {
-         Log.error(DiagnosticId::ReferenceAggregatesBaseRequired,
-            "AGGREGATES has no aggregation base",get_line(ctx));
+         logger.error(DiagnosticId::ReferenceAggregatesBaseRequired,
+            "AGGREGATES has no aggregation base",builder.line(ctx));
       }
       return element;
    }
 
    if (object->name == nullptr) {
-      Log.error(DiagnosticId::ReferencePathElementNameRequired,
-         "path element has no name",get_line(ctx));
+      logger.error(DiagnosticId::ReferencePathElementNameRequired,
+         "path element has no name",builder.line(ctx));
       state.current = nullptr;
       return element;
    }
 
    string name = object->name->getText();
    if (state.current == nullptr) {
-      Log.error(DiagnosticId::ReferenceViewableContextRequired,
-         "path element " + name + " has no viewable context",get_line(ctx));
+      logger.error(DiagnosticId::ReferenceViewableContextRequired,
+         "path element " + name + " has no viewable context",builder.line(ctx));
       return element;
    }
 
    View *currentView = dynamic_cast<View *>(state.current);
-   AttrOrParam *attribute = find_contextual_attribute(state.current,state.scope,name,get_line(ctx));
-   Role *role = find_role(state.current,name);
+   AttrOrParam *attribute = find_contextual_attribute(builder,logger,state.current,state.scope,name,builder.line(ctx));
+   Role *role = builder.findRole(state.current,name);
 
    if (currentView != nullptr && attribute != nullptr &&
        attribute->Type != nullptr && attribute->Type->getClass() == "ObjectType") {
@@ -421,7 +425,7 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
 
    if (currentView != nullptr) {
       Class *target = nullptr;
-      MetaElement *throughBase = resolve_through_view_bases(currentView,state.scope,name,target,get_line(ctx));
+      MetaElement *throughBase = resolve_through_view_bases(builder,logger,currentView,state.scope,name,target,builder.line(ctx));
       if (throughBase != nullptr) {
          element->Ref = throughBase;
          element->Kind = throughBase->getClass() == "Role" ? PathEl::Role : PathEl::Attribute;
@@ -430,9 +434,9 @@ PathEl *resolve_path_element(parser::Ili2Parser::PathElContext *ctx,PathResoluti
       }
    }
 
-   Log.error(DiagnosticId::ReferencePathElementNotFound,
+   logger.error(DiagnosticId::ReferencePathElementNotFound,
       "path element " + name + " not found in " + get_path(state.current),
-      get_line(ctx));
+      builder.line(ctx));
    state.current = nullptr;
    return element;
 }
@@ -464,25 +468,25 @@ antlrcpp::Any Ili2Input::visitObjectOrAttributePath(parser::Ili2Parser::ObjectOr
       string _path = "";
    */
 
-   debug(ctx, ">>> visitObjectOrAttributePath()");
-   Log.incNestLevel();
+   builder_.debug(ctx, ">>> visitObjectOrAttributePath()");
+   logger_.incNestLevel();
    
-   PathOrInspFactor *f = make_mmobject<PathOrInspFactor>();
-   init_factor(f,ctx->start->getLine());
+   PathOrInspFactor *f = builder_.store().make<PathOrInspFactor>();
+   builder_.initFactor(f,ctx->start->getLine());
 
    PathResolutionState state;
-   if (get_context() != nullptr && get_context()->getClass() == "Graphic") {
-      Graphic *g = static_cast<Graphic *>(get_context());
+   if (builder_.current() != nullptr && builder_.current()->getClass() == "Graphic") {
+      Graphic *g = static_cast<Graphic *>(builder_.current());
       state.current = g->Base;
    }
    else {
-      state.current = get_class_context();
+      state.current = builder_.currentClass();
    }
    state.enclosingView = dynamic_cast<View *>(state.current);
-   state.scope = get_package_context();
+   state.scope = builder_.currentPackage();
 
    for (auto p : ctx->pathEl()) {
-      f->PathEls.push_back(resolve_path_element(p,state));
+      f->PathEls.push_back(resolve_path_element(builder_,logger_,p,state));
       if (f->_path != "") {
          f->_path += "->";
       }
@@ -499,17 +503,17 @@ antlrcpp::Any Ili2Input::visitObjectOrAttributePath(parser::Ili2Parser::ObjectOr
       }
    }
 
-   Log.decNestLevel();
-   debug(ctx, "<<< visitObjectOrAttributePath(" + f->_path + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx, "<<< visitObjectOrAttributePath(" + f->_path + ")");
    return f;
 
 }
 
 antlrcpp::Any Ili2Input::visitAttributePath(parser::Ili2Parser::AttributePathContext *ctx)
 {
-   debug(ctx, ">>> visitAttributePath()");
+   builder_.debug(ctx, ">>> visitAttributePath()");
    PathOrInspFactor *f = visitObjectOrAttributePath(ctx->objectOrAttributePath());
-   debug(ctx, "<<< visitAttributePath()");
+   builder_.debug(ctx, "<<< visitAttributePath()");
    return f;
 }
 
@@ -541,9 +545,9 @@ antlrcpp::Any Ili2Input::visitPathEl(parser::Ili2Parser::PathElContext *ctx)
    */
 
    PathResolutionState state;
-   state.current = get_class_context();
+   state.current = builder_.currentClass();
    state.enclosingView = dynamic_cast<View *>(state.current);
-   state.scope = get_package_context();
-   return resolve_path_element(ctx,state);
+   state.scope = builder_.currentPackage();
+   return resolve_path_element(builder_,logger_,ctx,state);
 
 }

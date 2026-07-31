@@ -3,7 +3,7 @@
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
 #include "../../metamodel/DiagnosticUtil.h"
-#include "../../metamodel/MetaModelInput.h"
+#include "../../metamodel/MetaModelBuilder.h"
 #include "../../util/Logger.h"
 
 using namespace input;
@@ -80,60 +80,60 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    }
    
    const string diagnosticName = name1.empty() ? "anonymous association" : name1;
-   debug(ctx,">>> visitAssociationDef(" + diagnosticName + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitAssociationDef(" + diagnosticName + ")");
+   logger_.incNestLevel();
    
    if (name1.empty() != name2.empty()) {
       if (name1.empty()) {
-         Log.error(DiagnosticId::AssociationUnexpectedEndName,
+         logger_.error(DiagnosticId::AssociationUnexpectedEndName,
             "anonymous association must not have the closing name \"" + name2 + "\"",
             ctx->END()->getSymbol()->getLine());
       }
       else {
-         Log.error(DiagnosticId::AssociationMissingEndName,
+         logger_.error(DiagnosticId::AssociationMissingEndName,
             "association \"" + name1 + "\" must end with \"END " + name1 + "\"",
             ctx->END()->getSymbol()->getLine());
       }
    }
    else if (!name1.empty() && name1 != name2) {
-      Log.error(DiagnosticId::AssociationEndNameMismatch,
+      logger_.error(DiagnosticId::AssociationEndNameMismatch,
          "association \"" + name1 + "\" must end with \"END " + name1
             + "\"; found \"END " + name2 + "\"",
          ctx->END()->getSymbol()->getLine());
    }
 
    // init Class
-   Class *c = make_mmobject<Class>();
+   Class *c = builder_.store().make<Class>();
    c->Kind = Class::Association;
-   init_type(c,get_line(ctx));
-   set_selection_source(c,ctx->associationname1);
-   set_end_selection_source(c,ctx->associationname2);
+   builder_.initType(c,builder_.line(ctx));
+   builder_.setSelectionSource(c,ctx->associationname1);
+   builder_.setEndSelectionSource(c,ctx->associationname2);
 
    // MetaElement Attributes
    c->Name = name1.empty() ? "???" : name1;
 
    // ExtendableME Attributes
-   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,EXTENDED,FINAL,OID}));
+   map<string,bool> properties = get_properties(logger_,ctx->properties(),vector<string>({ABSTRACT,EXTENDED,FINAL,OID}));
    c->Abstract = properties[ABSTRACT];
    c->Final = properties[FINAL];
    c->Extended = properties[EXTENDED];
 
    // EXTENDED
    if (c->Extended) {
-      set_reference_source(c,"inheritance",ctx->associationname1);
-      DataUnit* u = find_dataunit(get_path(get_package_context()),c->_line);
+      builder_.setReferenceSource(c,"inheritance",ctx->associationname1);
+      DataUnit* u = builder_.findDataUnit(get_path(builder_.currentPackage()),c->_line);
       if (u->Super == nullptr) {
-         Log.error(DiagnosticId::InheritanceExtendedTopicRequired,
+         logger_.error(DiagnosticId::InheritanceExtendedTopicRequired,
             "EXTENDED can only by used in extended topics",diagnostic_range(c));
       }
       else {
-         Class *s = find_association(
+         Class *s = builder_.findAssociation(
             name1,c->_line,c->_selectionSource);
          c->Super = s;
          if (s != nullptr) {
             s->Sub.push_back(c);
             if (s->Final) {
-               Log.error(DiagnosticId::InheritanceFinalBase,
+               logger_.error(DiagnosticId::InheritanceFinalBase,
                   "association " + name1 +
                      " can not extend FINAL base association " + get_path(s),
                   diagnostic_range(c));
@@ -144,15 +144,15 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    
    // EXTENDS
    if (ctx->associationRef() != nullptr) {
-      set_reference_source(c,"inheritance",ctx->associationRef());
-      Class *s = find_association(
+      builder_.setReferenceSource(c,"inheritance",ctx->associationRef());
+      Class *s = builder_.findAssociation(
          ctx->associationRef()->getText(),c->_line,
          c->_selectionSource);
       c->Super = s;
       if (s != nullptr) {
          s->Sub.push_back(c);
          if (s->Final) {
-            Log.error(DiagnosticId::InheritanceFinalBase,
+            logger_.error(DiagnosticId::InheritanceFinalBase,
                "association " + name1 +
                   " can not extend FINAL base association " + get_path(s),
                diagnostic_range(c));
@@ -165,14 +165,14 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    }
    
    if (ctx->DERIVED() != nullptr) {
-      c->View = find_view(visitPath(ctx->renamedViewableRef()->path()),get_line(ctx->renamedViewableRef()));
+      c->View = builder_.findView(visitPath(ctx->renamedViewableRef()->path()),builder_.line(ctx->renamedViewableRef()));
    }
 
    // role from ASSOCIATION LocalType
    // metamodel::AttrOrParam *LTParent;
 
    if (ctx->assocoid != nullptr) {
-      DomainType *t = find_domaintype(ctx->assocoid->getText(),get_line(ctx->assocoid));
+      DomainType *t = builder_.findDomainType(ctx->assocoid->getText(),builder_.line(ctx->assocoid));
       c->Oid = t;
    }
    c->NoOid = ctx->NO() != nullptr;
@@ -180,18 +180,18 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
    // role from ASSOCIATION DerivedAssoc
    // View *View;
    
-   add_class(c);
-   push_context(c);
+   builder_.addClass(c);
+   builder_.pushContext(*c);
 
    for (auto rctx : ctx->roleDef()) {
       Role *r = visitRoleDef(rctx);
       if (r->Abstract && !c->Abstract) {
-         Log.error(DiagnosticId::AssociationAbstractRoleInConcrete,
+         logger_.error(DiagnosticId::AssociationAbstractRoleInConcrete,
             "concrete association " + get_path(c) +
                " can not contain abstract role " + r->Name,diagnostic_range(r));
       }
       if (c->Super != nullptr && !r->Extended) {
-         Log.error(DiagnosticId::AssociationAdditionalRoleInExtension,
+         logger_.error(DiagnosticId::AssociationAdditionalRoleInExtension,
             "can not add role " + r->Name + " in extended association",
             diagnostic_range(r));
       }
@@ -208,7 +208,7 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
       cc = static_cast<Class *>(cc->Super);
    }
    if (rolecount < 2) {
-      Log.error(DiagnosticId::AssociationRoleCount,
+      logger_.error(DiagnosticId::AssociationRoleCount,
          "an association requires at least two roles",diagnostic_range(c));
    }
    
@@ -236,16 +236,16 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
             else if (r1->_baseclass->ElementInPackage != c->ElementInPackage) {
                continue;
             }
-            if (find_attribute(r1->_baseclass,r2->Name)) {
-               Log.error(DiagnosticId::AssociationAttributeNameConflict,
+            if (builder_.findAttribute(r1->_baseclass,r2->Name)) {
+               logger_.error(DiagnosticId::AssociationAttributeNameConflict,
                   "attribute with name " + r2->Name + " already exists in " +
                      get_path(r1->_baseclass),diagnostic_range(r2));
             }
-            else if (Role *existing = find_role(r1->_baseclass,r2->Name)) {
+            else if (Role *existing = builder_.findRole(r1->_baseclass,r2->Name)) {
                // A ternary self-association reaches the same access through
                // more than one opposite role; that is one access, not a clash.
                if (existing != r2) {
-                  Log.error(DiagnosticId::AssociationRoleAccessNameConflict,
+                  logger_.error(DiagnosticId::AssociationRoleAccessNameConflict,
                      "role or roleaccess with name " + r2->Name +
                         " already exists in " + get_path(r1->_baseclass),
                      diagnostic_range(r2));
@@ -263,11 +263,11 @@ antlrcpp::Any Ili2Input::visitAssociationDef(parser::Ili2Parser::AssociationDefC
       c->Constraints.push_back(cc);
    }
 
-   check_references(c,"",0);
-   pop_context();
+   check_references(builder_,logger_,c,"",0);
+   builder_.popContext();
 
-   Log.decNestLevel();
-   debug(ctx,"<<< visitAssociationDef(" + diagnosticName + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitAssociationDef(" + diagnosticName + ")");
    
    return c;
 
@@ -325,22 +325,22 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
 
    string name = ctx->rolename->getText();
 
-   debug(ctx,">>> visitRoleDef(" + name + ")");
-   Log.incNestLevel();
+   builder_.debug(ctx,">>> visitRoleDef(" + name + ")");
+   logger_.incNestLevel();
 
-   if (find_attribute(get_class_context(),name)) {
-      Log.error(DiagnosticId::AttributeDuplicate,
-         "there is already an attribute with name " + name,get_line(ctx));
+   if (builder_.findAttribute(builder_.currentClass(),name)) {
+      logger_.error(DiagnosticId::AttributeDuplicate,
+         "there is already an attribute with name " + name,builder_.line(ctx));
    }
 
-   Role *r = make_mmobject<Role>();
-   init_domaintype(r,ctx->start->getLine());
-   set_selection_source(r,ctx->rolename);
+   Role *r = builder_.store().make<Role>();
+   builder_.initDomainType(r,ctx->start->getLine());
+   builder_.setSelectionSource(r,ctx->rolename);
 
    r->Name = name;
    r->ElementInPackage = nullptr;
 
-   map<string,bool> properties = get_properties(ctx->properties(),vector<string>({ABSTRACT,EXTENDED,FINAL,HIDING,ORDERED,EXTERNAL}));
+   map<string,bool> properties = get_properties(logger_,ctx->properties(),vector<string>({ABSTRACT,EXTENDED,FINAL,HIDING,ORDERED,EXTERNAL}));
    r->Abstract = properties[ABSTRACT];
    r->Final = properties[FINAL];
    r->Ordered = properties[ORDERED];
@@ -349,29 +349,29 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
    r->Hiding = properties[HIDING];
 
    if (r->Extended) {
-      set_reference_source(r,"inheritance",ctx->rolename);
-      Class* c = get_class_context();
+      builder_.setReferenceSource(r,"inheritance",ctx->rolename);
+      Class* c = builder_.currentClass();
       if (c->Super == nullptr) {
-         Log.error(DiagnosticId::InheritanceExtendedAssociationRequired,
+         logger_.error(DiagnosticId::InheritanceExtendedAssociationRequired,
             "EXTENDED can only be used in extended associations",diagnostic_range(r));
       }
       else {
          Class* s = static_cast<Class*>(c->Super);
-         Role *rr = find_role(s,r->Name);
+         Role *rr = builder_.findRole(s,r->Name);
          if (rr == nullptr) {
-            Log.error(DiagnosticId::RoleBaseNotFound,
+            logger_.error(DiagnosticId::RoleBaseNotFound,
                "base of role " + r->Name + " not found in " + get_path(s),
                diagnostic_range(r));
          }
          else if (rr->Final) {
-            Log.error(DiagnosticId::RoleBaseFinal,
+            logger_.error(DiagnosticId::RoleBaseFinal,
                "base of role " + r->Name + " is FINAL",diagnostic_range(r));
          }
          r->Super = rr;
       }
    }
 
-   r->Association = get_class_context();
+   r->Association = builder_.currentClass();
 
    if (ctx->ASSOCIATE() != nullptr) {
       r->Strongness = Role::Assoc;
@@ -394,7 +394,7 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
          continue;
       }
       for (auto t : rrr->_classrestriction) {
-         ExplicitAssocAccess *a = make_mmobject<ExplicitAssocAccess>();
+         ExplicitAssocAccess *a = builder_.store().make<ExplicitAssocAccess>();
          a->AssocAccOf = t;
          // Role* OriginRole; to do !!!
          // Role* TargetRole; to do !!!
@@ -402,15 +402,15 @@ antlrcpp::Any Ili2Input::visitRoleDef(parser::Ili2Parser::RoleDefContext *ctx)
       }
       r->_baseclass = rrr->_baseclass;
       r->_classrestriction = rrr->_classrestriction;
-      if (rr->typeref != nullptr) set_reference_source(r,"role",rr->typeref);
+      if (rr->typeref != nullptr) builder_.setReferenceSource(r,"role",rr->typeref);
       else if (rr->ANYCLASS() != nullptr)
-         set_reference_source(r,"role",rr->ANYCLASS()->getSymbol());
+         builder_.setReferenceSource(r,"role",rr->ANYCLASS()->getSymbol());
       else if (rr->ANYSTRUCTURE() != nullptr)
-         set_reference_source(r,"role",rr->ANYSTRUCTURE()->getSymbol());
+         builder_.setReferenceSource(r,"role",rr->ANYSTRUCTURE()->getSymbol());
    }
    
-   Log.decNestLevel();
-   debug(ctx,"<<< visitRoleDef(" + name + ")");
+   logger_.decNestLevel();
+   builder_.debug(ctx,"<<< visitRoleDef(" + name + ")");
 
    return r;
    
@@ -431,7 +431,7 @@ antlrcpp::Any Ili2Input::visitCardinality(parser::Ili2Parser::CardinalityContext
    : LCURLY (STAR | min=POSNUMBER (DOTDOT (max=POSNUMBER | STAR))?) RCURLY
    */
 
-   debug(ctx,">>> visitCardinality()");
+   builder_.debug(ctx,">>> visitCardinality()");
    
    Multiplicity m;
    m.Min = -1;
@@ -452,7 +452,7 @@ antlrcpp::Any Ili2Input::visitCardinality(parser::Ili2Parser::CardinalityContext
       m.Max = -1;
    }
 
-   debug(ctx,"<<< visitCardinality(" + to_string(m.Min) + ".." + to_string(m.Max) + ")");
+   builder_.debug(ctx,"<<< visitCardinality(" + to_string(m.Min) + ".." + to_string(m.Max) + ")");
 
    return m;
    
