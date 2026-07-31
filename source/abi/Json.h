@@ -44,5 +44,7 @@ private:
 
 Value parse(const std::string &text);
 std::string stringify(const Value &value);
+void appendQuoted(std::string &output,const std::string &value);
+std::string quote(const std::string &value);
 
 } // namespace ilic::json

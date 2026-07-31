@@ -162,27 +162,29 @@ private:
    }
 };
 
-std::string escaped(const std::string &value)
+void appendEscaped(std::string &result,const std::string &value)
 {
-   std::ostringstream result;
-   result << '"';
+   result.push_back('"');
    for (unsigned char character : value) {
       switch (character) {
-         case '"': result << "\\\""; break;
-         case '\\': result << "\\\\"; break;
-         case '\b': result << "\\b"; break;
-         case '\f': result << "\\f"; break;
-         case '\n': result << "\\n"; break;
-         case '\r': result << "\\r"; break;
-         case '\t': result << "\\t"; break;
+         case '"': result += "\\\""; break;
+         case '\\': result += "\\\\"; break;
+         case '\b': result += "\\b"; break;
+         case '\f': result += "\\f"; break;
+         case '\n': result += "\\n"; break;
+         case '\r': result += "\\r"; break;
+         case '\t': result += "\\t"; break;
          default:
-            if (character < 0x20) result << "\\u" << std::hex << std::setw(4)
-               << std::setfill('0') << static_cast<int>(character);
-            else result << static_cast<char>(character);
+            if (character < 0x20) {
+               static constexpr char hex[] = "0123456789abcdef";
+               result += "\\u00";
+               result.push_back(hex[character >> 4]);
+               result.push_back(hex[character & 0x0f]);
+            }
+            else result.push_back(static_cast<char>(character));
       }
    }
-   result << '"';
-   return result.str();
+   result.push_back('"');
 }
 
 }
@@ -228,7 +230,7 @@ std::string stringify(const Value &value)
       result << std::setprecision(15) << number;
       return result.str();
    }
-   if (value.isString()) return escaped(value.string());
+   if (value.isString()) return quote(value.string());
    if (value.isArray()) {
       std::string result = "[";
       for (std::size_t i = 0; i < value.array().size(); ++i) {
@@ -241,9 +243,22 @@ std::string stringify(const Value &value)
    std::size_t index = 0;
    for (const auto &entry : value.object()) {
       if (index++ != 0) result += ',';
-      result += escaped(entry.first) + ':' + stringify(entry.second);
+      result += quote(entry.first) + ':' + stringify(entry.second);
    }
    return result + '}';
+}
+
+void appendQuoted(std::string &output,const std::string &value)
+{
+   appendEscaped(output,value);
+}
+
+std::string quote(const std::string &value)
+{
+   std::string result;
+   result.reserve(value.size() + 2);
+   appendEscaped(result,value);
+   return result;
 }
 
 } // namespace ilic::json

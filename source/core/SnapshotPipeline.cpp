@@ -204,6 +204,8 @@ const char *referenceKind(EditorReferenceKind kind)
 
 class EditorSnapshotAccumulator final {
 public:
+   static constexpr std::size_t noDeclaration = static_cast<std::size_t>(-1);
+
    EditorSnapshotAccumulator(const SourceRangeMapper &ranges,std::string iliVersion)
       : ranges_(ranges)
    {
@@ -212,13 +214,13 @@ public:
       snapshot_.iliVersion = std::move(iliVersion);
    }
 
-   void addDeclaration(const antlr4::ParserRuleContext *context,EditorSymbolKind kind,
-      const antlr4::Token *name,const antlr4::Token *endName)
+   std::size_t addDeclaration(const antlr4::ParserRuleContext *context,EditorSymbolKind kind,
+      const antlr4::Token *name,const antlr4::Token *endName,std::size_t containerIndex)
    {
-      if (context == nullptr || name == nullptr || name->getStartIndex() == INVALID_INDEX) return;
+      if (context == nullptr || name == nullptr || name->getStartIndex() == INVALID_INDEX)
+         return noDeclaration;
       const SourceRange selection = ranges_.token(name);
-      if (!selection.valid) return;
-      const EditorDeclaration *owner = nearestContainer(context->parent);
+      if (!selection.valid) return noDeclaration;
       EditorDeclaration declaration;
       declaration.name = name->getText();
       declaration.kind = kind;
@@ -228,17 +230,15 @@ public:
       declaration.selectionRange = selection;
       if (endName != nullptr && endName->getStartIndex() != INVALID_INDEX)
          declaration.endRange = ranges_.token(endName);
-      if (owner != nullptr) {
-         declaration.qualifiedName = owner->qualifiedName + "." + declaration.name;
-         if (isContainer(owner->kind)) {
-            declaration.containerId = owner->id;
-            declaration.hasContainer = true;
-         }
+      if (containerIndex != noDeclaration) {
+         const EditorDeclaration &container = snapshot_.declarations[containerIndex];
+         declaration.qualifiedName = container.qualifiedName + "." + declaration.name;
+         declaration.containerId = container.id;
+         declaration.hasContainer = true;
       }
       if (declaration.qualifiedName.empty()) declaration.qualifiedName = declaration.name;
       const std::size_t index = snapshot_.declarations.size();
       snapshot_.declarations.push_back(std::move(declaration));
-      declarationByContext_[context] = index;
       if (isContainer(kind)) snapshot_.contexts.push_back({containerRule(kind),snapshot_.declarations.back().range});
       if (isContainer(kind) && endName == nullptr) recovered_ = true;
       if (endName != nullptr && endName->getStartIndex() != INVALID_INDEX
@@ -253,16 +253,17 @@ public:
          snapshot_.diagnostics.push_back(std::move(diagnostic));
          recovered_ = true;
       }
+      return index;
    }
 
    void addReference(const antlr4::ParserRuleContext *context,EditorReferenceKind kind,
-      std::string text)
+      std::string text,std::size_t declarationIndex)
    {
       if (context == nullptr || text.empty()) return;
       const SourceRange valueRange = ranges_.context(context);
       if (!valueRange.valid) return;
-      const EditorDeclaration *owner = nearestDeclaration(context->parent);
-      const std::string sourceId = owner == nullptr ? std::string() : owner->id;
+      const std::string sourceId = declarationIndex == noDeclaration
+         ? std::string() : snapshot_.declarations[declarationIndex].id;
       const std::string key = std::string(referenceKind(kind)) + ":"
          + std::to_string(valueRange.start.byteOffset) + ":"
          + std::to_string(valueRange.end.byteOffset) + ":" + text + ":" + sourceId;
@@ -271,8 +272,8 @@ public:
       reference.text = std::move(text);
       reference.kind = kind;
       reference.range = valueRange;
-      if (owner != nullptr) {
-         reference.sourceId = owner->id;
+      if (declarationIndex != noDeclaration) {
+         reference.sourceId = sourceId;
          reference.hasSource = true;
       }
       snapshot_.references.push_back(std::move(reference));
@@ -342,25 +343,6 @@ public:
       return std::move(snapshot_);
    }
 
-   const EditorDeclaration *nearestDeclaration(const antlr4::tree::ParseTree *node) const
-   {
-      for (auto *current = node; current != nullptr;) {
-         auto *context = dynamic_cast<const antlr4::ParserRuleContext *>(current);
-         if (context != nullptr) {
-            auto found = declarationByContext_.find(context);
-            if (found != declarationByContext_.end()) return &snapshot_.declarations[found->second];
-         }
-         current = current->parent;
-      }
-      return nullptr;
-   }
-
-   const EditorDeclaration *nearestContainer(const antlr4::tree::ParseTree *node) const
-   {
-      const EditorDeclaration *declaration = nearestDeclaration(node);
-      return declaration != nullptr && isContainer(declaration->kind) ? declaration : nullptr;
-   }
-
    EditorSnapshot &snapshot() noexcept { return snapshot_; }
 
 private:
@@ -380,7 +362,6 @@ private:
 
    const SourceRangeMapper &ranges_;
    EditorSnapshot snapshot_;
-   std::map<const antlr4::ParserRuleContext *,std::size_t> declarationByContext_;
    std::set<std::string> references_;
    bool recovered_ = false;
 };
@@ -392,52 +373,56 @@ std::string pathText(const Context *context)
       : const_cast<Context *>(context)->getText();
 }
 
-void collectIli2Declarations(EditorSnapshotAccumulator &output,antlr4::tree::ParseTree *tree)
+struct EditorDeclarationMatch {
+   EditorSymbolKind kind = EditorSymbolKind::Attribute;
+   const antlr4::ParserRuleContext *context = nullptr;
+   const antlr4::Token *name = nullptr;
+   const antlr4::Token *endName = nullptr;
+};
+
+EditorDeclarationMatch ili2DeclarationMatch(antlr4::tree::ParseTree *tree)
 {
-   if (tree == nullptr) return;
    if (auto *context = dynamic_cast<parser::Ili2Parser::ModelDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Model,context->modelname1,context->modelname2);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::TopicDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Topic,context->topicname1,context->topicname2);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::ClassDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Class,context->classname1,context->classname2);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::StructureDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Structure,context->structurename1,context->structurename2);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::AssociationDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Association,context->associationname1,context->associationname2);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::ViewDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::View,context->viewname1,context->viewname2);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::GraphicDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Graphic,context->graphicname1,context->graphicname2);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::DomainTypeContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Domain,context->domainname,nullptr);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::UnitDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Unit,context->unitname,nullptr);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::AttributeDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Attribute,context->attributname,nullptr);
-   else if (auto *context = dynamic_cast<parser::Ili2Parser::ViewAttributeContext *>(tree)) {
+      return {EditorSymbolKind::Model,context,context->modelname1,context->modelname2};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::TopicDefContext *>(tree))
+      return {EditorSymbolKind::Topic,context,context->topicname1,context->topicname2};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::ClassDefContext *>(tree))
+      return {EditorSymbolKind::Class,context,context->classname1,context->classname2};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::StructureDefContext *>(tree))
+      return {EditorSymbolKind::Structure,context,context->structurename1,context->structurename2};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::AssociationDefContext *>(tree))
+      return {EditorSymbolKind::Association,context,context->associationname1,context->associationname2};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::ViewDefContext *>(tree))
+      return {EditorSymbolKind::View,context,context->viewname1,context->viewname2};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::GraphicDefContext *>(tree))
+      return {EditorSymbolKind::Graphic,context,context->graphicname1,context->graphicname2};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::DomainTypeContext *>(tree))
+      return {EditorSymbolKind::Domain,context,context->domainname,nullptr};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::UnitDefContext *>(tree))
+      return {EditorSymbolKind::Unit,context,context->unitname,nullptr};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::AttributeDefContext *>(tree))
+      return {EditorSymbolKind::Attribute,context,context->attributname,nullptr};
+   if (auto *context = dynamic_cast<parser::Ili2Parser::ViewAttributeContext *>(tree))
       if (context->attributeDef() == nullptr)
-         output.addDeclaration(context,EditorSymbolKind::Attribute,context->attributename,nullptr);
-   }
-   for (auto *child : tree->children) collectIli2Declarations(output,child);
+         return {EditorSymbolKind::Attribute,context,context->attributename,nullptr};
+   return {};
 }
 
-void collectIli1Declarations(EditorSnapshotAccumulator &output,antlr4::tree::ParseTree *tree)
+EditorDeclarationMatch ili1DeclarationMatch(antlr4::tree::ParseTree *tree)
 {
-   if (tree == nullptr) return;
    if (auto *context = dynamic_cast<parser::Ili1Parser::ModelDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Model,context->modelname1,context->modelname2);
-   else if (auto *context = dynamic_cast<parser::Ili1Parser::TopicDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Topic,context->topicname1,context->topicname2);
-   else if (auto *context = dynamic_cast<parser::Ili1Parser::TableDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Class,context->tablename1,context->tablename2);
-   else if (auto *context = dynamic_cast<parser::Ili1Parser::DomainDefContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Domain,context->domainname,nullptr);
-   else if (auto *context = dynamic_cast<parser::Ili1Parser::AttributeContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::Attribute,context->attributename,nullptr);
-   else if (auto *context = dynamic_cast<parser::Ili1Parser::ViewContext *>(tree))
-      output.addDeclaration(context,EditorSymbolKind::View,context->modelname1,context->modelname2);
-   for (auto *child : tree->children) collectIli1Declarations(output,child);
+      return {EditorSymbolKind::Model,context,context->modelname1,context->modelname2};
+   if (auto *context = dynamic_cast<parser::Ili1Parser::TopicDefContext *>(tree))
+      return {EditorSymbolKind::Topic,context,context->topicname1,context->topicname2};
+   if (auto *context = dynamic_cast<parser::Ili1Parser::TableDefContext *>(tree))
+      return {EditorSymbolKind::Class,context,context->tablename1,context->tablename2};
+   if (auto *context = dynamic_cast<parser::Ili1Parser::DomainDefContext *>(tree))
+      return {EditorSymbolKind::Domain,context,context->domainname,nullptr};
+   if (auto *context = dynamic_cast<parser::Ili1Parser::AttributeContext *>(tree))
+      return {EditorSymbolKind::Attribute,context,context->attributename,nullptr};
+   if (auto *context = dynamic_cast<parser::Ili1Parser::ViewContext *>(tree))
+      return {EditorSymbolKind::View,context,context->modelname1,context->modelname2};
+   return {};
 }
 
 EditorReferenceKind ili2ReferenceKind(const parser::Ili2Parser::PathContext *path)
@@ -468,20 +453,31 @@ EditorReferenceKind ili2ReferenceKind(const parser::Ili2Parser::PathContext *pat
    return EditorReferenceKind::Type;
 }
 
-void collectIli2ReferencesAndImports(EditorSnapshotAccumulator &output,antlr4::tree::ParseTree *tree)
+void collectIli2Editor(EditorSnapshotAccumulator &output,const SourceRangeMapper &ranges,
+   antlr4::tree::ParseTree *tree,std::size_t containerIndex,std::size_t declarationIndex)
 {
    if (tree == nullptr) return;
+   const EditorDeclarationMatch match = ili2DeclarationMatch(tree);
+   std::size_t currentDeclaration = declarationIndex;
+   std::size_t currentContainer = containerIndex;
+   if (match.name != nullptr) {
+      currentDeclaration = output.addDeclaration(match.context,match.kind,match.name,
+         match.endName,containerIndex);
+      if (currentDeclaration != EditorSnapshotAccumulator::noDeclaration
+         && isContainer(match.kind)) currentContainer = currentDeclaration;
+   }
    if (auto *importing = dynamic_cast<parser::Ili2Parser::ImportingContext *>(tree)) {
       const antlr4::Token *name = nullptr;
       if (auto *node = importing->INTERLIS()) name = node->getSymbol();
       if (name == nullptr) if (auto *node = importing->NAME()) name = node->getSymbol();
       if (name != nullptr) output.addImport({name->getText(),importing->UNQUALIFIED() != nullptr,
-         SourceRange{}});
+         ranges.token(name)});
       else {
          for (auto *child : tree->children) {
             auto *path = dynamic_cast<parser::Ili2Parser::PathContext *>(child);
             if (path == nullptr) continue;
-            output.addImport({pathText(path),importing->UNQUALIFIED() != nullptr,SourceRange{}});
+            output.addImport({pathText(path),importing->UNQUALIFIED() != nullptr,
+               ranges.context(path)});
          }
       }
    }
@@ -489,22 +485,37 @@ void collectIli2ReferencesAndImports(EditorSnapshotAccumulator &output,antlr4::t
       bool imported = false;
       for (auto *parent = path->parent; parent != nullptr; parent = parent->parent)
          if (dynamic_cast<parser::Ili2Parser::ImportingContext *>(parent) != nullptr) imported = true;
-      if (!imported) output.addReference(path,ili2ReferenceKind(path),pathText(path));
+      if (!imported)
+         output.addReference(path,ili2ReferenceKind(path),pathText(path),currentDeclaration);
    }
-   for (auto *child : tree->children) collectIli2ReferencesAndImports(output,child);
+   for (auto *child : tree->children)
+      collectIli2Editor(output,ranges,child,currentContainer,currentDeclaration);
 }
 
-void collectIli1References(EditorSnapshotAccumulator &output,antlr4::tree::ParseTree *tree)
+void collectIli1Editor(EditorSnapshotAccumulator &output,
+   antlr4::tree::ParseTree *tree,std::size_t containerIndex,std::size_t declarationIndex)
 {
    if (tree == nullptr) return;
+   const EditorDeclarationMatch match = ili1DeclarationMatch(tree);
+   std::size_t currentDeclaration = declarationIndex;
+   std::size_t currentContainer = containerIndex;
+   if (match.name != nullptr) {
+      currentDeclaration = output.addDeclaration(match.context,match.kind,match.name,
+         match.endName,containerIndex);
+      if (currentDeclaration != EditorSnapshotAccumulator::noDeclaration
+         && isContainer(match.kind)) currentContainer = currentDeclaration;
+   }
    if (auto *type = dynamic_cast<parser::Ili1Parser::TypeContext *>(tree)) {
-      if (type->name != nullptr) output.addReference(type,EditorReferenceKind::Type,type->name->getText());
+      if (type->name != nullptr)
+         output.addReference(type,EditorReferenceKind::Type,type->name->getText(),currentDeclaration);
    }
    if (auto *attribute = dynamic_cast<parser::Ili1Parser::AttributeContext *>(tree)) {
       if (attribute->tablename != nullptr)
-         output.addReference(attribute,EditorReferenceKind::Reference,attribute->tablename->getText());
+         output.addReference(attribute,EditorReferenceKind::Reference,
+            attribute->tablename->getText(),currentDeclaration);
    }
-   for (auto *child : tree->children) collectIli1References(output,child);
+   for (auto *child : tree->children)
+      collectIli1Editor(output,child,currentContainer,currentDeclaration);
 }
 
 template<class Parser,class Lexer,class Root>
@@ -523,7 +534,7 @@ SnapshotBundle buildParsed(const SourceBuffer &source,bool includeEditor,Root *r
       }
       else bundle.syntax.iliVersion = "1.0";
    }
-   if constexpr (std::is_same_v<Root,parser::Ili2Parser::Interlis2DefContext>) {
+   if (!includeEditor) if constexpr (std::is_same_v<Root,parser::Ili2Parser::Interlis2DefContext>) {
       auto *editorRoot = root;
       if (editorRoot != nullptr)
          for (auto *model : editorRoot->modelDef())
@@ -553,27 +564,15 @@ SnapshotBundle buildParsed(const SourceBuffer &source,bool includeEditor,Root *r
    if (includeEditor) {
       EditorSnapshotAccumulator editor(ranges,bundle.syntax.iliVersion);
       if constexpr (std::is_same_v<Root,parser::Ili2Parser::Interlis2DefContext>) {
-         collectIli2Declarations(editor,root);
-         collectIli2ReferencesAndImports(editor,root);
+         collectIli2Editor(editor,ranges,root,EditorSnapshotAccumulator::noDeclaration,
+            EditorSnapshotAccumulator::noDeclaration);
       }
       else {
-         collectIli1Declarations(editor,root);
-         collectIli1References(editor,root);
+         collectIli1Editor(editor,root,EditorSnapshotAccumulator::noDeclaration,
+            EditorSnapshotAccumulator::noDeclaration);
       }
       editor.appendSyntaxDiagnostics(bundle.syntax.diagnostics);
       bundle.editor = editor.finish(bundle.syntax.success);
-      for (auto &reference : bundle.editor.imports) {
-         if (!reference.range.valid) {
-            for (const auto &syntaxImport : bundle.syntax.importReferences)
-               if (syntaxImport.model == reference.model && syntaxImport.unqualified == reference.unqualified) {
-                  reference.range = syntaxImport.range;
-                  break;
-               }
-         }
-      }
-      // The collector uses parse-tree ranges for imports; make sure the public
-      // import contract is identical to the syntax product.
-      bundle.editor.imports = bundle.syntax.importReferences;
       // The editor contract historically treated UNQUALIFIED as applying to
       // the complete comma-separated import clause. Keep that projection
       // stable while SyntaxSnapshot preserves the grammar's per-import flag.

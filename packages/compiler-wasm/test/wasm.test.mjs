@@ -355,6 +355,20 @@ END Diagnostics.
   session.dispose();
 });
 
+test("preserves JSON escaping in editor snapshot metadata", async () => {
+  const compiler = await createCompiler();
+  const session = compiler.createSession();
+  const uri = "memory:///editor\ncontrol.ili";
+  session.putSource(uri, `INTERLIS 2.3;
+MODEL Escaped AT "https://example.com" VERSION "1" =
+END Escaped.
+`, 1);
+  const snapshot = session.editorSnapshot(uri);
+  assert.equal(snapshot.uri, uri);
+  assert.equal(snapshot.declarations[0].name, "Escaped");
+  session.dispose();
+});
+
 test("keeps editor snapshots within the interactive latency budget", async () => {
   const compiler = await createCompiler();
   for (const [count, budget] of [[550, 150], [3_500, 750]]) {
@@ -377,13 +391,17 @@ END Performance.
     // Warm the native/WASM parser and allocator before measuring the
     // steady-state editor latency budget.
     session.editorSnapshot(uri);
-    const started = performance.now();
-    const snapshot = session.editorSnapshot(uri);
-    const elapsed = performance.now() - started;
+    const samples = [];
+    let snapshot;
+    for (let sample = 0; sample < 5; sample += 1) {
+      const started = performance.now();
+      snapshot = session.editorSnapshot(uri);
+      samples.push(performance.now() - started);
+    }
     assert.equal(snapshot.declarations.length, count + 3);
     assert.ok(
-      elapsed < budget,
-      `${new TextEncoder().encode(source).length} bytes took ${elapsed.toFixed(1)} ms (budget ${budget} ms)`,
+      Math.max(...samples) < budget,
+      `${new TextEncoder().encode(source).length} bytes took ${samples.map(value => value.toFixed(1)).join(", ")} ms (budget ${budget} ms)`,
     );
     session.dispose();
   }

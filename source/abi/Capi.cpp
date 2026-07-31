@@ -27,12 +27,17 @@ std::shared_ptr<ilic::CompilerSession> getSession(std::uint32_t handle)
    return found == sessions.end() ? nullptr : found->second;
 }
 
-std::uint32_t store(Value value)
+std::uint32_t storeJson(std::string value)
 {
    std::lock_guard<std::mutex> lock(registryMutex);
    const std::uint32_t handle = nextResult++;
-   results[handle] = ilic::json::stringify(value);
+   results[handle] = std::move(value);
    return handle;
+}
+
+std::uint32_t store(Value value)
+{
+   return storeJson(ilic::json::stringify(value));
 }
 
 const char *severity(ilic::DiagnosticSeverity value)
@@ -298,41 +303,205 @@ const char *editorReferenceKind(ilic::EditorReferenceKind kind)
    return "type";
 }
 
-Value editorResult(const ilic::EditorSnapshot &result)
+void appendJsonField(std::string &output,bool &first,const char *name)
 {
-   Value::Array declarations;
+   if (!first) output.push_back(',');
+   first = false;
+   ilic::json::appendQuoted(output,name);
+   output.push_back(':');
+}
+
+void appendJsonItemSeparator(std::string &output,bool &first)
+{
+   if (!first) output.push_back(',');
+   first = false;
+}
+
+void appendJsonPosition(std::string &output,const ilic::Position &value)
+{
+   output.push_back('{');
+   bool first = true;
+   appendJsonField(output,first,"line");
+   output += std::to_string(value.line);
+   appendJsonField(output,first,"character");
+   output += std::to_string(value.character);
+   appendJsonField(output,first,"byteOffset");
+   output += std::to_string(value.byteOffset);
+   output.push_back('}');
+}
+
+void appendJsonRange(std::string &output,const ilic::SourceRange &value)
+{
+   if (!value.valid) {
+      output += "null";
+      return;
+   }
+   output.push_back('{');
+   bool first = true;
+   appendJsonField(output,first,"uri");
+   ilic::json::appendQuoted(output,value.uri);
+   appendJsonField(output,first,"start");
+   appendJsonPosition(output,value.start);
+   appendJsonField(output,first,"end");
+   appendJsonPosition(output,value.end);
+   output.push_back('}');
+}
+
+void appendJsonDiagnostics(std::string &output,const std::vector<ilic::Diagnostic> &values)
+{
+   output.push_back('[');
+   bool firstDiagnostic = true;
+   for (const auto &diagnostic : values) {
+      appendJsonItemSeparator(output,firstDiagnostic);
+      output.push_back('{');
+      bool first = true;
+      appendJsonField(output,first,"severity");
+      ilic::json::appendQuoted(output,severity(diagnostic.severity));
+      appendJsonField(output,first,"code");
+      ilic::json::appendQuoted(output,diagnostic.code);
+      appendJsonField(output,first,"message");
+      ilic::json::appendQuoted(output,diagnostic.message);
+      appendJsonField(output,first,"range");
+      appendJsonRange(output,diagnostic.range);
+      appendJsonField(output,first,"relatedInformation");
+      output.push_back('[');
+      bool firstRelated = true;
+      for (const auto &information : diagnostic.relatedInformation) {
+         appendJsonItemSeparator(output,firstRelated);
+         output.push_back('{');
+         bool firstInformation = true;
+         appendJsonField(output,firstInformation,"range");
+         appendJsonRange(output,information.range);
+         appendJsonField(output,firstInformation,"message");
+         ilic::json::appendQuoted(output,information.message);
+         output.push_back('}');
+      }
+      output.push_back(']');
+      appendJsonField(output,first,"notes");
+      output.push_back('[');
+      bool firstNote = true;
+      for (const auto &note : diagnostic.notes) {
+         appendJsonItemSeparator(output,firstNote);
+         ilic::json::appendQuoted(output,note);
+      }
+      output.push_back(']');
+      appendJsonField(output,first,"treatedAsError");
+      output += diagnostic.treatedAsError ? "true" : "false";
+      if (!diagnostic.source.empty()) {
+         appendJsonField(output,first,"source");
+         ilic::json::appendQuoted(output,diagnostic.source);
+      }
+      output.push_back('}');
+   }
+   output.push_back(']');
+}
+
+std::string editorResultJson(const ilic::EditorSnapshot &result)
+{
+   std::string output;
+   output.reserve(256 + result.declarations.size() * 360);
+   output.push_back('{');
+   bool first = true;
+   appendJsonField(output,first,"schemaVersion");
+   output += "1";
+   appendJsonField(output,first,"abiVersion");
+   output += "1";
+   appendJsonField(output,first,"compilerVersion");
+   ilic::json::appendQuoted(output,ilic::version());
+   appendJsonField(output,first,"kind");
+   output += "\"editor\"";
+   appendJsonField(output,first,"success");
+   output += result.success ? "true" : "false";
+   appendJsonField(output,first,"recovered");
+   output += result.recovered ? "true" : "false";
+   appendJsonField(output,first,"complete");
+   output += result.complete ? "true" : "false";
+   appendJsonField(output,first,"uri");
+   ilic::json::appendQuoted(output,result.uri);
+   appendJsonField(output,first,"documentVersion");
+   output += std::to_string(result.documentVersion);
+   appendJsonField(output,first,"iliVersion");
+   ilic::json::appendQuoted(output,result.iliVersion);
+   appendJsonField(output,first,"declarations");
+   output.push_back('[');
+   bool firstDeclaration = true;
    for (const auto &declaration : result.declarations) {
-      declarations.push_back(Value::Object{
-         {"id",declaration.id}, {"name",declaration.name},
-         {"qualifiedName",declaration.qualifiedName},
-         {"kind",editorSymbolKind(declaration.kind)},
-         {"containerId",declaration.hasContainer ? Value(declaration.containerId) : Value(nullptr)},
-         {"range",range(declaration.range)},
-         {"selectionRange",range(declaration.selectionRange)},
-         {"endRange",range(declaration.endRange)}});
+      appendJsonItemSeparator(output,firstDeclaration);
+      output.push_back('{');
+      bool firstValue = true;
+      appendJsonField(output,firstValue,"id");
+      ilic::json::appendQuoted(output,declaration.id);
+      appendJsonField(output,firstValue,"name");
+      ilic::json::appendQuoted(output,declaration.name);
+      appendJsonField(output,firstValue,"qualifiedName");
+      ilic::json::appendQuoted(output,declaration.qualifiedName);
+      appendJsonField(output,firstValue,"kind");
+      ilic::json::appendQuoted(output,editorSymbolKind(declaration.kind));
+      appendJsonField(output,firstValue,"containerId");
+      if (declaration.hasContainer) ilic::json::appendQuoted(output,declaration.containerId);
+      else output += "null";
+      appendJsonField(output,firstValue,"range");
+      appendJsonRange(output,declaration.range);
+      appendJsonField(output,firstValue,"selectionRange");
+      appendJsonRange(output,declaration.selectionRange);
+      appendJsonField(output,firstValue,"endRange");
+      appendJsonRange(output,declaration.endRange);
+      output.push_back('}');
    }
-   Value::Array references;
+   output.push_back(']');
+   appendJsonField(output,first,"references");
+   output.push_back('[');
+   bool firstReference = true;
    for (const auto &reference : result.references) {
-      references.push_back(Value::Object{
-         {"text",reference.text}, {"kind",editorReferenceKind(reference.kind)},
-         {"sourceId",reference.hasSource ? Value(reference.sourceId) : Value(nullptr)},
-         {"range",range(reference.range)}});
+      appendJsonItemSeparator(output,firstReference);
+      output.push_back('{');
+      bool firstValue = true;
+      appendJsonField(output,firstValue,"text");
+      ilic::json::appendQuoted(output,reference.text);
+      appendJsonField(output,firstValue,"kind");
+      ilic::json::appendQuoted(output,editorReferenceKind(reference.kind));
+      appendJsonField(output,firstValue,"sourceId");
+      if (reference.hasSource) ilic::json::appendQuoted(output,reference.sourceId);
+      else output += "null";
+      appendJsonField(output,firstValue,"range");
+      appendJsonRange(output,reference.range);
+      output.push_back('}');
    }
-   Value::Array imports;
-   for (const auto &reference : result.imports)
-      imports.push_back(Value::Object{{"model",reference.model},
-         {"unqualified",reference.unqualified},{"range",range(reference.range)}});
-   Value::Array contexts;
-   for (const auto &context : result.contexts)
-      contexts.push_back(Value::Object{{"kind",context.kind},{"range",range(context.range)}});
-   return Value::Object{
-      {"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
-      {"kind","editor"},{"success",result.success},{"recovered",result.recovered},
-      {"complete",result.complete},{"uri",result.uri},
-      {"documentVersion",static_cast<double>(result.documentVersion)},
-      {"iliVersion",result.iliVersion},{"declarations",std::move(declarations)},
-      {"references",std::move(references)},{"imports",std::move(imports)},
-      {"contexts",std::move(contexts)},{"diagnostics",diagnostics(result.diagnostics)}};
+   output.push_back(']');
+   appendJsonField(output,first,"imports");
+   output.push_back('[');
+   bool firstImport = true;
+   for (const auto &reference : result.imports) {
+      appendJsonItemSeparator(output,firstImport);
+      output.push_back('{');
+      bool firstValue = true;
+      appendJsonField(output,firstValue,"model");
+      ilic::json::appendQuoted(output,reference.model);
+      appendJsonField(output,firstValue,"unqualified");
+      output += reference.unqualified ? "true" : "false";
+      appendJsonField(output,firstValue,"range");
+      appendJsonRange(output,reference.range);
+      output.push_back('}');
+   }
+   output.push_back(']');
+   appendJsonField(output,first,"contexts");
+   output.push_back('[');
+   bool firstContext = true;
+   for (const auto &context : result.contexts) {
+      appendJsonItemSeparator(output,firstContext);
+      output.push_back('{');
+      bool firstValue = true;
+      appendJsonField(output,firstValue,"kind");
+      ilic::json::appendQuoted(output,context.kind);
+      appendJsonField(output,firstValue,"range");
+      appendJsonRange(output,context.range);
+      output.push_back('}');
+   }
+   output.push_back(']');
+   appendJsonField(output,first,"diagnostics");
+   appendJsonDiagnostics(output,result.diagnostics);
+   output.push_back('}');
+   return output;
 }
 
 Value semanticResult(const ilic::SemanticSnapshot &result)
@@ -582,7 +751,7 @@ std::uint32_t ilic_editor_snapshot(std::uint32_t session,const char *requestJson
       if (!json.get("uri").isString() || json.get("uri").string().empty())
          throw std::runtime_error("uri must be a non-empty string");
       uri = json.get("uri").string();
-      return store(editorResult(value->editorSnapshot(uri)));
+      return storeJson(editorResultJson(value->editorSnapshot(uri)));
    }
    catch (const std::exception &error) {
       const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
