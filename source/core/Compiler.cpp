@@ -13,7 +13,10 @@
 
 #include <chrono>
 #include <ctime>
+#include <algorithm>
+#include <iomanip>
 #include <list>
+#include <map>
 #include <mutex>
 #include <set>
 #include <sstream>
@@ -149,6 +152,74 @@ std::string compilerRunTimestamp()
    return timestamp;
 }
 
+std::string incrementalHash(const std::string &bytes)
+{
+   std::uint64_t hash = 1469598103934665603ULL;
+   for (const unsigned char byte : bytes) {
+      hash ^= byte;
+      hash *= 1099511628211ULL;
+   }
+   std::ostringstream result;
+   result << std::hex << std::setw(16) << std::setfill('0') << hash;
+   return result.str();
+}
+
+ilic::SourceIdentity identityFor(const ilic::SourceManager &sources,
+   const std::string &uri)
+{
+   if (const auto *identity = sources.identity(uri)) return *identity;
+   const auto *source = sources.get(uri);
+   if (source == nullptr) return {uri,0,0,0,"",0};
+   return {uri,source->version,0,0,incrementalHash(source->text),source->text.size()};
+}
+
+ilic::SourceIdentity identityFor(const ilic::SourceManager &sources,
+   const ilic::SourceBuffer &source)
+{
+   if (const auto *identity = sources.identity(source.uri)) return *identity;
+   return {source.uri,source.version,0,0,incrementalHash(source.text),source.text.size()};
+}
+
+std::string requestKey(const CompilationRequest &request)
+{
+   std::ostringstream key;
+   key << (request.options.autoSearch ? '1' : '0') << ':'
+      << (request.options.warningsAsErrors ? '1' : '0') << ':';
+   for (const auto &root : request.roots) key << root.size() << ':' << root << ';';
+   key << '|';
+   for (const auto &directory : request.options.modelDirectories)
+      key << directory.size() << ':' << directory << ';';
+   key << '|';
+   for (const auto &attribute : request.externalMetaAttributes)
+      key << attribute.element.size() << ':' << attribute.element << ':'
+         << attribute.name.size() << ':' << attribute.name << ':'
+         << attribute.value.size() << ':' << attribute.value << ';';
+   return key.str();
+}
+
+std::string rootKey(const std::string &base,
+   const std::vector<std::string> &uris,const ilic::SourceManager &sources)
+{
+   std::ostringstream key;
+   key << base << "|grammar=0.9.9|abi=1|builtin=INTERLIS-2.3;";
+   for (const auto &uri : uris) {
+      const auto identity = identityFor(sources,uri);
+      key << uri.size() << ':' << uri << ':' << identity.contentRevision << ':'
+         << identity.contentHash << ':' << identity.byteLength << ';';
+   }
+   return key.str();
+}
+
+std::size_t parsedRetainedBytes(const std::string &text,
+   const detail::SnapshotBundle &bundle)
+{
+   return text.size()
+      + bundle.syntax.tokens.size() * sizeof(SyntaxToken)
+      + bundle.syntax.nodes.size() * sizeof(SyntaxNode)
+      + bundle.editor.declarations.size() * sizeof(EditorDeclaration)
+      + bundle.editor.references.size() * sizeof(EditorReference);
+}
+
 void appendInputFileTranscript(std::vector<std::string> &transcript,
    util::IliFile *file)
 {
@@ -206,7 +277,12 @@ bool compileFile(
    transcript.push_back("inf: compiling " + file->getFilePath() + " ...");
    const int errorsBefore = logger.getErrorCount();
    const ilic::SourceBuffer source = sourceFor(context,file);
-   if (file->getIliVersion() == "1.0")
+   if (auto artifact = context.parsedSourceArtifact(source)) {
+      artifact->reportParserDiagnostics(logger);
+      if (artifact->parserDiagnostics().empty())
+         artifact->buildMetaModel(context.builder(),logger);
+   }
+   else if (file->getIliVersion() == "1.0")
       input::parseIli1(source,context.builder(),logger);
    else
       input::parseIli2(source,context.builder(),logger);
@@ -225,23 +301,172 @@ CompilationResult compileRun(detail::CompilerContext &context,
    const CompilationRequest &request,std::vector<std::string> &lastCompilationSourceUris);
 
 struct CompilerSession::Impl {
+   struct ParsedCacheEntry {
+      std::string uri;
+      std::string hash;
+      std::string text;
+      detail::SnapshotBundle bundle;
+      std::size_t retainedBytes = 0;
+      std::uint64_t lastUsed = 0;
+   };
+
+   struct RootCacheEntry {
+      std::string baseKey;
+      std::string key;
+      std::vector<std::string> closure;
+      std::vector<SourceIdentity> identities;
+      bool hadMissingModels = false;
+      CompilationAnalysisResult result;
+      std::size_t retainedBytes = 0;
+      std::uint64_t lastUsed = 0;
+   };
+
    SourceManager sources;
    std::mutex mutex;
+   std::map<std::string,ParsedCacheEntry> parsedCache;
+   std::map<std::string,RootCacheEntry> rootCache;
+   std::size_t parsedBytes = 0;
+   std::size_t rootBytes = 0;
+   std::uint64_t cacheClock = 0;
+   ParsedSourceCacheOptions parsedOptions;
+   RootAnalysisCacheOptions rootOptions;
+   IncrementalStats stats;
+   IncrementalTrace trace;
+
+   detail::SnapshotBundle ensureParsed(const SourceBuffer &source)
+   {
+      const auto identity = identityFor(sources,source);
+      const std::string key = source.uri + "\n" + identity.contentHash + ":"
+         + std::to_string(identity.byteLength);
+      auto found = parsedCache.find(key);
+      if (found != parsedCache.end() && found->second.text == source.text) {
+         ++stats.parserHits;
+         found->second.lastUsed = ++cacheClock;
+         return found->second.bundle;
+      }
+      auto bundle = detail::SnapshotPipeline(sources).build(source,true);
+      ParsedCacheEntry entry{source.uri,identity.contentHash,source.text,bundle,
+         parsedRetainedBytes(source.text,bundle),++cacheClock};
+      retainParsed(key,std::move(entry));
+      ++stats.parserBuilds;
+      return bundle;
+   }
+
+   detail::ParsedSourceArtifactPtr parsedArtifact(const SourceBuffer &source)
+   {
+      return ensureParsed(source).artifact;
+   }
+
+   void retainParsed(std::string key,ParsedCacheEntry entry)
+   {
+      auto old = parsedCache.find(key);
+      if (old != parsedCache.end()) {
+         parsedBytes -= old->second.retainedBytes;
+         parsedCache.erase(old);
+      }
+      parsedBytes += entry.retainedBytes;
+      parsedCache.emplace(std::move(key),std::move(entry));
+      while (!parsedCache.empty() && (parsedCache.size() > parsedOptions.maxEntries
+         || parsedBytes > parsedOptions.maxRetainedBytes)) {
+         auto victim = std::min_element(parsedCache.begin(),parsedCache.end(),
+            [](const auto &left,const auto &right) {
+               return left.second.lastUsed < right.second.lastUsed;
+            });
+         parsedBytes -= victim->second.retainedBytes;
+         parsedCache.erase(victim);
+         ++stats.parserEvictions;
+      }
+      stats.parserBytes = parsedBytes;
+   }
+
+   void retainRoot(std::string key,RootCacheEntry entry)
+   {
+      auto old = rootCache.find(key);
+      if (old != rootCache.end()) {
+         rootBytes -= old->second.retainedBytes;
+         rootCache.erase(old);
+      }
+      rootBytes += entry.retainedBytes;
+      rootCache.emplace(std::move(key),std::move(entry));
+      while (!rootCache.empty() && (rootCache.size() > rootOptions.maxEntries
+         || rootBytes > rootOptions.maxRetainedBytes)) {
+         auto victim = std::min_element(rootCache.begin(),rootCache.end(),
+            [](const auto &left,const auto &right) {
+               return left.second.lastUsed < right.second.lastUsed;
+            });
+         rootBytes -= victim->second.retainedBytes;
+         rootCache.erase(victim);
+         ++stats.rootAnalysisEvictions;
+      }
+   }
 };
 
-CompilerSession::CompilerSession() : impl_(std::make_unique<Impl>()) {}
+CompilerSession::CompilerSession() : CompilerSession(IncrementalCacheOptions{}) {}
+
+CompilerSession::CompilerSession(IncrementalCacheOptions cacheOptions)
+   : impl_(std::make_unique<Impl>())
+{
+   impl_->parsedOptions = cacheOptions.parsed;
+   impl_->rootOptions = cacheOptions.root;
+}
 CompilerSession::~CompilerSession() = default;
 
 void CompilerSession::putSource(std::string uri,std::string utf8,std::uint64_t version)
 {
+   (void)updateSource(std::move(uri),std::move(utf8),version);
+}
+
+SourceUpdateResult CompilerSession::updateSource(std::string uri,std::string utf8,
+   std::uint64_t version)
+{
    std::lock_guard<std::mutex> lock(impl_->mutex);
-   impl_->sources.put(std::move(uri),std::move(utf8),version);
+   SourceUpdateResult result = impl_->sources.update(std::move(uri),std::move(utf8),version);
+   switch (result.kind) {
+      case SourceUpdateKind::Added: ++impl_->stats.sourceAdds; break;
+      case SourceUpdateKind::Reintroduced: ++impl_->stats.sourceReintroductions; break;
+      case SourceUpdateKind::Unchanged: ++impl_->stats.sourceNoOps; break;
+      case SourceUpdateKind::VersionOnly: ++impl_->stats.versionOnlyUpdates; break;
+      case SourceUpdateKind::ContentChanged: ++impl_->stats.contentChanges; break;
+      case SourceUpdateKind::Rejected: ++impl_->stats.rejectedUpdates; break;
+      case SourceUpdateKind::Removed: break;
+   }
+   if (result.accepted && (result.kind == SourceUpdateKind::ContentChanged
+      || result.kind == SourceUpdateKind::Reintroduced)) {
+      for (auto iterator = impl_->rootCache.begin(); iterator != impl_->rootCache.end();) {
+         const auto &closure = iterator->second.closure;
+         if (std::find(closure.begin(),closure.end(),result.current.uri) == closure.end()) {
+            ++iterator;
+            continue;
+         }
+         ++impl_->stats.invalidatedRootEntries;
+         iterator = impl_->rootCache.erase(iterator);
+      }
+   }
+   impl_->trace = {};
+   impl_->trace.operation = "updateSource";
+   impl_->trace.reasons.push_back(result.current.uri.empty() ? "rejected" : result.current.uri);
+   return result;
 }
 
 bool CompilerSession::removeSource(const std::string &uri)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
-   return impl_->sources.remove(uri);
+   const bool removed = impl_->sources.remove(uri);
+   if (!removed) return false;
+   ++impl_->stats.sourceRemoves;
+   for (auto iterator = impl_->rootCache.begin(); iterator != impl_->rootCache.end();) {
+      const auto &closure = iterator->second.closure;
+      if (std::find(closure.begin(),closure.end(),uri) == closure.end()) {
+         ++iterator;
+         continue;
+      }
+      ++impl_->stats.invalidatedRootEntries;
+      iterator = impl_->rootCache.erase(iterator);
+   }
+   impl_->trace = {};
+   impl_->trace.operation = "removeSource";
+   impl_->trace.reasons.push_back(uri);
+   return true;
 }
 
 SourceManager &CompilerSession::sources() { return impl_->sources; }
@@ -250,13 +475,51 @@ const SourceManager &CompilerSession::sources() const { return impl_->sources; }
 SyntaxSnapshot CompilerSession::parse(const std::string &uri)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
-   return parseSyntax(impl_->sources,uri);
+   const auto *source = impl_->sources.get(uri);
+   if (source == nullptr) return detail::SnapshotPipeline(impl_->sources).syntax(uri);
+   const auto identity = identityFor(impl_->sources,uri);
+   const std::string key = uri + "\n" + identity.contentHash + ":" +
+      std::to_string(identity.byteLength);
+   auto found = impl_->parsedCache.find(key);
+   if (found != impl_->parsedCache.end() && found->second.text == source->text) {
+      ++impl_->stats.parserHits;
+      found->second.lastUsed = ++impl_->cacheClock;
+      ++impl_->stats.syntaxMaterializations;
+      return found->second.bundle.syntax;
+   }
+   auto bundle = detail::SnapshotPipeline(impl_->sources).build(uri,true);
+   const SyntaxSnapshot syntax = bundle.syntax;
+   CompilerSession::Impl::ParsedCacheEntry entry{uri,identity.contentHash,source->text,
+      bundle,parsedRetainedBytes(source->text,bundle),++impl_->cacheClock};
+   impl_->retainParsed(key,std::move(entry));
+   ++impl_->stats.parserBuilds;
+   ++impl_->stats.syntaxMaterializations;
+   return syntax;
 }
 
 EditorSnapshot CompilerSession::editorSnapshot(const std::string &uri)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
-   return detail::SnapshotPipeline(impl_->sources).editor(uri);
+   const auto *source = impl_->sources.get(uri);
+   if (source == nullptr) return detail::SnapshotPipeline(impl_->sources).editor(uri);
+   const auto identity = identityFor(impl_->sources,uri);
+   const std::string key = uri + "\n" + identity.contentHash + ":" +
+      std::to_string(identity.byteLength);
+   auto found = impl_->parsedCache.find(key);
+   if (found != impl_->parsedCache.end() && found->second.text == source->text) {
+      ++impl_->stats.parserHits;
+      found->second.lastUsed = ++impl_->cacheClock;
+      ++impl_->stats.editorMaterializations;
+      return found->second.bundle.editor;
+   }
+   auto bundle = detail::SnapshotPipeline(impl_->sources).build(uri,true);
+   const EditorSnapshot editor = bundle.editor;
+   CompilerSession::Impl::ParsedCacheEntry entry{uri,identity.contentHash,source->text,
+      bundle,parsedRetainedBytes(source->text,bundle),++impl_->cacheClock};
+   impl_->retainParsed(key,std::move(entry));
+   ++impl_->stats.parserBuilds;
+   ++impl_->stats.editorMaterializations;
+   return editor;
 }
 
 SemanticSnapshot CompilerSession::analyze(const CompilationRequest &request)
@@ -274,14 +537,96 @@ CompilationAnalysisResult CompilerSession::compileAndAnalyze(const CompilationRe
 CompilationAnalysisResult CompilerSession::compileAndAnalyzeUnlocked(
    const CompilationRequest &request)
 {
-   detail::CompilerContext context(impl_->sources,request.options);
+   const std::string baseKey = requestKey(request);
+   for (auto &entry : impl_->rootCache) {
+      auto &cached = entry.second;
+      if (cached.baseKey != baseKey) continue;
+      if (cached.hadMissingModels && cached.identities.size() != impl_->sources.uris().size()) continue;
+      bool current = true;
+      for (std::size_t index = 0; index < cached.closure.size(); ++index) {
+         const auto *identity = impl_->sources.identity(cached.closure[index]);
+         if (identity == nullptr || index >= cached.identities.size()
+            || identity->contentRevision != cached.identities[index].contentRevision
+            || identity->contentHash != cached.identities[index].contentHash
+            || identity->byteLength != cached.identities[index].byteLength) {
+            current = false;
+            break;
+         }
+      }
+      if (!current) continue;
+      ++impl_->stats.rootAnalysisHits;
+      ++impl_->stats.reusedClosureSources;
+      cached.lastUsed = ++impl_->cacheClock;
+      CompilationAnalysisResult result = cached.result;
+      for (auto &version : result.semantic.documentVersions)
+         if (const auto *source = impl_->sources.get(version.first)) version.second = source->version;
+      for (auto &syntax : result.syntax)
+         if (const auto *source = impl_->sources.get(syntax.uri)) syntax.documentVersion = source->version;
+      for (auto iterator = result.compilation.transcript.rbegin();
+         iterator != result.compilation.transcript.rend(); ++iterator) {
+         if (iterator->rfind("inf: ilic completed with ",0) == 0) {
+            const std::size_t timestamp = iterator->rfind(' ');
+            if (timestamp != std::string::npos)
+               *iterator = iterator->substr(0,timestamp + 1) + compilerRunTimestamp();
+            break;
+         }
+      }
+      impl_->trace = {"compileAndAnalyze","ExactCacheHit",request.roots,cached.closure,{}, {},{}, {"root cache hit"}};
+      ++compileInvocationCount_;
+      ++impl_->stats.compilationInvocations;
+      return result;
+   }
+   ++impl_->stats.rootAnalysisMisses;
+   detail::CompilerContext context(impl_->sources,request.options,
+      [this](const SourceBuffer &source) { return impl_->parsedArtifact(source); });
    ++compileInvocationCount_;
+   ++impl_->stats.compilationInvocations;
    CompilationAnalysisResult result;
    std::vector<std::string> compilationSourceUris;
    result.compilation = compileRun(context,request,compilationSourceUris);
+   for (const auto &uri : compilationSourceUris) {
+      if (impl_->sources.get(uri) == nullptr) continue;
+      const auto identity = identityFor(impl_->sources,uri);
+      const std::string cacheKey = uri + "\n" + identity.contentHash + ":" +
+         std::to_string(identity.byteLength);
+      auto found = impl_->parsedCache.find(cacheKey);
+      if (found != impl_->parsedCache.end() && found->second.text == impl_->sources.get(uri)->text) {
+         ++impl_->stats.parserHits;
+         found->second.lastUsed = ++impl_->cacheClock;
+         ++impl_->stats.syntaxMaterializations;
+         result.syntax.push_back(found->second.bundle.syntax);
+      }
+      else {
+         auto bundle = detail::SnapshotPipeline(impl_->sources).build(uri,true);
+         const SyntaxSnapshot syntax = bundle.syntax;
+         const std::size_t retainedBytes = parsedRetainedBytes(
+            impl_->sources.get(uri)->text,bundle);
+         Impl::ParsedCacheEntry entry{uri,identity.contentHash,impl_->sources.get(uri)->text,
+            std::move(bundle),retainedBytes,++impl_->cacheClock};
+         impl_->retainParsed(cacheKey,std::move(entry));
+         ++impl_->stats.parserBuilds;
+         ++impl_->stats.syntaxMaterializations;
+         result.syntax.push_back(syntax);
+      }
+   }
    result.semantic = buildSemanticSnapshot(impl_->sources,request,
       result.compilation,compilationSourceUris,&result.syntax,
       &context.models());
+   const std::string key = rootKey(baseKey,compilationSourceUris,impl_->sources);
+   Impl::RootCacheEntry cached;
+   cached.baseKey = baseKey;
+   cached.key = key;
+   cached.closure = compilationSourceUris;
+   for (const auto &uri : compilationSourceUris)
+      cached.identities.push_back(identityFor(impl_->sources,uri));
+   cached.hadMissingModels = !result.compilation.missingModels.empty();
+   cached.result = result;
+   cached.retainedBytes = sizeof(cached) + result.syntax.size() * sizeof(SyntaxSnapshot);
+   cached.lastUsed = ++impl_->cacheClock;
+   impl_->retainRoot(key,std::move(cached));
+   ++impl_->stats.rootAnalysisBuilds;
+   impl_->stats.reparsedClosureSources += result.compilation.success ? 1 : 0;
+   impl_->trace = {"compileAndAnalyze","RebuildWithParseReuse",request.roots,compilationSourceUris,{},compilationSourceUris,{}, {"root cache miss"}};
    return result;
 }
 
@@ -414,9 +759,36 @@ CompilationResult CompilerSession::compile(const CompilationRequest &request)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
    ++compileInvocationCount_;
-   detail::CompilerContext context(impl_->sources,request.options);
+   ++impl_->stats.compilationInvocations;
+   detail::CompilerContext context(impl_->sources,request.options,
+      [this](const SourceBuffer &source) { return impl_->parsedArtifact(source); });
    std::vector<std::string> compilationSourceUris;
    return compileRun(context,request,compilationSourceUris);
+}
+
+IncrementalStats CompilerSession::incrementalStats() const
+{
+   std::lock_guard<std::mutex> lock(impl_->mutex);
+   IncrementalStats result = impl_->stats;
+   result.parserBytes = impl_->parsedBytes;
+   return result;
+}
+
+IncrementalTrace CompilerSession::lastIncrementalTrace() const
+{
+   std::lock_guard<std::mutex> lock(impl_->mutex);
+   return impl_->trace;
+}
+
+void CompilerSession::clearIncrementalCaches()
+{
+   std::lock_guard<std::mutex> lock(impl_->mutex);
+   impl_->parsedCache.clear();
+   impl_->rootCache.clear();
+   impl_->parsedBytes = 0;
+   impl_->rootBytes = 0;
+   impl_->stats.parserBytes = 0;
+   impl_->trace = {};
 }
 
 const char *version() { return "0.9.9"; }

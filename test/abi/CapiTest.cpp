@@ -90,6 +90,14 @@ END AbiModel.
    ILIC_REQUIRE(combined.find("\"syntax\":[{") != std::string::npos);
    ILIC_REQUIRE(combined.find("\"transcript\":[") != std::string::npos);
 
+   std::string incrementalStats = resultJson(ilic_incremental_stats(session));
+   ILIC_REQUIRE(incrementalStats.find("\"kind\":\"incremental-stats\"")
+      != std::string::npos);
+   ILIC_REQUIRE(incrementalStats.find("\"parserBuilds\":") != std::string::npos);
+   ILIC_REQUIRE(ilic_clear_incremental_caches(session) == 0);
+   incrementalStats = resultJson(ilic_incremental_stats(session));
+   ILIC_REQUIRE(incrementalStats.find("\"parserBytes\":0") != std::string::npos);
+
    const std::string formatRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili","options":{"indentSize":2}})json";
    std::string formatting = resultJson(ilic_format(session,formatRequest.data(),formatRequest.size()));

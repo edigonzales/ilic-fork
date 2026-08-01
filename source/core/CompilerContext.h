@@ -2,10 +2,13 @@
 
 #include "../../include/ilic/Compiler.h"
 #include "CompilationSourceStore.h"
+#include "ParsedSourceArtifact.h"
 #include "../metamodel/MetaModelBuilder.h"
 #include "../metamodel/MetaModelStore.h"
 #include "../util/IliFile.h"
 #include "../util/Logger.h"
+
+#include <functional>
 
 namespace ilic {
 namespace detail {
@@ -14,7 +17,11 @@ namespace detail {
 // this aggregate is shared with another CompilerContext.
 class CompilerContext final {
 public:
-   CompilerContext(SourceManager &sessionSources,const CompilerOptions &options);
+   using ParsedSourceArtifactProvider = std::function<ParsedSourceArtifactPtr(
+      const SourceBuffer &source)>;
+
+   CompilerContext(SourceManager &sessionSources,const CompilerOptions &options,
+      ParsedSourceArtifactProvider parsedSourceProvider = {});
    ~CompilerContext() noexcept = default;
    CompilerContext(const CompilerContext &) = delete;
    CompilerContext &operator=(const CompilerContext &) = delete;
@@ -34,6 +41,10 @@ public:
    const metamodel::MetaModelStore &models() const noexcept { return models_; }
    metamodel::MetaModelBuilder &builder() noexcept { return builder_; }
    const metamodel::MetaModelBuilder &builder() const noexcept { return builder_; }
+   ParsedSourceArtifactPtr parsedSourceArtifact(const SourceBuffer &source) const
+   {
+      return parsedSourceProvider_ ? parsedSourceProvider_(source) : nullptr;
+   }
 
 private:
    SourceManager &sessionSources_;
@@ -43,6 +54,7 @@ private:
    util::IliFileCatalog files_;
    metamodel::MetaModelStore models_;
    metamodel::MetaModelBuilder builder_;
+   ParsedSourceArtifactProvider parsedSourceProvider_;
 };
 
 } // namespace detail

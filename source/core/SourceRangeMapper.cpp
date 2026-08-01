@@ -148,7 +148,7 @@ SourceRange SourceRangeMapper::eof() const
 std::string SourceRangeMapper::normalizedUtf8() const
 {
    std::string normalized;
-   normalized.reserve(source_.text.size());
+   normalized.reserve(source_.text.size() + 1);
    std::size_t offset = 0;
    while (offset < source_.text.size()) {
       const DecodedCodepoint value = decode(source_.text,offset);
@@ -163,6 +163,10 @@ std::string SourceRangeMapper::normalizedUtf8() const
          offset += value.width;
       }
    }
+   // INTERLIS line comments are traditionally terminated by a line break.
+   // Treat an unterminated final comment as a comment as well, without
+   // changing any source ranges (the synthetic byte is never mapped back).
+   if (!normalized.empty() && normalized.back() != '\n') normalized.push_back('\n');
    return normalized;
 }
 

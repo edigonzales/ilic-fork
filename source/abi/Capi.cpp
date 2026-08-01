@@ -27,6 +27,12 @@ std::shared_ptr<ilic::CompilerSession> getSession(std::uint32_t handle)
    return found == sessions.end() ? nullptr : found->second;
 }
 
+const ilic::SourceManager &sessionSources(
+   const std::shared_ptr<ilic::CompilerSession> &session)
+{
+   return static_cast<const ilic::CompilerSession &>(*session).sources();
+}
+
 std::uint32_t storeJson(std::string value)
 {
    std::lock_guard<std::mutex> lock(registryMutex);
@@ -648,6 +654,32 @@ Value compilationAnalysisResult(const ilic::CompilationAnalysisResult &result)
       {"semantic",semanticResult(result.semantic)},{"syntax",std::move(syntax)}};
 }
 
+Value incrementalStatsResult(const ilic::IncrementalStats &stats)
+{
+   const auto count = [](std::uint64_t value) {
+      return Value(static_cast<double>(value));
+   };
+   return Value::Object{
+      {"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
+      {"kind","incremental-stats"},
+      {"sourceAdds",count(stats.sourceAdds)},{"sourceRemoves",count(stats.sourceRemoves)},
+      {"sourceNoOps",count(stats.sourceNoOps)},{"versionOnlyUpdates",count(stats.versionOnlyUpdates)},
+      {"contentChanges",count(stats.contentChanges)},{"sourceReintroductions",count(stats.sourceReintroductions)},
+      {"rejectedUpdates",count(stats.rejectedUpdates)},{"parserBuilds",count(stats.parserBuilds)},
+      {"parserHits",count(stats.parserHits)},{"parserEvictions",count(stats.parserEvictions)},
+      {"parserBytes",count(stats.parserBytes)},{"syntaxMaterializations",count(stats.syntaxMaterializations)},
+      {"editorMaterializations",count(stats.editorMaterializations)},
+      {"rootAnalysisHits",count(stats.rootAnalysisHits)},{"rootAnalysisMisses",count(stats.rootAnalysisMisses)},
+      {"rootAnalysisBuilds",count(stats.rootAnalysisBuilds)},
+      {"rootAnalysisEvictions",count(stats.rootAnalysisEvictions)},
+      {"invalidatedRootEntries",count(stats.invalidatedRootEntries)},
+      {"reusedClosureSources",count(stats.reusedClosureSources)},
+      {"reparsedClosureSources",count(stats.reparsedClosureSources)},
+      {"compilationInvocations",count(stats.compilationInvocations)},
+      {"cancelledPlans",count(stats.cancelledPlans)}
+   };
+}
+
 } // namespace
 
 extern "C" {
@@ -677,10 +709,27 @@ std::int32_t ilic_session_put_source(std::uint32_t session,const char *uri,std::
    auto value = getSession(session);
    if (value == nullptr || uri == nullptr || (utf8 == nullptr && utf8Length != 0)) return -1;
    try {
-      value->putSource(std::string(uri,uriLength),
+      const auto update = value->updateSource(std::string(uri,uriLength),
          std::string(reinterpret_cast<const char *>(utf8),utf8Length),documentVersion);
-      return 0;
+      return update.accepted ? 0 : -3;
    }
+   catch (...) { return -2; }
+}
+
+std::uint32_t ilic_incremental_stats(std::uint32_t session)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return store(errorResult("incremental-stats","invalid session handle"));
+   try { return store(incrementalStatsResult(value->incrementalStats())); }
+   catch (const std::exception &error) { return store(errorResult("incremental-stats",error.what())); }
+   catch (...) { return store(errorResult("incremental-stats","unknown C++ exception")); }
+}
+
+std::int32_t ilic_clear_incremental_caches(std::uint32_t session)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return -1;
+   try { value->clearIncrementalCaches(); return 0; }
    catch (...) { return -2; }
 }
 
@@ -725,11 +774,11 @@ std::uint32_t ilic_parse(std::uint32_t session,const char *requestJson,std::size
       return store(syntaxResult(value->parse(uri)));
    }
    catch (const std::exception &error) {
-      const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
+      const ilic::SourceBuffer *source = uri.empty() ? nullptr : sessionSources(value).get(uri);
       return store(errorResult("syntax",error.what(),uri,source == nullptr ? 0 : source->version));
    }
    catch (...) {
-      const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
+      const ilic::SourceBuffer *source = uri.empty() ? nullptr : sessionSources(value).get(uri);
       return store(errorResult("syntax","unknown C++ exception",uri,
          source == nullptr ? 0 : source->version));
    }
@@ -754,12 +803,12 @@ std::uint32_t ilic_editor_snapshot(std::uint32_t session,const char *requestJson
       return storeJson(editorResultJson(value->editorSnapshot(uri)));
    }
    catch (const std::exception &error) {
-      const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
+      const ilic::SourceBuffer *source = uri.empty() ? nullptr : sessionSources(value).get(uri);
       return store(errorResult("editor",error.what(),uri,
          source == nullptr ? 0 : source->version));
    }
    catch (...) {
-      const ilic::SourceBuffer *source = uri.empty() ? nullptr : value->sources().get(uri);
+      const ilic::SourceBuffer *source = uri.empty() ? nullptr : sessionSources(value).get(uri);
       return store(errorResult("editor","unknown C++ exception",uri,
          source == nullptr ? 0 : source->version));
    }
@@ -813,7 +862,7 @@ std::uint32_t ilic_format(std::uint32_t session,const char *requestJson,std::siz
       if (!json.get("uri").isString() || json.get("uri").string().empty())
          throw std::runtime_error("uri must be a non-empty string");
       const std::string uri = json.get("uri").string();
-      const ilic::SourceBuffer *source = value->sources().get(uri);
+      const ilic::SourceBuffer *source = sessionSources(value).get(uri);
       if (source == nullptr) throw std::runtime_error("format source is not registered");
       ilic::FormatOptions options;
       const Value &jsonOptions = json.get("options");

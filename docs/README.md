@@ -48,6 +48,7 @@ node docs/examples/wasm-session.mjs
 | Modell-Repositories, Auflösung und Cache    | [Repositories](repositories.md)                                      |
 | Fehlerpositionen und strukturierte Logs     | [Diagnostik und Logging](diagnostik-und-logging.md)                  |
 | C++-API, C-ABI und JSON-Protokoll           | [Native APIs](native-api.md)                                         |
+| Dateiweise und semantische Inkrementalität  | [Inkrementelle Compiler-Sessions](architecture/incremental-compilation.md) |
 | Versionierte Syntax-/Semantik-Snapshots     | [Language-Tooling-Snapshots](language-tooling-snapshots.md)          |
 | WebAssembly, Node, Browser, Worker und LSP  | [WASM](wasm.md)                                                      |
 | npm-Snapshots, OIDC und Bootstrap           | [npm-Publikation](npm-publikation.md)                                |

@@ -155,7 +155,7 @@ if(EMSCRIPTEN)
         "-sWASM_BIGINT=1"
         "-sASSERTIONS=1"
         "-fexceptions"
-        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_parse','_ilic_editor_snapshot','_ilic_analyze','_ilic_compile','_ilic_compile_and_analyze','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
+        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_incremental_stats','_ilic_clear_incremental_caches','_ilic_parse','_ilic_editor_snapshot','_ilic_analyze','_ilic_compile','_ilic_compile_and_analyze','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
     )
     set_target_properties(ilic-wasm PROPERTIES OUTPUT_NAME "ilic" SUFFIX ".mjs")
 endif()
@@ -286,7 +286,7 @@ if(BUILD_TESTING)
     add_executable(ilic_snapshot_json_driver test/abi/SnapshotJsonDriver.cpp)
     target_link_libraries(ilic_snapshot_json_driver PRIVATE ilic-capi)
 
-    if(UNIX)
+    if(UNIX AND ILIC_ENABLE_NATIVE_REPOSITORY)
         add_test(NAME ilic_docs_cli_examples
             COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples/cli.sh"
                 "$<TARGET_FILE:ilic>"
@@ -315,6 +315,9 @@ if(BUILD_TESTING)
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_core_session COMMAND ilic_core_session_test)
+    add_executable(ilic_incremental_compiler_test test/core/IncrementalCompilerTest.cpp)
+    target_link_libraries(ilic_incremental_compiler_test PRIVATE ilic-core ilic::test-support)
+    add_test(NAME ilic_incremental_compiler COMMAND ilic_incremental_compiler_test)
     add_executable(ilic_compiler_concurrency_test test/core/CompilerConcurrencyTest.cpp)
     target_link_libraries(ilic_compiler_concurrency_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_compiler_concurrency COMMAND ilic_compiler_concurrency_test)

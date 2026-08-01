@@ -89,8 +89,11 @@ async function readResponseBytes(response, maxBytes) {
 
 export class FetchRepositoryTransport {
   #fetch;
-  constructor({ fetch: fetchFunction = globalThis.fetch } = {}) {
-    this.#fetch = fetchFunction;
+  constructor({ fetch: fetchFunction } = {}) {
+    const defaultFetch = fetchFunction === undefined ? globalThis.fetch : fetchFunction;
+    this.#fetch = fetchFunction === undefined && typeof defaultFetch === "function"
+      ? defaultFetch.bind(globalThis)
+      : defaultFetch;
   }
 
   async get(request) {

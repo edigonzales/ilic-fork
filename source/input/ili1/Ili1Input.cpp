@@ -66,9 +66,20 @@ void input::parseIli1(const ilic::SourceBuffer &source,
       return;
    }
 
+   input::visitIli1(source,ili1d,builder,logger);
+
+}
+
+void input::visitIli1(const ilic::SourceBuffer &source,
+   parser::Ili1Parser::Interlis1DefContext *root,
+   metamodel::MetaModelBuilder &builder,util::Logger &logger)
+{
+   if (root == nullptr) return;
+   auto sourceScope = builder.enterSource(source);
+   auto categoryScope = logger.categoryScope("parser");
    logger.debug("ili1 building meta model ...");
    input::Ili1Input ili1input(builder,logger);
-   ili1input.visit(ili1d);
+   ili1input.visit(root);
 
 }
 

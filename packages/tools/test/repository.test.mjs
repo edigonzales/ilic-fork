@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
+import { FetchRepositoryTransport } from "../browser.js";
 import { MemoryCache, RepositoryManager } from "../index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -24,6 +25,47 @@ const catalog = (name, file = `${name}.ili`, extra = "") => `<?xml version="1.0"
   <Name>${name}</Name><File>${file}</File><SchemaLanguage>ili2_4</SchemaLanguage>
   <Version>1</Version>${extra}
 </IliRepository20.RepositoryIndex.ModelMetadata></DATASECTION></TRANSFER>`;
+
+test("binds the browser default fetch and preserves injected fetchers", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    let defaultCalled = false;
+    globalThis.fetch = function (input, init) {
+      defaultCalled = true;
+      assert.equal(this, globalThis);
+      assert.equal(input, "https://default.invalid/model.ili");
+      assert.equal(init.redirect, "manual");
+      return Promise.resolve(new Response("default", { status: 200 }));
+    };
+    const defaultTransport = new FetchRepositoryTransport();
+    const defaultResult = await defaultTransport.get({
+      uri: "https://default.invalid/model.ili",
+      maxBytes: 1024,
+      maxRedirects: 3
+    });
+    assert.equal(defaultCalled, true);
+    assert.equal(defaultResult.success, true);
+    assert.deepEqual([...defaultResult.body], [...new TextEncoder().encode("default")]);
+
+    let injectedCalled = false;
+    const injectedTransport = new FetchRepositoryTransport({
+      fetch: async () => {
+        injectedCalled = true;
+        return new Response("injected", { status: 200 });
+      }
+    });
+    const injectedResult = await injectedTransport.get({
+      uri: "https://injected.invalid/model.ili",
+      maxBytes: 1024,
+      maxRedirects: 3
+    });
+    assert.equal(injectedCalled, true);
+    assert.equal(injectedResult.success, true);
+    assert.deepEqual([...injectedResult.body], [...new TextEncoder().encode("injected")]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("keeps usable catalogs when another repository is unavailable", async () => {
   const warnings = [];

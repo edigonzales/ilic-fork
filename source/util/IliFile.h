@@ -1,12 +1,14 @@
 #pragma once
 
 #include <map>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "antlr4-runtime.h"
 #include "../core/CompilationSourceStore.h"
+#include "../core/ParsedSourceArtifact.h"
 #include "../input/parser/generated/IliFileParserBaseVisitor.h"
 #include "Logger.h"
 
@@ -43,6 +45,13 @@ public:
    const vector<string> &requiredModels() const noexcept { return required_models_; }
    const vector<string> &models() const noexcept { return models_; }
    bool autoSearched() const noexcept { return auto_search_; }
+   void setParsedHeader(const ilic::detail::ParsedSourceHeader &header)
+   {
+      iliversion_ = header.iliVersion.empty() ? "2.3" : header.iliVersion;
+      models_ = header.models;
+      imports_ = header.imports;
+      required_models_ = header.requiredModels;
+   }
 
 private:
    friend class IliFileCatalog;
@@ -79,9 +88,12 @@ private:
 
 class IliFileCatalog final {
 public:
+   using ParsedSourceHeaderProvider = std::function<ilic::detail::ParsedSourceHeader(
+      const ilic::SourceBuffer &source)>;
+
    IliFileCatalog(ilic::detail::CompilationSourceStore &sources,Logger &logger);
    IliFileCatalog(ilic::detail::CompilationSourceStore &sources,Logger &logger,
-      const ilic::CompilerOptions &options);
+      const ilic::CompilerOptions &options,ParsedSourceHeaderProvider headerProvider = {});
    IliFileCatalog(const IliFileCatalog &) = delete;
    IliFileCatalog &operator=(const IliFileCatalog &) = delete;
 
@@ -110,6 +122,7 @@ private:
    ilic::detail::CompilationSourceStore &sources_;
    Logger &logger_;
    const ilic::CompilerOptions *options_ = nullptr;
+   ParsedSourceHeaderProvider headerProvider_;
    vector<unique_ptr<IliFile>> ownedFiles_;
    vector<IliFile *> files_;
    map<string,IliFile *> models_;

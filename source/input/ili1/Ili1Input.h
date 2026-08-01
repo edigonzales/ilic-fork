@@ -12,6 +12,9 @@ namespace input {
    
    void parseIli1(const ilic::SourceBuffer &source,
       metamodel::MetaModelBuilder &builder,util::Logger &logger);
+   void visitIli1(const ilic::SourceBuffer &source,
+      parser::Ili1Parser::Interlis1DefContext *root,
+      metamodel::MetaModelBuilder &builder,util::Logger &logger);
 
    class Ili1Input : public parser::Ili1ParserBaseVisitor {
    public:

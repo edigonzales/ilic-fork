@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SourceManager.h"
+#include "Incremental.h"
 #include "Diagnostic.h"
 #include "Syntax.h"
 #include "Editor.h"
@@ -58,6 +59,7 @@ struct CompilationResult {
 class CompilerSession {
 public:
    CompilerSession();
+   explicit CompilerSession(IncrementalCacheOptions cacheOptions);
    ~CompilerSession();
    CompilerSession(const CompilerSession &) = delete;
    CompilerSession &operator=(const CompilerSession &) = delete;
@@ -65,9 +67,13 @@ public:
    CompilerSession &operator=(CompilerSession &&) = delete;
 
    void putSource(std::string uri, std::string utf8, std::uint64_t version = 0);
+   SourceUpdateResult updateSource(std::string uri, std::string utf8,
+      std::uint64_t version = 0);
    bool removeSource(const std::string &uri);
-   // Direct mutable access requires external synchronization with every
-   // other operation on this session.
+   // Legacy mutable access is retained for source compatibility. Prefer
+   // updateSource/removeSource so incremental classification and metrics are
+   // recorded by the session façade.
+   [[deprecated("use CompilerSession::updateSource/removeSource")]]
    SourceManager &sources();
    const SourceManager &sources() const;
    SyntaxSnapshot parse(const std::string &uri);
@@ -75,6 +81,9 @@ public:
    SemanticSnapshot analyze(const CompilationRequest &request);
    CompilationAnalysisResult compileAndAnalyze(const CompilationRequest &request);
    CompilationResult compile(const CompilationRequest &request);
+   IncrementalStats incrementalStats() const;
+   IncrementalTrace lastIncrementalTrace() const;
+   void clearIncrementalCaches();
 
 private:
    struct Impl;

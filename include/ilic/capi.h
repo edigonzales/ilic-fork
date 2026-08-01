@@ -26,6 +26,8 @@ ILIC_CAPI_EXPORT int32_t ilic_session_put_source(uint32_t session,
    const char *uri,size_t uri_length,const uint8_t *utf8,size_t utf8_length,uint64_t document_version);
 ILIC_CAPI_EXPORT int32_t ilic_session_remove_source(uint32_t session,
    const char *uri,size_t uri_length);
+ILIC_CAPI_EXPORT uint32_t ilic_incremental_stats(uint32_t session);
+ILIC_CAPI_EXPORT int32_t ilic_clear_incremental_caches(uint32_t session);
 
 ILIC_CAPI_EXPORT uint32_t ilic_compile(uint32_t session,
    const char *request_json,size_t request_length);

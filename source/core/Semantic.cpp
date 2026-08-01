@@ -723,9 +723,15 @@ SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
    for (const auto &model : compilation.models) modelUris[model.name] = model.uri;
    for (const auto &model : compilation.models) uriModels[model.uri] = model.name;
    std::map<std::string,SyntaxSnapshot> syntaxByUri;
+   const bool hasPrebuiltSyntax = syntaxSnapshots != nullptr && !syntaxSnapshots->empty();
+   if (hasPrebuiltSyntax)
+      for (const auto &syntax : *syntaxSnapshots) syntaxByUri.emplace(syntax.uri,syntax);
    for (const auto &uri : reachableUris) {
       if (sources.get(uri) == nullptr) continue;
-      SyntaxSnapshot syntax = parseSyntax(sources,uri);
+      SyntaxSnapshot syntax;
+      const auto prebuilt = syntaxByUri.find(uri);
+      if (prebuilt != syntaxByUri.end()) syntax = prebuilt->second;
+      else syntax = parseSyntax(sources,uri);
       for (const auto &reference : syntax.importReferences) {
          auto found = modelUris.find(reference.model);
          if (found != modelUris.end())
@@ -770,7 +776,7 @@ SemanticSnapshot buildSemanticSnapshot(const SourceManager &sources,
          }
       }
    }
-   if (syntaxSnapshots != nullptr) {
+   if (syntaxSnapshots != nullptr && !hasPrebuiltSyntax) {
       syntaxSnapshots->reserve(syntaxByUri.size());
       for (auto &entry : syntaxByUri)
          syntaxSnapshots->push_back(std::move(entry.second));

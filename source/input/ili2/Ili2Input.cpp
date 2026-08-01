@@ -50,9 +50,7 @@ void input::parseIli2(const ilic::SourceBuffer &source,
          return;
       }
 
-      logger.debug("ili2 building meta model ...");
-      input::Ili2Input ili2input(builder,logger);
-      ili2input.visit(ili2d);
+      input::visitIli2(source,ili2d,builder,logger);
 
    }
    catch (const exception &e) {
@@ -60,6 +58,18 @@ void input::parseIli2(const ilic::SourceBuffer &source,
       logger.internal_error(string(e.what()),1);
    }
    
+}
+
+void input::visitIli2(const ilic::SourceBuffer &source,
+   parser::Ili2Parser::Interlis2DefContext *root,
+   metamodel::MetaModelBuilder &builder,util::Logger &logger)
+{
+   if (root == nullptr) return;
+   auto sourceScope = builder.enterSource(source);
+   auto categoryScope = logger.categoryScope("parser");
+   logger.debug("ili2 building meta model ...");
+   input::Ili2Input ili2input(builder,logger);
+   ili2input.visit(root);
 }
 
 // parser visitor interface

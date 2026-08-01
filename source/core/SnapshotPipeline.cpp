@@ -3,6 +3,8 @@
 #include "SourceRangeMapper.h"
 
 #include "../../include/ilic/Compiler.h"
+#include "../input/ili1/Ili1Input.h"
+#include "../input/ili2/Ili2Input.h"
 #include "../input/parser/generated/Ili1Lexer.h"
 #include "../input/parser/generated/Ili1Parser.h"
 #include "../input/parser/generated/Ili2Lexer.h"
@@ -14,9 +16,12 @@
 #include "tree/ParseTree.h"
 #include "tree/TerminalNode.h"
 
+#include "../util/Logger.h"
+
 #include <algorithm>
 #include <cctype>
 #include <exception>
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
@@ -625,13 +630,110 @@ void collectIli1Editor(EditorSnapshotAccumulator &output,
       collectIli1Editor(output,child,currentContainer,currentDeclaration);
 }
 
+template<class Parser,class Lexer,class TokenStream,class Root>
+class ParsedSourceArtifactImpl final : public ParsedSourceArtifact {
+public:
+   using VisitFunction = void (*)(const SourceBuffer &,Root *,
+      metamodel::MetaModelBuilder &,util::Logger &);
+   using HeaderFunction = ParsedSourceHeader (*)(Root *);
+
+   ParsedSourceArtifactImpl(SourceBuffer source,
+      std::unique_ptr<antlr4::ANTLRInputStream> input,
+      std::unique_ptr<Lexer> lexer,std::unique_ptr<TokenStream> tokens,
+      std::unique_ptr<Parser> parser,Root *root,bool valid,VisitFunction visit,
+      std::vector<Diagnostic> parserDiagnostics)
+      : source_(std::move(source)),input_(std::move(input)),lexer_(std::move(lexer)),
+        tokens_(std::move(tokens)),parser_(std::move(parser)),root_(root),valid_(valid),
+        visit_(visit),parserDiagnostics_(std::move(parserDiagnostics)) {}
+
+   void setHeader(HeaderFunction header) noexcept { header_ = header; }
+
+   ParsedSourceHeader header() const override
+   {
+      return header_ == nullptr ? ParsedSourceHeader{} : header_(root_);
+   }
+
+   const std::vector<Diagnostic> &parserDiagnostics() const noexcept override
+   {
+      return parserDiagnostics_;
+   }
+
+   void reportParserDiagnostics(util::Logger &logger) const override
+   {
+      for (const auto &diagnostic : parserDiagnostics_)
+         logger.error(diagnostic.message,diagnostic.range,diagnostic.code,
+            diagnostic.relatedInformation,diagnostic.notes);
+   }
+
+   void buildMetaModel(metamodel::MetaModelBuilder &builder,
+      util::Logger &logger) const override
+   {
+      if (valid_ && root_ != nullptr && visit_ != nullptr)
+         visit_(source_,root_,builder,logger);
+   }
+
+   Parser *parser() noexcept { return parser_.get(); }
+   Lexer *lexer() noexcept { return lexer_.get(); }
+   TokenStream *tokens() noexcept { return tokens_.get(); }
+
+private:
+   SourceBuffer source_;
+   std::unique_ptr<antlr4::ANTLRInputStream> input_;
+   std::unique_ptr<Lexer> lexer_;
+   std::unique_ptr<TokenStream> tokens_;
+   std::unique_ptr<Parser> parser_;
+   Root *root_ = nullptr;
+   bool valid_ = false;
+   VisitFunction visit_ = nullptr;
+   HeaderFunction header_ = nullptr;
+   std::vector<Diagnostic> parserDiagnostics_;
+};
+
+ParsedSourceHeader ili2Header(parser::Ili2Parser::Interlis2DefContext *root)
+{
+   ParsedSourceHeader header;
+   if (root == nullptr) return header;
+   if (root->iliversion != nullptr) header.iliVersion = root->iliversion->getText();
+   for (auto *model : root->modelDef()) {
+      if (model == nullptr) continue;
+      if (model->modelname1 != nullptr) header.models.push_back(model->modelname1->getText());
+      if (model->translationOf != nullptr)
+         header.requiredModels.push_back(model->translationOf->getText());
+      for (auto *definition : model->importDef()) {
+         if (definition == nullptr) continue;
+         for (auto *importing : definition->importing()) {
+            if (importing == nullptr) continue;
+            auto *name = importing->INTERLIS();
+            if (name == nullptr) name = importing->NAME();
+            if (name != nullptr) {
+               header.imports.push_back(name->getText());
+               header.requiredModels.push_back(name->getText());
+            }
+         }
+      }
+   }
+   return header;
+}
+
+ParsedSourceHeader ili1Header(parser::Ili1Parser::Interlis1DefContext *root)
+{
+   ParsedSourceHeader header;
+   header.iliVersion = "1.0";
+   if (root != nullptr && root->modelDef() != nullptr
+      && root->modelDef()->modelname1 != nullptr)
+      header.models.push_back(root->modelDef()->modelname1->getText());
+   return header;
+}
+
 template<class Parser,class Lexer,class Root>
 SnapshotBundle buildParsed(const SourceBuffer &source,bool includeEditor,Root *root,
    Parser &parser,Lexer &lexer,antlr4::CommonTokenStream &tokens,
    const SourceRangeMapper &ranges,SnapshotErrorCollector &lexerErrors,
-   SnapshotErrorCollector &parserErrors)
+   SnapshotErrorCollector &parserErrors,ParsedSourceArtifactPtr artifact)
 {
+   (void)includeEditor;
    SnapshotBundle bundle;
+   bundle.artifact = std::move(artifact);
    bundle.syntax.uri = source.uri;
    bundle.syntax.documentVersion = source.version;
    bundle.syntax.iliVersion = "unknown";
@@ -641,7 +743,7 @@ SnapshotBundle buildParsed(const SourceBuffer &source,bool includeEditor,Root *r
       }
       else bundle.syntax.iliVersion = "1.0";
    }
-   if (!includeEditor) if constexpr (std::is_same_v<Root,parser::Ili2Parser::Interlis2DefContext>) {
+   if constexpr (std::is_same_v<Root,parser::Ili2Parser::Interlis2DefContext>) {
       auto *editorRoot = root;
       if (editorRoot != nullptr)
          for (auto *model : editorRoot->modelDef())
@@ -657,18 +759,17 @@ SnapshotBundle buildParsed(const SourceBuffer &source,bool includeEditor,Root *r
                      importing->UNQUALIFIED() != nullptr,valueRange});
                }
    }
-   // The editor product needs only the parser tree and diagnostics. Avoid
-   // materializing the much larger token/node syntax product on this path;
-   // both products still come from the same lexer, token stream and parser.
-   if (!includeEditor) {
-      appendSyntaxTokens(tokens,lexer,ranges,bundle.syntax);
-      if (root != nullptr) appendSyntaxNodes(root,parser,ranges,bundle.syntax,0,false);
-   }
+   // Both public projections are materialized from this one parser tree. The
+   // caller may discard either projection, but must not cause a second parser
+   // invocation merely because it asks for syntax and editor data in a
+   // different order.
+   appendSyntaxTokens(tokens,lexer,ranges,bundle.syntax);
+   if (root != nullptr) appendSyntaxNodes(root,parser,ranges,bundle.syntax,0,false);
    bundle.syntax.diagnostics = std::move(lexerErrors.diagnostics);
    bundle.syntax.diagnostics.insert(bundle.syntax.diagnostics.end(),parserErrors.diagnostics.begin(),parserErrors.diagnostics.end());
    sortDiagnostics(bundle.syntax.diagnostics);
    bundle.syntax.success = bundle.syntax.diagnostics.empty();
-   if (includeEditor) {
+   {
       EditorSnapshotAccumulator editor(ranges,bundle.syntax.iliVersion);
       if constexpr (std::is_same_v<Root,parser::Ili2Parser::Interlis2DefContext>) {
          collectIli2Editor(editor,ranges,root,EditorSnapshotAccumulator::noDeclaration,
@@ -698,36 +799,68 @@ SnapshotBundle buildParsed(const SourceBuffer &source,bool includeEditor,Root *r
 SnapshotBundle buildIli2(const SourceBuffer &source,bool includeEditor)
 {
    SourceRangeMapper ranges(source);
-   antlr4::ANTLRInputStream input(ranges.normalizedUtf8());
-   lexer::Ili2Lexer lexer(&input);
+   auto input = std::make_unique<antlr4::ANTLRInputStream>(ranges.normalizedUtf8());
+   auto lexer = std::make_unique<lexer::Ili2Lexer>(input.get());
    SnapshotErrorCollector lexerErrors(ranges,"compiler");
-   lexer.removeErrorListeners();
-   lexer.addErrorListener(&lexerErrors);
-   EditorTokenStream tokens(&lexer);
-   if (includeEditor) tokens.recoverBareModelHeaders();
-   parser::Ili2Parser parser(&tokens);
+   lexer->removeErrorListeners();
+   lexer->addErrorListener(&lexerErrors);
+   auto tokens = std::make_unique<EditorTokenStream>(lexer.get());
+   if (includeEditor) tokens->recoverBareModelHeaders();
+   auto parser = std::make_unique<parser::Ili2Parser>(tokens.get());
    SnapshotErrorCollector parserErrors(ranges,"compiler");
-   parser.removeErrorListeners();
-   parser.addErrorListener(&parserErrors);
-   auto *root = parser.interlis2Def();
-   return buildParsed(source,includeEditor,root,parser,lexer,tokens,ranges,lexerErrors,parserErrors);
+   parser->removeErrorListeners();
+   parser->addErrorListener(&parserErrors);
+   auto *root = parser->interlis2Def();
+   using Artifact = ParsedSourceArtifactImpl<parser::Ili2Parser,lexer::Ili2Lexer,
+      EditorTokenStream,parser::Ili2Parser::Interlis2DefContext>;
+   auto artifact = std::make_shared<Artifact>(source,std::move(input),std::move(lexer),
+      std::move(tokens),std::move(parser),root,parserErrors.diagnostics.empty()
+         && lexerErrors.diagnostics.empty(),input::visitIli2,
+      [&]() {
+         std::vector<Diagnostic> diagnostics = lexerErrors.diagnostics;
+         diagnostics.insert(diagnostics.end(),parserErrors.diagnostics.begin(),
+            parserErrors.diagnostics.end());
+         return diagnostics;
+      }());
+   artifact->setHeader(ili2Header);
+   auto *artifactParser = artifact->parser();
+   auto *artifactLexer = artifact->lexer();
+   auto *artifactTokens = artifact->tokens();
+   return buildParsed(source,includeEditor,root,*artifactParser,*artifactLexer,
+      *artifactTokens,ranges,lexerErrors,parserErrors,std::move(artifact));
 }
 
 SnapshotBundle buildIli1(const SourceBuffer &source,bool includeEditor)
 {
    SourceRangeMapper ranges(source);
-   antlr4::ANTLRInputStream input(ranges.normalizedUtf8());
-   lexer::Ili1Lexer lexer(&input);
+   auto input = std::make_unique<antlr4::ANTLRInputStream>(ranges.normalizedUtf8());
+   auto lexer = std::make_unique<lexer::Ili1Lexer>(input.get());
    SnapshotErrorCollector lexerErrors(ranges,"compiler");
-   lexer.removeErrorListeners();
-   lexer.addErrorListener(&lexerErrors);
-   antlr4::CommonTokenStream tokens(&lexer);
-   parser::Ili1Parser parser(&tokens);
+   lexer->removeErrorListeners();
+   lexer->addErrorListener(&lexerErrors);
+   auto tokens = std::make_unique<antlr4::CommonTokenStream>(lexer.get());
+   auto parser = std::make_unique<parser::Ili1Parser>(tokens.get());
    SnapshotErrorCollector parserErrors(ranges,"compiler");
-   parser.removeErrorListeners();
-   parser.addErrorListener(&parserErrors);
-   auto *root = parser.interlis1Def();
-   return buildParsed(source,includeEditor,root,parser,lexer,tokens,ranges,lexerErrors,parserErrors);
+   parser->removeErrorListeners();
+   parser->addErrorListener(&parserErrors);
+   auto *root = parser->interlis1Def();
+   using Artifact = ParsedSourceArtifactImpl<parser::Ili1Parser,lexer::Ili1Lexer,
+      antlr4::CommonTokenStream,parser::Ili1Parser::Interlis1DefContext>;
+   auto artifact = std::make_shared<Artifact>(source,std::move(input),std::move(lexer),
+      std::move(tokens),std::move(parser),root,parserErrors.diagnostics.empty()
+         && lexerErrors.diagnostics.empty(),input::visitIli1,
+      [&]() {
+         std::vector<Diagnostic> diagnostics = lexerErrors.diagnostics;
+         diagnostics.insert(diagnostics.end(),parserErrors.diagnostics.begin(),
+            parserErrors.diagnostics.end());
+         return diagnostics;
+      }());
+   artifact->setHeader(ili1Header);
+   auto *artifactParser = artifact->parser();
+   auto *artifactLexer = artifact->lexer();
+   auto *artifactTokens = artifact->tokens();
+   return buildParsed(source,includeEditor,root,*artifactParser,*artifactLexer,
+      *artifactTokens,ranges,lexerErrors,parserErrors,std::move(artifact));
 }
 
 EditorSnapshot missingEditor(const std::string &uri)
@@ -765,25 +898,30 @@ SnapshotBundle SnapshotPipeline::build(const std::string &uri,bool includeEditor
       if (includeEditor) missing.editor = missingEditor(uri);
       return missing;
    }
+   return build(*source,includeEditor);
+}
+
+SnapshotBundle SnapshotPipeline::build(const SourceBuffer &source,bool includeEditor) const
+{
    try {
-      return detectLanguage(*source) == DetectedLanguage::Ili1
-         ? buildIli1(*source,includeEditor) : buildIli2(*source,includeEditor);
+      return detectLanguage(source) == DetectedLanguage::Ili1
+         ? buildIli1(source,includeEditor) : buildIli2(source,includeEditor);
    }
    catch (const std::exception &error) {
       SnapshotBundle failure;
-      failure.syntax.uri = source->uri;
-      failure.syntax.documentVersion = source->version;
+      failure.syntax.uri = source.uri;
+      failure.syntax.documentVersion = source.version;
       failure.syntax.iliVersion = "unknown";
       Diagnostic diagnostic;
       diagnostic.severity = DiagnosticSeverity::Error;
       diagnostic.code = "ILIC-SYNTAX";
       diagnostic.message = std::string("snapshot parser failure: ") + error.what();
-      diagnostic.range = SourceRangeMapper(*source).eof();
+      diagnostic.range = SourceRangeMapper(source).eof();
       diagnostic.source = "compiler";
       failure.syntax.diagnostics.push_back(std::move(diagnostic));
       if (includeEditor) {
-         failure.editor.uri = source->uri;
-         failure.editor.documentVersion = source->version;
+         failure.editor.uri = source.uri;
+         failure.editor.documentVersion = source.version;
          failure.editor.iliVersion = "unknown";
          failure.editor.diagnostics = failure.syntax.diagnostics;
          failure.editor.recovered = true;
@@ -792,19 +930,19 @@ SnapshotBundle SnapshotPipeline::build(const std::string &uri,bool includeEditor
    }
    catch (...) {
       SnapshotBundle failure;
-      failure.syntax.uri = source->uri;
-      failure.syntax.documentVersion = source->version;
+      failure.syntax.uri = source.uri;
+      failure.syntax.documentVersion = source.version;
       failure.syntax.iliVersion = "unknown";
       Diagnostic diagnostic;
       diagnostic.severity = DiagnosticSeverity::Error;
       diagnostic.code = "ILIC-SYNTAX";
       diagnostic.message = "snapshot parser failure: unknown exception";
-      diagnostic.range = SourceRangeMapper(*source).eof();
+      diagnostic.range = SourceRangeMapper(source).eof();
       diagnostic.source = "compiler";
       failure.syntax.diagnostics.push_back(std::move(diagnostic));
       if (includeEditor) {
-         failure.editor.uri = source->uri;
-         failure.editor.documentVersion = source->version;
+         failure.editor.uri = source.uri;
+         failure.editor.documentVersion = source.version;
          failure.editor.iliVersion = "unknown";
          failure.editor.diagnostics = failure.syntax.diagnostics;
          failure.editor.recovered = true;

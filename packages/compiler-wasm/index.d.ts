@@ -110,6 +110,32 @@ export interface EditorSnapshot {
 }
 export interface CompilerCapabilities {
   nativeEditorSnapshot: boolean;
+  incrementalSession?: boolean;
+  incrementalStats?: boolean;
+}
+export interface IncrementalStats {
+  sourceAdds: number;
+  sourceRemoves: number;
+  sourceNoOps: number;
+  versionOnlyUpdates: number;
+  contentChanges: number;
+  sourceReintroductions: number;
+  rejectedUpdates: number;
+  parserBuilds: number;
+  parserHits: number;
+  parserEvictions: number;
+  parserBytes: number;
+  syntaxMaterializations: number;
+  editorMaterializations: number;
+  rootAnalysisHits: number;
+  rootAnalysisMisses: number;
+  rootAnalysisBuilds: number;
+  rootAnalysisEvictions: number;
+  invalidatedRootEntries: number;
+  reusedClosureSources: number;
+  reparsedClosureSources: number;
+  compilationInvocations: number;
+  cancelledPlans: number;
 }
 export interface SemanticSymbol {
   id: string; name: string; qualifiedName: string; kind: string;
@@ -220,6 +246,8 @@ export interface EmscriptenIlicModule {
   _ilic_session_put_source(session: number, uri: number, uriLength: number,
     source: number, sourceLength: number, version: bigint): number;
   _ilic_session_remove_source(session: number, uri: number, uriLength: number): number;
+  _ilic_incremental_stats?(session: number): number;
+  _ilic_clear_incremental_caches?(session: number): number;
   _ilic_compile(session: number, request: number, requestLength: number): number;
   _ilic_parse(session: number, request: number, requestLength: number): number;
   _ilic_editor_snapshot?(session: number, request: number, requestLength: number): number;
@@ -234,6 +262,8 @@ export class CompilerSession {
   putSource(uri: string, source: string | Uint8Array, version?: number): void;
   putWorkspace(workspace: ResolvedWorkspace): void;
   removeSource(uri: string): boolean;
+  incrementalStats?(): IncrementalStats;
+  clearIncrementalCaches?(): void;
   compile(request: CompilationRequest): CompilationResult;
   parse(uri: string): SyntaxSnapshot;
   editorSnapshot(uri: string): EditorSnapshot;

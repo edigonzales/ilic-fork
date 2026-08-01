@@ -66,8 +66,9 @@ IliFileCatalog::IliFileCatalog(ilic::detail::CompilationSourceStore &sources,
 }
 
 IliFileCatalog::IliFileCatalog(ilic::detail::CompilationSourceStore &sources,
-   Logger &logger,const ilic::CompilerOptions &options)
-   : sources_(sources),logger_(logger),options_(&options)
+   Logger &logger,const ilic::CompilerOptions &options,ParsedSourceHeaderProvider headerProvider)
+   : sources_(sources),logger_(logger),options_(&options),
+     headerProvider_(std::move(headerProvider))
 {
    setAutoSearch(options.autoSearch);
    setModelDirectories(options.modelDirectories);
@@ -126,21 +127,25 @@ IliFile *IliFileCatalog::load(const string &filepath,bool autoSearched)
 
    auto sourceScope = logger_.sourceScope(filepath);
    auto categoryScope = logger_.categoryScope("parser");
-   antlr4::ANTLRInputStream input(registered->text);
-   lexer::IliFileLexer lexer(&input);
-   antlr4::CommonTokenStream tokens(&lexer);
-   parser::IliFileParser parser(&tokens);
-   parser::IliFileParser::IliFileContext *context = parser.iliFile();
-   if (context == nullptr) {
-      logger_.error("unable to parse ili file structure " + filepath);
-      return nullptr;
-   }
-
    std::unique_ptr<IliFile> file(new IliFile(filepath,logger_));
    file->source_ = registered;
    file->auto_search_ = autoSearched;
-   IliFileHeaderVisitor visitor(logger_,*file);
-   visitor.visitIliFile(context);
+   if (headerProvider_) {
+      file->setParsedHeader(headerProvider_(*registered));
+   }
+   else {
+      antlr4::ANTLRInputStream input(registered->text);
+      lexer::IliFileLexer lexer(&input);
+      antlr4::CommonTokenStream tokens(&lexer);
+      parser::IliFileParser parser(&tokens);
+      parser::IliFileParser::IliFileContext *context = parser.iliFile();
+      if (context == nullptr) {
+         logger_.error("unable to parse ili file structure " + filepath);
+         return nullptr;
+      }
+      IliFileHeaderVisitor visitor(logger_,*file);
+      visitor.visitIliFile(context);
+   }
    IliFile *result = file.get();
    ownedFiles_.push_back(std::move(file));
    for (const string &model : result->getModels()) models_[model] = result;
