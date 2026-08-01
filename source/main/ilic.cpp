@@ -480,13 +480,11 @@ static bool compile(CliState &state,IliFile *f)
 
    // parse input
    if (f->getIliVersion() == "1.0") {
-      const string source = f->getFilePath() == "INTERLIS" ? input::getInterlisModel23() :
-         load_filtered_string_from_file(f->getFilePath());
+      const string source = f->source().text;
       input::parseIli1({f->getFilePath(),source,0},state.context.builder(),logger);
    }
    else {
-      const string source = f->getFilePath() == "INTERLIS" ? input::getInterlisModel23() :
-         load_filtered_string_from_file(f->getFilePath());
+      const string source = f->source().text;
       input::parseIli2({f->getFilePath(),source,0},state.context.builder(),logger);
    }
 

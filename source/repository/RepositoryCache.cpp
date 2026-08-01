@@ -145,7 +145,11 @@ std::filesystem::path defaultCacheDirectory()
    return std::filesystem::temp_directory_path() / "ilic-cache-v1";
 }
 
-RepositoryCache::RepositoryCache(std::filesystem::path root) : root_(std::move(root)) {}
+RepositoryCache::RepositoryCache(std::filesystem::path root,
+   repository::ports::RepositoryCachePort *port,repository::ports::RepositoryClock *clock)
+   : root_(std::move(root)),port_(port),clock_(clock)
+{
+}
 
 std::filesystem::path RepositoryCache::pathFor(std::string_view uri) const
 {
@@ -161,6 +165,18 @@ std::filesystem::path RepositoryCache::makeTemporaryPath(
 CacheLookupResult RepositoryCache::lookup(std::string_view uri,std::chrono::seconds ttl) const
 {
    CacheLookupResult result;
+   if (port_ != nullptr) {
+      const auto cached = port_->get(uri);
+      if (!cached.hit) {
+         result.error = cached.error;
+         return result;
+      }
+      result.exists = true;
+      result.content = cached.entry.value;
+      const auto now = clock_ == nullptr ? std::chrono::system_clock::now() : clock_->now();
+      result.fresh = now < cached.entry.storedAt + ttl;
+      return result;
+   }
    result.path = pathFor(uri);
    std::error_code error;
    result.exists = std::filesystem::is_regular_file(result.path,error);
@@ -171,18 +187,27 @@ CacheLookupResult RepositoryCache::lookup(std::string_view uri,std::chrono::seco
       return result;
    }
    const auto written = std::filesystem::last_write_time(result.path,error);
-   if (!error) result.fresh = std::filesystem::file_time_type::clock::now() - written <= ttl;
+   if (!error) result.fresh = std::filesystem::file_time_type::clock::now() - written < ttl;
    return result;
 }
 
 CacheStoreResult RepositoryCache::store(std::string_view uri,std::string_view content)
 {
+   if (port_ != nullptr) {
+      const auto storedAt = clock_ == nullptr ? std::chrono::system_clock::now() : clock_->now();
+      const auto stored = port_->put(uri,content,storedAt);
+      return {stored.success,stored.localPath,stored.error};
+   }
    const std::filesystem::path target = pathFor(uri);
    return writeAtomically(target,makeTemporaryPath(target),content);
 }
 
 void RepositoryCache::invalidate(std::string_view uri)
 {
+   if (port_ != nullptr) {
+      port_->remove(uri);
+      return;
+   }
    std::error_code error;
    std::filesystem::remove(pathFor(uri),error);
 }

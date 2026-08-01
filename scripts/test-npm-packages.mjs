@@ -71,6 +71,7 @@ async function verifyPackList(directory, expectedName) {
 async function main() {
   const { projectRoot, stagingRoot } = parseArguments(process.argv.slice(2));
   const packages = [
+    { id: "repository_core", name: "@ilic/repository-core", directory: resolve(stagingRoot, "repository-core") },
     { id: "tools", name: "@ilic/tools", directory: resolve(stagingRoot, "tools") },
     { id: "compiler", name: "@ilic/compiler-wasm", directory: resolve(stagingRoot, "compiler-wasm") }
   ];
@@ -95,6 +96,7 @@ async function main() {
   await writeFile(resolve(consumerDirectory, "smoke.mjs"), `
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import * as repositoryCore from "@ilic/repository-core";
 import * as compilerPackage from "@ilic/compiler-wasm";
 import { BrowserCache } from "@ilic/tools/browser";
 import * as toolsPackage from "@ilic/tools";
@@ -107,6 +109,7 @@ assert.deepEqual(Object.keys(compilerPackage).sort(),
 assert.deepEqual(Object.keys(toolsPackage).sort(),
   [
     "MemoryCache",
+    "RepositoryError",
     "RepositoryManager",
     "normalizeRepositoryUri",
     "parseIliModelsXml",
@@ -116,6 +119,7 @@ assert.deepEqual(Object.keys(toolsPackage).sort(),
     "supportedSchemaLanguagePreference",
     "validateRepositoryRelativePath"
   ]);
+assert.equal(typeof repositoryCore.RepositoryManagerCore, "function");
 assert.equal(typeof BrowserCache, "function");
 assert.equal(typeof MemoryCache, "function");
 assert.equal(typeof NodeFileCache, "function");

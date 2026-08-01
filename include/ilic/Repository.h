@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Diagnostic.h"
+#include "RepositoryContract.h"
 
 #include <chrono>
 #include <filesystem>
@@ -49,9 +50,18 @@ struct RepositoryResult {
    std::vector<Diagnostic> diagnostics;
 };
 
+struct RepositoryPorts {
+   std::unique_ptr<repository::ports::RepositoryTransportPort> transport;
+   std::unique_ptr<repository::ports::RepositoryCachePort> cache;
+   std::unique_ptr<repository::ports::RepositoryClock> clock;
+   std::unique_ptr<repository::ports::RepositoryMetadataDecoder> metadataDecoder;
+   std::unique_ptr<repository::ports::RepositoryChecksum> checksum;
+};
+
 class RepositoryManager {
 public:
    explicit RepositoryManager(RepositoryOptions options = {});
+   RepositoryManager(RepositoryOptions options,RepositoryPorts ports);
    ~RepositoryManager();
 
    RepositoryManager(RepositoryManager &&) noexcept;

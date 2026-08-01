@@ -32,18 +32,23 @@ struct FetchOptions {
 class RepositoryResourceLoader {
 public:
    RepositoryResourceLoader(const RepositoryOptions &options,
-      RepositoryTransport &transport,RepositoryCache &cache);
+      RepositoryTransport &transport,RepositoryCache &cache,
+      const repository::ports::RepositoryChecksum *checksum = nullptr);
 
-   RepositoryResource load(const RepositoryUri &uri,const FetchOptions &options);
-   RepositoryResource loadModel(const RepositoryUri &uri,std::string_view expectedMd5);
+   RepositoryResource load(const RepositoryUri &uri,const FetchOptions &options,
+      RepositoryResourceKind kind = RepositoryResourceKind::ModelIndex);
+   RepositoryResource loadModel(const RepositoryUri &uri,std::string_view expectedMd5,
+      bool materialize = true);
 
 private:
-   RepositoryResource download(const RepositoryUri &uri,bool optional);
+   RepositoryResource download(const RepositoryUri &uri,bool optional,RepositoryResourceKind kind);
    bool materializeFallback(RepositoryResource &resource);
+   std::string checksum(std::string_view content) const;
 
    const RepositoryOptions &options_;
    RepositoryTransport &transport_;
    RepositoryCache &cache_;
+   const repository::ports::RepositoryChecksum *checksum_ = nullptr;
    TemporaryModelStore temporaryModels_;
 };
 

@@ -163,6 +163,17 @@ endif()
 if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
     include(cmake/IlicDependencies.cmake)
     ilic_configure_repository_dependencies(ILIC_CURL_TARGET ILIC_XML_TARGET)
+    add_library(ilic-repository-core STATIC
+        source/repository/core/RepositoryPolicy.cpp
+        source/repository/core/RepositoryResourceCoordinator.cpp
+        source/repository/ports/RepositoryClock.cpp
+    )
+    add_library(ilic::repository-core ALIAS ilic-repository-core)
+    target_compile_features(ilic-repository-core PUBLIC cxx_std_17)
+    target_include_directories(ilic-repository-core
+        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/source/repository/core"
+    )
     add_library(ilic-repository STATIC
         source/repository/Md5.cpp
         source/repository/Repository.cpp
@@ -173,6 +184,7 @@ if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
         source/repository/RepositoryCache.cpp
         source/repository/RepositoryResourceLoader.cpp
         source/repository/RepositoryCrawler.cpp
+        source/repository/RepositoryWorkspaceInstaller.cpp
     )
     add_library(ilic::repository ALIAS ilic-repository)
     target_include_directories(ilic-repository
@@ -181,6 +193,7 @@ if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
     )
     target_link_libraries(ilic-repository
         PUBLIC ilic-core
+        PUBLIC ilic-repository-core
         PRIVATE ${ILIC_CURL_TARGET} ${ILIC_XML_TARGET}
     )
     target_link_libraries(ilic PRIVATE ilic-repository)
@@ -248,6 +261,18 @@ if(BUILD_TESTING)
             "${CMAKE_CURRENT_SOURCE_DIR}"
     )
     set_tests_properties(ilic_no_javascript_parser PROPERTIES LABELS "architecture")
+    add_test(
+        NAME ilic_repository_layering
+        COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-repository-layering.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    set_tests_properties(ilic_repository_layering PROPERTIES LABELS "architecture")
+    add_test(
+        NAME ilic_repository_layering_negative_canary
+        COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-repository-layering.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}" --negative-canary
+    )
+    set_tests_properties(ilic_repository_layering_negative_canary PROPERTIES LABELS "architecture")
 
     add_executable(ilic_docs_cpp_example docs/examples/cpp-session.cpp)
     target_link_libraries(ilic_docs_cpp_example PRIVATE ilic-core)
@@ -320,10 +345,22 @@ if(BUILD_TESTING)
     add_test(NAME ilic_formatter COMMAND ilic_formatter_test)
     if(TARGET ilic-repository)
         find_package(Threads REQUIRED)
+        add_executable(ilic_repository_core_contract_test
+            test/repository/RepositoryCoreContractTest.cpp)
+        target_include_directories(ilic_repository_core_contract_test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/repository/core")
+        target_link_libraries(ilic_repository_core_contract_test PRIVATE
+            ilic::repository-core ilic::test-support)
+        add_test(NAME ilic_repository_core_contract COMMAND ilic_repository_core_contract_test)
         add_executable(ilic_repository_test test/repository/RepositoryTest.cpp)
         target_link_libraries(ilic_repository_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository COMMAND ilic_repository_test
             "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture")
+        add_executable(ilic_repository_port_manager_test
+            test/repository/RepositoryPortManagerTest.cpp)
+        target_link_libraries(ilic_repository_port_manager_test PRIVATE
+            ilic-repository ilic::test-support)
+        add_test(NAME ilic_repository_port_manager COMMAND ilic_repository_port_manager_test)
         add_executable(ilic_repository_uri_test test/repository/RepositoryUriTest.cpp)
         target_include_directories(ilic_repository_uri_test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")

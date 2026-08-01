@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ilic/RepositoryContract.h"
+
 #include <chrono>
 #include <filesystem>
 #include <string>
@@ -25,7 +27,9 @@ std::filesystem::path defaultCacheDirectory();
 
 class RepositoryCache {
 public:
-   explicit RepositoryCache(std::filesystem::path root);
+   explicit RepositoryCache(std::filesystem::path root,
+      repository::ports::RepositoryCachePort *port = nullptr,
+      repository::ports::RepositoryClock *clock = nullptr);
 
    const std::filesystem::path &root() const { return root_; }
    CacheLookupResult lookup(std::string_view uri,std::chrono::seconds ttl) const;
@@ -36,6 +40,8 @@ private:
    std::filesystem::path pathFor(std::string_view uri) const;
    std::filesystem::path makeTemporaryPath(const std::filesystem::path &target) const;
    std::filesystem::path root_;
+   repository::ports::RepositoryCachePort *port_ = nullptr;
+   repository::ports::RepositoryClock *clock_ = nullptr;
 };
 
 class TemporaryModelStore {

@@ -1,0 +1,22 @@
+{
+  "name": "@ilic/repository-core",
+  "version": "0.9.9",
+  "description": "Platform-neutral INTERLIS repository resolution core.",
+  "author": "edigonzales",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edigonzales/ilic-fork.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": ["LICENSE", "README.md", "index.js", "index.d.ts", "clock.js", "diagnostics.js", "md5.js", "repository-catalog.js", "repository-graph-walker.js", "repository-manager-core.js", "repository-uri.js", "resource-coordinator.js", "version-selector.js", "xml-decoder.js"],
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "engines": { "node": ">=18" },
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" }
+}

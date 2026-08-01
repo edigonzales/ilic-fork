@@ -6,6 +6,12 @@ import { pathToFileURL } from "node:url";
 
 const PACKAGE_SPECS = [
   {
+    id: "repository_core",
+    name: "@ilic/repository-core",
+    source: "packages/repository-core",
+    destination: "repository-core"
+  },
+  {
     id: "tools",
     name: "@ilic/tools",
     source: "packages/tools",
@@ -151,8 +157,13 @@ export async function prepareNpmSnapshot({
       await mkdir(dirname(target), { recursive: true });
       await cp(resolve(source, file), target);
     }
+    const stagedManifest = { ...manifest, version: snapshotVersion };
+    if (stagedManifest.dependencies?.["@ilic/repository-core"] !== undefined) {
+      stagedManifest.dependencies = { ...stagedManifest.dependencies,
+        "@ilic/repository-core": snapshotVersion };
+    }
     await writeFile(resolve(destination, "package.json"),
-      `${JSON.stringify({ ...manifest, version: snapshotVersion }, null, 2)}\n`);
+      `${JSON.stringify(stagedManifest, null, 2)}\n`);
     directories[spec.id] = destination;
   }
 
@@ -187,6 +198,7 @@ async function main() {
     await appendFile(githubOutput, [
       `base_version=${result.baseVersion}`,
       `snapshot_version=${result.snapshotVersion}`,
+      `repository_core_directory=${result.directories.repository_core}`,
       `tools_directory=${result.directories.tools}`,
       `compiler_wasm_directory=${result.directories.compiler_wasm}`,
       ""

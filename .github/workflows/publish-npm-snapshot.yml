@@ -61,6 +61,8 @@ jobs:
 
       - name: Test source packages and staging logic
         run: |
+          npm install --prefix packages/tools --no-save --package-lock=false ./packages/repository-core
+          npm test --prefix packages/repository-core
           npm test --prefix packages/tools
           npm test --prefix packages/compiler-wasm
           node --test test/npm/PrepareNpmSnapshotTest.mjs
@@ -71,6 +73,9 @@ jobs:
 
       - name: Verify packed and installed packages
         run: node scripts/test-npm-packages.mjs
+
+      - name: Publish @ilic/repository-core
+        run: npm publish "${{ steps.stage.outputs.repository_core_directory }}" --access public --tag snapshot
 
       - name: Publish @ilic/tools
         run: npm publish "${{ steps.stage.outputs.tools_directory }}" --access public --tag snapshot

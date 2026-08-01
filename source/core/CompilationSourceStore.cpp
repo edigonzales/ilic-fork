@@ -73,6 +73,12 @@ const ilic::SourceBuffer &CompilationSourceStore::rememberFileSystemSource(
    return remember(std::move(uri),std::move(utf8),SourceOrigin::FileSystem);
 }
 
+const ilic::SourceBuffer &CompilationSourceStore::rememberRepositorySource(
+   std::string uri,std::string utf8)
+{
+   return remember(std::move(uri),std::move(utf8),SourceOrigin::Repository);
+}
+
 const ilic::SourceBuffer &CompilationSourceStore::rememberBuiltinSource(
    std::string uri,std::string utf8)
 {

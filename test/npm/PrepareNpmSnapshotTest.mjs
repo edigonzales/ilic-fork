@@ -19,6 +19,7 @@ async function createFixture(t) {
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(join(root, "packages/tools"), { recursive: true });
   await mkdir(join(root, "packages/compiler-wasm"), { recursive: true });
+  await mkdir(join(root, "packages/repository-core"), { recursive: true });
   await writeFile(join(root, "CMakeLists.txt"),
     "project(ilic VERSION 0.9.9 LANGUAGES C CXX)\n");
   await writeJson(join(root, "packages/tools/package.json"), {
@@ -37,6 +38,13 @@ async function createFixture(t) {
   await writeFile(join(root, "packages/compiler-wasm/index.js"), "export {};\n");
   await writeFile(join(root, "packages/compiler-wasm/ilic.mjs"), "export default {};\n");
   await writeFile(join(root, "packages/compiler-wasm/ilic.wasm"), new Uint8Array([0, 97, 115, 109]));
+  await writeJson(join(root, "packages/repository-core/package.json"), {
+    name: "@ilic/repository-core",
+    version: "0.9.9",
+    files: ["README.md", "index.js"]
+  });
+  await writeFile(join(root, "packages/repository-core/README.md"), "core\n");
+  await writeFile(join(root, "packages/repository-core/index.js"), "export {}\n");
   return root;
 }
 
@@ -48,7 +56,8 @@ test("stages both packages with one snapshot version without mutating sources", 
   const root = await createFixture(t);
   const toolsManifest = join(root, "packages/tools/package.json");
   const compilerManifest = join(root, "packages/compiler-wasm/package.json");
-  const before = await Promise.all([readFile(toolsManifest, "utf8"), readFile(compilerManifest, "utf8")]);
+  const coreManifest = join(root, "packages/repository-core/package.json");
+  const before = await Promise.all([readFile(toolsManifest, "utf8"), readFile(compilerManifest, "utf8"), readFile(coreManifest, "utf8")]);
 
   const result = await prepareNpmSnapshot({
     projectRoot: root,
@@ -60,12 +69,13 @@ test("stages both packages with one snapshot version without mutating sources", 
   assert.equal(result.snapshotVersion, `0.9.9-SNAPSHOT.${fixedTimestamp}`);
   const staged = await Promise.all([
     readFile(join(result.directories.tools, "package.json"), "utf8"),
-    readFile(join(result.directories.compiler_wasm, "package.json"), "utf8")
+    readFile(join(result.directories.compiler_wasm, "package.json"), "utf8"),
+    readFile(join(result.directories.repository_core, "package.json"), "utf8")
   ]);
   assert.equal(JSON.parse(staged[0]).version, result.snapshotVersion);
   assert.equal(JSON.parse(staged[1]).version, result.snapshotVersion);
   assert.deepEqual(await Promise.all([
-    readFile(toolsManifest, "utf8"), readFile(compilerManifest, "utf8")
+    readFile(toolsManifest, "utf8"), readFile(compilerManifest, "utf8"), readFile(coreManifest, "utf8")
   ]), before);
 });
 

@@ -275,6 +275,7 @@ jobs:
           ./scripts/build-wasm.sh
       - name: Test JavaScript packages
         run: |
+          npm install --prefix packages/tools --no-save --package-lock=false ./packages/repository-core
           npm test --prefix packages/tools
           npm test --prefix packages/compiler-wasm
           node --test test/npm/PrepareNpmSnapshotTest.mjs

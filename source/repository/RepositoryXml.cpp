@@ -9,6 +9,8 @@
 namespace ilic::repository {
 namespace {
 
+constexpr std::size_t maxXmlDepth = 128;
+
 std::string_view localName(std::string_view name)
 {
    const std::size_t colon = name.rfind(':');
@@ -72,9 +74,14 @@ RepositoryIndex RepositoryXml::parseModelIndex(std::string_view xml,
 {
    RepositoryIndex index;
    index.repository = std::string(repository);
+   if (xml.size() > 32 * 1024 * 1024) {
+      if (diagnostics != nullptr) diagnostics->push_back(diagnostic(DiagnosticSeverity::Error,
+         "ILIC-REPO-LIMIT","ilimodels.xml exceeds the 32 MiB limit"));
+      return index;
+   }
    pugi::xml_document document;
    const pugi::xml_parse_result parsed = document.load_buffer(xml.data(),xml.size(),
-      pugi::parse_default | pugi::parse_ws_pcdata_single);
+      (pugi::parse_default & ~pugi::parse_doctype) | pugi::parse_ws_pcdata_single);
    if (!parsed) {
       if (diagnostics != nullptr) diagnostics->push_back(diagnostic(DiagnosticSeverity::Error,
          "ILIC-REPO-INDEX","invalid ilimodels.xml in " + index.repository + ": "
@@ -82,10 +89,16 @@ RepositoryIndex RepositoryXml::parseModelIndex(std::string_view xml,
       return index;
    }
 
-   std::function<void(const pugi::xml_node &)> visit = [&](const pugi::xml_node &node) {
+   bool depthExceeded = false;
+   std::function<void(const pugi::xml_node &,std::size_t)> visit = [&](
+      const pugi::xml_node &node,std::size_t depth) {
+      if (depth > maxXmlDepth) {
+         depthExceeded = true;
+         return;
+      }
       for (const auto &current : node.children()) {
          if (!isMetadataNode(current)) {
-            visit(current);
+            visit(current,depth + 1);
             continue;
          }
          ModelMetadata model;
@@ -109,7 +122,10 @@ RepositoryIndex RepositoryXml::parseModelIndex(std::string_view xml,
          index.models.push_back(std::move(model));
       }
    };
-   visit(document);
+   visit(document,0);
+   if (depthExceeded && diagnostics != nullptr) diagnostics->push_back(diagnostic(
+      DiagnosticSeverity::Error,"ILIC-REPO-LIMIT",
+      "ilimodels.xml exceeds the XML nesting limit"));
    if (index.models.empty() && diagnostics != nullptr) diagnostics->push_back(diagnostic(
       DiagnosticSeverity::Error,"ILIC-REPO-INDEX",
       "no valid ModelMetadata entries in ilimodels.xml from " + index.repository));
@@ -120,23 +136,37 @@ RepositorySite RepositoryXml::parseSite(std::string_view xml,
    std::string_view repository,std::vector<Diagnostic> *diagnostics)
 {
    RepositorySite site;
+   if (xml.size() > 32 * 1024 * 1024) {
+      if (diagnostics != nullptr) diagnostics->push_back(diagnostic(DiagnosticSeverity::Warning,
+         "ILIC-REPO-LIMIT","ilisite.xml exceeds the 32 MiB limit"));
+      return site;
+   }
    pugi::xml_document document;
    const pugi::xml_parse_result parsed = document.load_buffer(xml.data(),xml.size(),
-      pugi::parse_default | pugi::parse_ws_pcdata_single);
+      (pugi::parse_default & ~pugi::parse_doctype) | pugi::parse_ws_pcdata_single);
    if (!parsed) {
       if (diagnostics != nullptr) diagnostics->push_back(diagnostic(DiagnosticSeverity::Warning,
          "ILIC-REPO-SITE","invalid ilisite.xml in " + std::string(repository) + ": "
             + parsed.description()));
       return site;
    }
-   std::function<void(const pugi::xml_node &)> visit = [&](const pugi::xml_node &node) {
+   bool depthExceeded = false;
+   std::function<void(const pugi::xml_node &,std::size_t)> visit = [&](
+      const pugi::xml_node &node,std::size_t depth) {
+      if (depth > maxXmlDepth) {
+         depthExceeded = true;
+         return;
+      }
       for (const auto &current : node.children()) {
          if (named(current,"parentSite")) collectValues(current,site.parentSites);
          else if (named(current,"subsidiarySite")) collectValues(current,site.subsidiarySites);
-         else visit(current);
+         else visit(current,depth + 1);
       }
    };
-   visit(document);
+   visit(document,0);
+   if (depthExceeded && diagnostics != nullptr) diagnostics->push_back(diagnostic(
+      DiagnosticSeverity::Warning,"ILIC-REPO-LIMIT",
+      "ilisite.xml exceeds the XML nesting limit"));
    return site;
 }
 

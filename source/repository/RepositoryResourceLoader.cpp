@@ -33,16 +33,21 @@ std::string lower(std::string value)
 } // namespace
 
 RepositoryResourceLoader::RepositoryResourceLoader(const RepositoryOptions &options,
-   RepositoryTransport &transport,RepositoryCache &cache)
-   : options_(options),transport_(transport),cache_(cache)
+   RepositoryTransport &transport,RepositoryCache &cache,
+   const repository::ports::RepositoryChecksum *checksum)
+   : options_(options),transport_(transport),cache_(cache),checksum_(checksum)
 {
 }
 
-RepositoryResource RepositoryResourceLoader::download(const RepositoryUri &uri,bool optional)
+RepositoryResource RepositoryResourceLoader::download(const RepositoryUri &uri,bool optional,
+   RepositoryResourceKind kind)
 {
    RepositoryResource resource;
    resource.uri = uri.normalized();
-   const auto response = transport_.get(resource.uri);
+   RepositoryTransportRequest request;
+   request.uri = resource.uri;
+   request.kind = kind;
+   const auto response = transport_.get(request);
    if (!response.success) {
       if (!optional) resource.error = response.error.empty() ? "request failed" : response.error;
       return resource;
@@ -56,7 +61,7 @@ RepositoryResource RepositoryResourceLoader::download(const RepositoryUri &uri,b
 }
 
 RepositoryResource RepositoryResourceLoader::load(const RepositoryUri &uri,
-   const FetchOptions &fetchOptions)
+   const FetchOptions &fetchOptions,RepositoryResourceKind kind)
 {
    RepositoryResource resource;
    resource.uri = uri.normalized();
@@ -81,7 +86,7 @@ RepositoryResource RepositoryResourceLoader::load(const RepositoryUri &uri,
       if (!fetchOptions.optional) resource.error = "offline and no cached copy of " + resource.uri;
       return resource;
    }
-   resource = download(uri,fetchOptions.optional);
+   resource = download(uri,fetchOptions.optional,kind);
    if (!resource.success && cached.exists && options_.allowStaleOnError) {
       const std::string downloadError = resource.error;
       resource.success = true;
@@ -110,19 +115,19 @@ bool RepositoryResourceLoader::materializeFallback(RepositoryResource &resource)
 }
 
 RepositoryResource RepositoryResourceLoader::loadModel(const RepositoryUri &uri,
-   std::string_view expectedMd5)
+   std::string_view expectedMd5,bool materialize)
 {
-   RepositoryResource resource = load(uri,{options_.modelTtl,false});
+   RepositoryResource resource = load(uri,{options_.modelTtl,false},RepositoryResourceKind::Model);
    if (!resource.success) return resource;
    if (options_.validateChecksums && !expectedMd5.empty()) {
-      std::string actual = md5(resource.content);
+      std::string actual = checksum(resource.content);
       if (lower(actual) != lower(std::string(expectedMd5))) {
          if (resource.fromCache && !options_.offline && uri.isRemote()) {
             cache_.invalidate(uri.cacheKey());
-            auto retry = download(uri,false);
+            auto retry = download(uri,false,RepositoryResourceKind::Model);
             retry.warnings.insert(retry.warnings.begin(),resource.warnings.begin(),resource.warnings.end());
             if (retry.success) {
-               actual = md5(retry.content);
+               actual = checksum(retry.content);
                resource = std::move(retry);
             }
          }
@@ -134,8 +139,13 @@ RepositoryResource RepositoryResourceLoader::loadModel(const RepositoryUri &uri,
          }
       }
    }
-   materializeFallback(resource);
+   if (materialize) materializeFallback(resource);
    return resource;
+}
+
+std::string RepositoryResourceLoader::checksum(std::string_view content) const
+{
+   return checksum_ == nullptr ? md5(std::string(content)) : checksum_->md5(content);
 }
 
 } // namespace ilic::repository

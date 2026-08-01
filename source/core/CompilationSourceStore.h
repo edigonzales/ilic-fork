@@ -10,6 +10,7 @@ namespace ilic::detail {
 
 enum class SourceOrigin {
    Session,
+   Repository,
    FileSystem,
    Builtin
 };
@@ -32,6 +33,7 @@ public:
    std::vector<std::string> uris() const;
 
    const SourceBuffer &rememberFileSystemSource(std::string uri,std::string utf8);
+   const SourceBuffer &rememberRepositorySource(std::string uri,std::string utf8);
    const SourceBuffer &rememberBuiltinSource(std::string uri,std::string utf8);
 
    SourcePosition position(const std::string &uri,std::size_t byteOffset) const;

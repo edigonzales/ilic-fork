@@ -162,6 +162,12 @@ IliFile *IliFileCatalog::loadByFile(const string &filepath)
    return file;
 }
 
+IliFile *IliFileCatalog::loadByRepositorySource(const string &uri,const string &source)
+{
+   sources_.rememberRepositorySource(uri,source);
+   return loadByFile(uri);
+}
+
 IliFile *IliFileCatalog::loadByModel(const string &modelname,const string &iliVersion)
 {
    if (IliFile *known = findByModel(modelname,iliVersion)) {

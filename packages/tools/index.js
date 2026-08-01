@@ -1,6 +1,7 @@
 export {
   MemoryCache,
   RepositoryManager,
+  RepositoryError,
   parseIliModelsXml,
   parseIliSiteXml
 } from "./repository-manager.js";

@@ -51,6 +51,22 @@ int main()
    ILIC_REQUIRE(snapshot.imports[1].model == "Units");
    ILIC_REQUIRE(snapshot.contexts.size() == 3);
 
+   ilic::CompilerSession recovered;
+   const std::string recoveredUri = "memory:///RecoveredEditor.ili";
+   recovered.putSource(recoveredUri,
+      "INTERLIS 2.4;\n"
+      "MODEL Partial =\n"
+      "  CLASS Item =\n"
+      "  END Item;\n"
+      "END Partial.\n",18);
+   const ilic::EditorSnapshot recoveredSnapshot = recovered.editorSnapshot(recoveredUri);
+   ILIC_REQUIRE(recoveredSnapshot.recovered);
+   ILIC_REQUIRE(!recoveredSnapshot.complete);
+   ILIC_REQUIRE(recoveredSnapshot.diagnostics.empty());
+   ILIC_REQUIRE(std::any_of(recoveredSnapshot.declarations.begin(),recoveredSnapshot.declarations.end(),
+      [](const auto &declaration) { return declaration.name == "Item"
+         && declaration.qualifiedName == "Partial.Item"; }));
+
    ilic::CompilerSession ili1;
    const std::string ili1Uri = "memory:///Editor1.ili";
    const std::string ili1Source =

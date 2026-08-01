@@ -113,7 +113,7 @@ bool loadResolvedRepositoryModels(util::IliFileCatalog &files,const RepositoryRe
 {
    bool success = true;
    for (const auto &model : resolved.models)
-      success = files.loadByFile(model.localPath.string()) != nullptr && success;
+      success = files.loadByRepositorySource(model.uri,model.source) != nullptr && success;
    return success;
 }
 

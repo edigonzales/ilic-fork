@@ -89,6 +89,7 @@ public:
    void setModelDirectories(vector<string> directories);
    void clear();
    IliFile *loadByFile(const string &filepath);
+   IliFile *loadByRepositorySource(const string &uri,const string &source);
    IliFile *loadByModel(const string &modelname,const string &iliVersion);
    IliFile *loadRoot(const string &uri) { return loadByFile(uri); }
    IliFile *resolveModel(const string &name,const string &version) {

@@ -12,8 +12,9 @@
 #include <cctype>
 #include <functional>
 #include <optional>
-#include <unordered_map>
-#include <unordered_set>
+#include <map>
+#include <set>
+#include <memory>
 
 namespace ilic {
 namespace {
@@ -42,9 +43,9 @@ struct LoadState {
 };
 
 struct ResolutionState {
-   std::unordered_set<std::string> resolvedModels;
+   std::set<std::string> resolvedModels;
    std::vector<std::string> stack;
-   std::unordered_map<std::string,std::string> emittedFileChecksums;
+   std::map<std::string,std::string> emittedFileChecksums;
 };
 
 std::string lower(std::string value)
@@ -63,14 +64,54 @@ private:
    std::vector<std::string> &stack_;
 };
 
+class PortTransportAdapter final : public repository::RepositoryTransport {
+public:
+   explicit PortTransportAdapter(repository::ports::RepositoryTransportPort &port) : port_(port) {}
+
+   repository::TransportResponse get(const std::string &uri) override
+   {
+      repository::RepositoryTransportRequest request;
+      request.uri = uri;
+      const auto response = get(request);
+      return response;
+   }
+
+   repository::TransportResponse get(const repository::RepositoryTransportRequest &request) override
+   {
+      repository::ports::RepositoryTransportRequest portRequest;
+      portRequest.uri = request.uri;
+      portRequest.maxBytes = request.maxBytes;
+      portRequest.maxRedirects = request.maxRedirects;
+      portRequest.kind = request.kind == repository::RepositoryResourceKind::ModelIndex
+         ? repository::ports::RepositoryResourceKind::ModelIndex
+         : request.kind == repository::RepositoryResourceKind::SiteIndex
+            ? repository::ports::RepositoryResourceKind::SiteIndex
+            : repository::ports::RepositoryResourceKind::Model;
+      const auto response = port_.get(portRequest);
+      return {response.success,response.statusCode,response.body,response.error,
+         response.finalUri,response.notFound,response.retryable};
+   }
+
+private:
+   repository::ports::RepositoryTransportPort &port_;
+};
+
 } // namespace
 
 class RepositoryManager::Impl final : public repository::RepositoryBackend {
 public:
-   explicit Impl(RepositoryOptions configured)
-      : options(std::move(configured)),cache(options.cacheDirectory.empty()
-           ? repository::defaultCacheDirectory() : options.cacheDirectory),
-        loader(options,transport,cache),crawler(*this)
+   explicit Impl(RepositoryOptions configured,RepositoryPorts configuredPorts = {})
+      : options(std::move(configured)),injectedPorts(std::move(configuredPorts)),
+        injectedTransport(injectedPorts.transport
+           ? std::make_unique<PortTransportAdapter>(*injectedPorts.transport) : nullptr),
+        ownedTransport(injectedTransport ? nullptr
+           : std::make_unique<repository::CurlRepositoryTransport>()),
+        transport(injectedTransport ? static_cast<repository::RepositoryTransport *>(injectedTransport.get())
+           : static_cast<repository::RepositoryTransport *>(ownedTransport.get())),
+        cache(options.cacheDirectory.empty()
+           ? repository::defaultCacheDirectory() : options.cacheDirectory,
+           injectedPorts.cache.get(),injectedPorts.clock.get()),
+        loader(options,*transport,cache,injectedPorts.checksum.get()),crawler(*this)
    {
       if (options.cacheDirectory.empty()) options.cacheDirectory = cache.root();
    }
@@ -91,7 +132,8 @@ public:
          return nullptr;
       }
       const auto indexUri = repositoryRoot->resolve("ilimodels.xml");
-      auto resource = loader.load(indexUri,{options.metadataTtl,false});
+      auto resource = loader.load(indexUri,{options.metadataTtl,false},
+         repository::RepositoryResourceKind::ModelIndex);
       appendResourceWarnings(resource,"ILIC-REPO-CACHE",diagnostics);
       if (!resource.success) {
          diagnostics->push_back(repositoryDiagnostic(DiagnosticSeverity::Warning,"ILIC-REPO-INDEX",
@@ -99,7 +141,12 @@ public:
          return nullptr;
       }
       std::vector<Diagnostic> parseDiagnostics;
-      state.value = repository::RepositoryXml::parseModelIndex(resource.content,repositoryUri,
+      if (injectedPorts.metadataDecoder != nullptr) {
+         state.value.repository = repositoryUri;
+         injectedPorts.metadataDecoder->decodeModelIndex(resource.content,repositoryUri,
+            state.value.models,parseDiagnostics);
+      }
+      else state.value = repository::RepositoryXml::parseModelIndex(resource.content,repositoryUri,
          &parseDiagnostics);
       for (auto &diagnostic : parseDiagnostics) {
          // A broken repository is recoverable while later repositories remain.
@@ -122,10 +169,14 @@ public:
       auto repositoryRoot = repository::RepositoryUri::parse(repositoryUri);
       if (!repositoryRoot) return nullptr;
       auto resource = loader.load(repositoryRoot->resolve("ilisite.xml"),
-         {options.metadataTtl,true});
+         {options.metadataTtl,true},repository::RepositoryResourceKind::SiteIndex);
       appendResourceWarnings(resource,"ILIC-REPO-CACHE",diagnostics);
       if (!resource.success) return nullptr; // ilisite.xml is optional.
-      state.value = repository::RepositoryXml::parseSite(resource.content,repositoryUri,diagnostics);
+      if (injectedPorts.metadataDecoder != nullptr) {
+         injectedPorts.metadataDecoder->decodeSite(resource.content,repositoryUri,
+            state.value.parentSites,state.value.subsidiarySites,*diagnostics);
+      }
+      else state.value = repository::RepositoryXml::parseSite(resource.content,repositoryUri,diagnostics);
       state.status = LoadState<repository::RepositorySite>::Status::Available;
       return &state.value;
    }
@@ -185,7 +236,7 @@ public:
 
       const auto emitted = state.emittedFileChecksums.find(uri.normalized());
       if (emitted == state.emittedFileChecksums.end()) {
-         auto resource = loader.loadModel(uri,lookup.metadata.md5);
+         auto resource = loader.loadModel(uri,lookup.metadata.md5,false);
          appendResourceWarnings(resource,"ILIC-REPO-CACHE",&result.diagnostics);
          if (!resource.success) {
             const std::string code = resource.error.rfind("MD5 mismatch",0) == 0
@@ -194,13 +245,7 @@ public:
                "unable to fetch " + uri.normalized() + ": " + resource.error));
             return false;
          }
-         if (!std::filesystem::is_regular_file(resource.localPath)) {
-            result.diagnostics.push_back(repositoryDiagnostic(DiagnosticSeverity::Error,
-               "ILIC-REPO-DOWNLOAD","downloaded model has no readable local path: "
-                  + uri.normalized()));
-            return false;
-         }
-         state.emittedFileChecksums.emplace(uri.normalized(),repository::md5(resource.content));
+         state.emittedFileChecksums.emplace(uri.normalized(),checksum(resource.content));
          result.models.push_back({lookup.metadata,uri.normalized(),resource.localPath,
             std::move(resource.content),resource.fromCache,resource.stale});
       }
@@ -223,17 +268,31 @@ public:
          repositoryDiagnostic(DiagnosticSeverity::Warning,code,message));
    }
 
+   std::string checksum(std::string_view content) const
+   {
+      return injectedPorts.checksum == nullptr ? repository::md5(std::string(content))
+         : injectedPorts.checksum->md5(content);
+   }
+
    RepositoryOptions options;
-   repository::CurlRepositoryTransport transport;
+   RepositoryPorts injectedPorts;
+   std::unique_ptr<PortTransportAdapter> injectedTransport;
+   std::unique_ptr<repository::RepositoryTransport> ownedTransport;
+   repository::RepositoryTransport *transport = nullptr;
    repository::RepositoryCache cache;
    repository::RepositoryResourceLoader loader;
    repository::RepositoryCrawler crawler;
-   std::unordered_map<std::string,LoadState<repository::RepositoryIndex>> repositoryIndexes;
-   std::unordered_map<std::string,LoadState<repository::RepositorySite>> repositorySites;
+   std::map<std::string,LoadState<repository::RepositoryIndex>> repositoryIndexes;
+   std::map<std::string,LoadState<repository::RepositorySite>> repositorySites;
 };
 
 RepositoryManager::RepositoryManager(RepositoryOptions options)
    : impl_(std::make_unique<Impl>(std::move(options)))
+{
+}
+
+RepositoryManager::RepositoryManager(RepositoryOptions options,RepositoryPorts ports)
+   : impl_(std::make_unique<Impl>(std::move(options),std::move(ports)))
 {
 }
 
