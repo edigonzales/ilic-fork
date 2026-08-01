@@ -1,8 +1,13 @@
 #include "RepositoryTransport.h"
 
+#if defined(_WIN32) && !defined(NOMINMAX)
+#define NOMINMAX
+#endif
+
 #include <curl/curl.h>
 
 #include <array>
+#include <algorithm>
 #include <limits>
 
 namespace ilic::repository {
