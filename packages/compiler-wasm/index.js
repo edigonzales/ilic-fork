@@ -275,6 +275,31 @@ export class CompilerSession {
     return readResultJson(this.#module, resultHandle);
   }
 
+  incrementalTrace() {
+    this.#active();
+    if (typeof this.#module._ilic_incremental_trace !== "function")
+      throw new Error("native incremental trace API is unavailable");
+    const resultHandle = this.#module._ilic_incremental_trace(this.#handle);
+    return readResultJson(this.#module, resultHandle);
+  }
+
+  incrementalCacheSnapshot() {
+    this.#active();
+    if (typeof this.#module._ilic_incremental_cache_snapshot !== "function")
+      throw new Error("native incremental cache snapshot API is unavailable");
+    const resultHandle = this.#module._ilic_incremental_cache_snapshot(this.#handle);
+    return readResultJson(this.#module, resultHandle);
+  }
+
+  resetIncrementalStats() {
+    this.#active();
+    if (typeof this.#module._ilic_reset_incremental_stats !== "function")
+      throw new Error("native incremental statistics reset API is unavailable");
+    const status = this.#module._ilic_reset_incremental_stats(this.#handle);
+    if (status !== 0)
+      throw new Error(`ilic could not reset incremental statistics (${status})`);
+  }
+
   clearIncrementalCaches() {
     this.#active();
     if (typeof this.#module._ilic_clear_incremental_caches !== "function") {
@@ -361,6 +386,12 @@ export class Compiler {
       nativeEditorSnapshot: typeof module._ilic_editor_snapshot === "function",
       incrementalSession: typeof module._ilic_incremental_stats === "function",
       incrementalStats: typeof module._ilic_incremental_stats === "function",
+      incrementalTrace: typeof module._ilic_incremental_trace === "function",
+      incrementalCacheSnapshot:
+        typeof module._ilic_incremental_cache_snapshot === "function",
+      strictEditorSeparation:
+        typeof module._ilic_incremental_trace === "function" &&
+        typeof module._ilic_editor_snapshot === "function",
     });
     if (
       !this.capabilities.nativeEditorSnapshot &&

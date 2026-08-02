@@ -10,11 +10,14 @@ Dokumentversion ändert keine bereits akzeptierte Quelle.
 ## Parser-Artefakt
 
 `ParsedSourceArtifact` besitzt die ANTLR-Eingabe, den Lexer, den Tokenstrom und
-den Parser für genau eine unveränderliche Inhaltsrevision. Syntaxprojektion,
-Editorprojektion, Headerdaten und der Compiler-Visitor verwenden dieses
-Artefakt. Der sitzungsgebundene `ParsedSourceCache` verwendet URI, Hash,
-Byte-Länge und einen Byte-/Eintrags-LRU; seine Grenzen sind über
-`IncrementalCacheOptions` konfigurierbar.
+den Parser für genau eine unveränderliche Inhaltsrevision. `ParseMode` ist
+Bestandteil der Identität: `StrictCompiler` verwendet den unveränderten
+`CommonTokenStream`, `TolerantEditor` darf gezielte Editor-Recovery verwenden.
+Nur das strikte Artefakt darf `buildMetaModel()` ausführen. Syntaxprojektion,
+Editorprojektion, Headerdaten und der Compiler-Visitor verwenden den zentralen
+`ParsedSourceCache`; dieser verwendet URI, Inhaltsrevision, Hash, Byte-Länge,
+Modus und Grammatur-Fingerprint sowie einen Byte-/Eintrags-LRU. Seine Grenzen
+sind über `IncrementalCacheOptions` konfigurierbar.
 
 ## Semantik
 
@@ -24,6 +27,11 @@ Source-Identitäten. Ein Treffer aktualisiert nur die sichtbaren
 Dokumentversionen. Inhaltsänderungen und Entfernen/Reintroduzieren invalidieren
 betroffene Root-Einträge; unabhängige Roots bleiben wiederverwendbar. Der
 `RootAnalysisCache` hat eigene LRU-Einträge und Speichergrenzen.
+`SourceModelIndex`, `SourceDependencyIndex` und `SourceImpactAnalyzer` werten
+Parser-Header und Reverse-Kanten aus; insbesondere invalidiert das Nachladen
+eines zuvor fehlenden Modells die wartenden Roots, während unabhängige Roots
+erhalten bleiben. Beide Caches führen Deep-Memory-Schätzungen und eine
+zentrale Erase-/Eviction-Buchhaltung.
 
 ## Language Service und Web IDE
 
@@ -43,4 +51,6 @@ explizite Versionsänderungen bleiben als Version-only-Update sichtbar.
 ABI/WASM verfügbar. Die Statistik enthält Source-Klassifikation,
 Parser-Hits/-Misses, Evictions, Root-Hits/-Misses und Invalidationen. Caches
 können über `clearIncrementalCaches()` geleert werden, ohne die Quellen der
-Session zu verlieren.
+Session zu verlieren; `resetIncrementalStats()` setzt nur die Counter zurück.
+Der Architektur-Guard prüft zusätzlich die Strict-/Tolerant-Dispatchgrenze und
+den modusbehafteten Parsercache-Key.

@@ -83,6 +83,8 @@ public:
    CompilationResult compile(const CompilationRequest &request);
    IncrementalStats incrementalStats() const;
    IncrementalTrace lastIncrementalTrace() const;
+   IncrementalCacheSnapshot incrementalCacheSnapshot() const;
+   void resetIncrementalStats();
    void clearIncrementalCaches();
 
 private:

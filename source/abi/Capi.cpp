@@ -665,18 +665,70 @@ Value incrementalStatsResult(const ilic::IncrementalStats &stats)
       {"sourceAdds",count(stats.sourceAdds)},{"sourceRemoves",count(stats.sourceRemoves)},
       {"sourceNoOps",count(stats.sourceNoOps)},{"versionOnlyUpdates",count(stats.versionOnlyUpdates)},
       {"contentChanges",count(stats.contentChanges)},{"sourceReintroductions",count(stats.sourceReintroductions)},
-      {"rejectedUpdates",count(stats.rejectedUpdates)},{"parserBuilds",count(stats.parserBuilds)},
+      {"rejectedUpdates",count(stats.rejectedUpdates)},
+      {"parseRequests",count(stats.parseRequests)},
+      {"editorSnapshotRequests",count(stats.editorSnapshotRequests)},
+      {"strictParserBuilds",count(stats.strictParserBuilds)},
+      {"tolerantParserBuilds",count(stats.tolerantParserBuilds)},
+      {"strictParserHits",count(stats.strictParserHits)},
+      {"tolerantParserHits",count(stats.tolerantParserHits)},
+      {"parserEntries",count(stats.parserEntries)},
+      {"parserRetainedBytes",count(stats.parserRetainedBytes)},
+      {"parserBuilds",count(stats.parserBuilds)},
       {"parserHits",count(stats.parserHits)},{"parserEvictions",count(stats.parserEvictions)},
       {"parserBytes",count(stats.parserBytes)},{"syntaxMaterializations",count(stats.syntaxMaterializations)},
       {"editorMaterializations",count(stats.editorMaterializations)},
       {"rootAnalysisHits",count(stats.rootAnalysisHits)},{"rootAnalysisMisses",count(stats.rootAnalysisMisses)},
       {"rootAnalysisBuilds",count(stats.rootAnalysisBuilds)},
       {"rootAnalysisEvictions",count(stats.rootAnalysisEvictions)},
+      {"rootEntries",count(stats.rootEntries)},
+      {"rootRetainedBytes",count(stats.rootRetainedBytes)},
       {"invalidatedRootEntries",count(stats.invalidatedRootEntries)},
       {"reusedClosureSources",count(stats.reusedClosureSources)},
       {"reparsedClosureSources",count(stats.reparsedClosureSources)},
       {"compilationInvocations",count(stats.compilationInvocations)},
+      {"compileRequests",count(stats.compileRequests)},
+      {"compileExecutions",count(stats.compileExecutions)},
       {"cancelledPlans",count(stats.cancelledPlans)}
+   };
+}
+
+Value incrementalTraceResult(const ilic::IncrementalTrace &trace)
+{
+   const auto strings = [](const std::vector<std::string> &values) {
+      Value::Array result;
+      for (const auto &value : values) result.emplace_back(value);
+      return result;
+   };
+   return Value::Object{
+      {"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
+      {"kind","incremental-trace"},{"operation",trace.operation},{"planKind",trace.planKind},
+      {"roots",strings(trace.roots)},{"closure",strings(trace.closure)},
+      {"parserHits",strings(trace.parserHits)},{"parserMisses",strings(trace.parserMisses)},
+      {"strictParserHits",strings(trace.strictParserHits)},
+      {"strictParserBuilds",strings(trace.strictParserBuilds)},
+      {"tolerantParserHits",strings(trace.tolerantParserHits)},
+      {"tolerantParserBuilds",strings(trace.tolerantParserBuilds)},
+      {"invalidatedRoots",strings(trace.invalidatedRoots)},
+      {"reasons",strings(trace.reasons)},
+      {"bytesRetained",static_cast<double>(trace.bytesRetained)},
+      {"bytesReleased",static_cast<double>(trace.bytesReleased)}
+   };
+}
+
+Value incrementalCacheSnapshotResult(const ilic::IncrementalCacheSnapshot &snapshot)
+{
+   return Value::Object{
+      {"schemaVersion",1},{"abiVersion",1},{"compilerVersion",ilic::version()},
+      {"kind","incremental-cache-snapshot"},
+      {"parserEntries",static_cast<double>(snapshot.parserEntries)},
+      {"parserRetainedBytes",static_cast<double>(snapshot.parserRetainedBytes)},
+      {"parserEvictions",static_cast<double>(snapshot.parserEvictions)},
+      {"rootEntries",static_cast<double>(snapshot.rootEntries)},
+      {"rootRetainedBytes",static_cast<double>(snapshot.rootRetainedBytes)},
+      {"rootEvictions",static_cast<double>(snapshot.rootEvictions)},
+      {"parserInvariants",snapshot.parserInvariants},
+      {"rootInvariants",snapshot.rootInvariants}
    };
 }
 
@@ -723,6 +775,32 @@ std::uint32_t ilic_incremental_stats(std::uint32_t session)
    try { return store(incrementalStatsResult(value->incrementalStats())); }
    catch (const std::exception &error) { return store(errorResult("incremental-stats",error.what())); }
    catch (...) { return store(errorResult("incremental-stats","unknown C++ exception")); }
+}
+
+std::uint32_t ilic_incremental_trace(std::uint32_t session)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return store(errorResult("incremental-trace","invalid session handle"));
+   try { return store(incrementalTraceResult(value->lastIncrementalTrace())); }
+   catch (const std::exception &error) { return store(errorResult("incremental-trace",error.what())); }
+   catch (...) { return store(errorResult("incremental-trace","unknown C++ exception")); }
+}
+
+std::uint32_t ilic_incremental_cache_snapshot(std::uint32_t session)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return store(errorResult("incremental-cache-snapshot","invalid session handle"));
+   try { return store(incrementalCacheSnapshotResult(value->incrementalCacheSnapshot())); }
+   catch (const std::exception &error) { return store(errorResult("incremental-cache-snapshot",error.what())); }
+   catch (...) { return store(errorResult("incremental-cache-snapshot","unknown C++ exception")); }
+}
+
+std::int32_t ilic_reset_incremental_stats(std::uint32_t session)
+{
+   auto value = getSession(session);
+   if (value == nullptr) return -1;
+   try { value->resetIncrementalStats(); return 0; }
+   catch (...) { return -2; }
 }
 
 std::int32_t ilic_clear_incremental_caches(std::uint32_t session)

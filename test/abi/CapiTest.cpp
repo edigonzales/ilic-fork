@@ -94,7 +94,16 @@ END AbiModel.
    ILIC_REQUIRE(incrementalStats.find("\"kind\":\"incremental-stats\"")
       != std::string::npos);
    ILIC_REQUIRE(incrementalStats.find("\"parserBuilds\":") != std::string::npos);
+   std::string cacheSnapshot = resultJson(ilic_incremental_cache_snapshot(session));
+   ILIC_REQUIRE(cacheSnapshot.find("\"kind\":\"incremental-cache-snapshot\"")
+      != std::string::npos);
+   ILIC_REQUIRE(cacheSnapshot.find("\"parserEntries\":") != std::string::npos);
+   ILIC_REQUIRE(cacheSnapshot.find("\"parserInvariants\":true") != std::string::npos);
+   ILIC_REQUIRE(cacheSnapshot.find("\"rootInvariants\":true") != std::string::npos);
    ILIC_REQUIRE(ilic_clear_incremental_caches(session) == 0);
+   cacheSnapshot = resultJson(ilic_incremental_cache_snapshot(session));
+   ILIC_REQUIRE(cacheSnapshot.find("\"parserRetainedBytes\":0") != std::string::npos);
+   ILIC_REQUIRE(cacheSnapshot.find("\"rootRetainedBytes\":0") != std::string::npos);
    incrementalStats = resultJson(ilic_incremental_stats(session));
    ILIC_REQUIRE(incrementalStats.find("\"parserBytes\":0") != std::string::npos);
 

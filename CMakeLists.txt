@@ -48,6 +48,13 @@ set(ILIC_CORE_SOURCES
     source/core/SnapshotPipeline.cpp
     source/core/Syntax.cpp
     source/core/Semantic.cpp
+    source/core/incremental/IncrementalMemoryEstimator.cpp
+    source/core/incremental/IncrementalFingerprint.cpp
+    source/core/incremental/ParsedSourceCache.cpp
+    source/core/incremental/RootAnalysisCache.cpp
+    source/core/incremental/SourceModelIndex.cpp
+    source/core/incremental/SourceDependencyIndex.cpp
+    source/core/incremental/SourceImpactAnalyzer.cpp
 
     source/input/ili1/Ili1Input.cpp
     source/input/ili1/Ili1Input_package.cpp
@@ -155,7 +162,7 @@ if(EMSCRIPTEN)
         "-sWASM_BIGINT=1"
         "-sASSERTIONS=1"
         "-fexceptions"
-        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_incremental_stats','_ilic_clear_incremental_caches','_ilic_parse','_ilic_editor_snapshot','_ilic_analyze','_ilic_compile','_ilic_compile_and_analyze','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
+        "SHELL:-sEXPORTED_FUNCTIONS=['_ilic_abi_version','_ilic_version','_ilic_alloc','_ilic_free','_ilic_session_create','_ilic_session_destroy','_ilic_session_put_source','_ilic_session_remove_source','_ilic_incremental_stats','_ilic_incremental_trace','_ilic_incremental_cache_snapshot','_ilic_reset_incremental_stats','_ilic_clear_incremental_caches','_ilic_parse','_ilic_editor_snapshot','_ilic_analyze','_ilic_compile','_ilic_compile_and_analyze','_ilic_format','_ilic_result_json','_ilic_result_destroy']"
     )
     set_target_properties(ilic-wasm PROPERTIES OUTPUT_NAME "ilic" SUFFIX ".mjs")
 endif()
@@ -318,6 +325,9 @@ if(BUILD_TESTING)
     add_executable(ilic_incremental_compiler_test test/core/IncrementalCompilerTest.cpp)
     target_link_libraries(ilic_incremental_compiler_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_incremental_compiler COMMAND ilic_incremental_compiler_test)
+    add_executable(ilic_incremental_hardening_test test/core/IncrementalHardeningTest.cpp)
+    target_link_libraries(ilic_incremental_hardening_test PRIVATE ilic-core ilic::test-support)
+    add_test(NAME ilic_incremental_hardening COMMAND ilic_incremental_hardening_test)
     add_executable(ilic_compiler_concurrency_test test/core/CompilerConcurrencyTest.cpp)
     target_link_libraries(ilic_compiler_concurrency_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_compiler_concurrency COMMAND ilic_compiler_concurrency_test)

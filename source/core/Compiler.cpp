@@ -3,6 +3,13 @@
 
 #include "CompilerContext.h"
 #include "SnapshotPipeline.h"
+#include "incremental/ParsedSourceCache.h"
+#include "incremental/RootAnalysisCache.h"
+#include "incremental/SourceDependencyIndex.h"
+#include "incremental/SourceModelIndex.h"
+#include "incremental/SourceImpactAnalyzer.h"
+#include "incremental/IncrementalMemoryEstimator.h"
+#include "incremental/IncrementalFingerprint.h"
 #include "../input/ili1/Ili1Input.h"
 #include "../input/ili2/Ili2Input.h"
 #include "../input/ili2/InterlisModel.h"
@@ -18,6 +25,7 @@
 #include <list>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <sstream>
 
@@ -201,7 +209,7 @@ std::string rootKey(const std::string &base,
    const std::vector<std::string> &uris,const ilic::SourceManager &sources)
 {
    std::ostringstream key;
-   key << base << "|grammar=0.9.9|abi=1|builtin=INTERLIS-2.3;";
+   key << base << "|fingerprint=" << detail::currentCompilerFingerprint().canonicalString() << ';';
    for (const auto &uri : uris) {
       const auto identity = identityFor(sources,uri);
       key << uri.size() << ':' << uri << ':' << identity.contentRevision << ':'
@@ -279,8 +287,11 @@ bool compileFile(
    const ilic::SourceBuffer source = sourceFor(context,file);
    if (auto artifact = context.parsedSourceArtifact(source)) {
       artifact->reportParserDiagnostics(logger);
-      if (artifact->parserDiagnostics().empty())
+      if (artifact->parserDiagnostics().empty() && artifact->supportsMetaModelBuild())
          artifact->buildMetaModel(context.builder(),logger);
+      else if (artifact->parserDiagnostics().empty())
+         logger.error(util::DiagnosticId::CompilerInternal,
+            "tolerant parser artifact cannot be used for compilation",-1);
    }
    else if (file->getIliVersion() == "1.0")
       input::parseIli1(source,context.builder(),logger);
@@ -301,114 +312,77 @@ CompilationResult compileRun(detail::CompilerContext &context,
    const CompilationRequest &request,std::vector<std::string> &lastCompilationSourceUris);
 
 struct CompilerSession::Impl {
-   struct ParsedCacheEntry {
-      std::string uri;
-      std::string hash;
-      std::string text;
-      detail::SnapshotBundle bundle;
-      std::size_t retainedBytes = 0;
-      std::uint64_t lastUsed = 0;
-   };
-
-   struct RootCacheEntry {
-      std::string baseKey;
-      std::string key;
-      std::vector<std::string> closure;
-      std::vector<SourceIdentity> identities;
-      bool hadMissingModels = false;
-      CompilationAnalysisResult result;
-      std::size_t retainedBytes = 0;
-      std::uint64_t lastUsed = 0;
-   };
-
    SourceManager sources;
    std::mutex mutex;
-   std::map<std::string,ParsedCacheEntry> parsedCache;
-   std::map<std::string,RootCacheEntry> rootCache;
-   std::size_t parsedBytes = 0;
-   std::size_t rootBytes = 0;
-   std::uint64_t cacheClock = 0;
-   ParsedSourceCacheOptions parsedOptions;
-   RootAnalysisCacheOptions rootOptions;
+   detail::ParsedSourceCache parsedCache;
+   detail::RootAnalysisCache rootCache;
+   detail::SourceModelIndex modelIndex;
+   detail::SourceDependencyIndex dependencyIndex;
    IncrementalStats stats;
    IncrementalTrace trace;
 
-   detail::SnapshotBundle ensureParsed(const SourceBuffer &source)
+   Impl(const IncrementalCacheOptions &options)
+      : parsedCache(options.parsed),rootCache(options.root) {}
+
+   std::shared_ptr<const detail::ParsedSourceCacheEntry> ensureParsed(
+      const SourceBuffer &source,detail::ParseMode mode)
    {
       const auto identity = identityFor(sources,source);
-      const std::string key = source.uri + "\n" + identity.contentHash + ":"
-         + std::to_string(identity.byteLength);
-      auto found = parsedCache.find(key);
-      if (found != parsedCache.end() && found->second.text == source.text) {
-         ++stats.parserHits;
-         found->second.lastUsed = ++cacheClock;
-         return found->second.bundle;
+      const auto before = parsedCache.metrics();
+      auto result = parsedCache.getOrBuild(source,identity,mode,"generated-grammar-v1",
+         [this](const SourceBuffer &value,detail::ParseMode requested) {
+            return detail::SnapshotPipeline(sources).build(value,requested);
+         });
+      const auto after = parsedCache.metrics();
+      const bool built = mode == detail::ParseMode::StrictCompiler
+         ? after.strictBuilds > before.strictBuilds
+         : after.tolerantBuilds > before.tolerantBuilds;
+      const bool hit = mode == detail::ParseMode::StrictCompiler
+         ? after.strictHits > before.strictHits
+         : after.tolerantHits > before.tolerantHits;
+      if (built) {
+         if (mode == detail::ParseMode::StrictCompiler) trace.strictParserBuilds.push_back(source.uri);
+         else trace.tolerantParserBuilds.push_back(source.uri);
+         trace.parserMisses.push_back(source.uri);
+      } else if (hit) {
+         if (mode == detail::ParseMode::StrictCompiler) trace.strictParserHits.push_back(source.uri);
+         else trace.tolerantParserHits.push_back(source.uri);
+         trace.parserHits.push_back(source.uri);
       }
-      auto bundle = detail::SnapshotPipeline(sources).build(source,true);
-      ParsedCacheEntry entry{source.uri,identity.contentHash,source.text,bundle,
-         parsedRetainedBytes(source.text,bundle),++cacheClock};
-      retainParsed(key,std::move(entry));
-      ++stats.parserBuilds;
-      return bundle;
+      return result;
    }
 
    detail::ParsedSourceArtifactPtr parsedArtifact(const SourceBuffer &source)
    {
-      return ensureParsed(source).artifact;
+      const auto entry = ensureParsed(source,detail::ParseMode::StrictCompiler);
+      return entry == nullptr ? detail::ParsedSourceArtifactPtr{} : entry->artifact;
    }
 
-   void retainParsed(std::string key,ParsedCacheEntry entry)
+   void syncCacheStats()
    {
-      auto old = parsedCache.find(key);
-      if (old != parsedCache.end()) {
-         parsedBytes -= old->second.retainedBytes;
-         parsedCache.erase(old);
-      }
-      parsedBytes += entry.retainedBytes;
-      parsedCache.emplace(std::move(key),std::move(entry));
-      while (!parsedCache.empty() && (parsedCache.size() > parsedOptions.maxEntries
-         || parsedBytes > parsedOptions.maxRetainedBytes)) {
-         auto victim = std::min_element(parsedCache.begin(),parsedCache.end(),
-            [](const auto &left,const auto &right) {
-               return left.second.lastUsed < right.second.lastUsed;
-            });
-         parsedBytes -= victim->second.retainedBytes;
-         parsedCache.erase(victim);
-         ++stats.parserEvictions;
-      }
-      stats.parserBytes = parsedBytes;
-   }
-
-   void retainRoot(std::string key,RootCacheEntry entry)
-   {
-      auto old = rootCache.find(key);
-      if (old != rootCache.end()) {
-         rootBytes -= old->second.retainedBytes;
-         rootCache.erase(old);
-      }
-      rootBytes += entry.retainedBytes;
-      rootCache.emplace(std::move(key),std::move(entry));
-      while (!rootCache.empty() && (rootCache.size() > rootOptions.maxEntries
-         || rootBytes > rootOptions.maxRetainedBytes)) {
-         auto victim = std::min_element(rootCache.begin(),rootCache.end(),
-            [](const auto &left,const auto &right) {
-               return left.second.lastUsed < right.second.lastUsed;
-            });
-         rootBytes -= victim->second.retainedBytes;
-         rootCache.erase(victim);
-         ++stats.rootAnalysisEvictions;
-      }
+      const auto parsed = parsedCache.metrics();
+      const auto root = rootCache.metrics();
+      stats.strictParserBuilds = parsed.strictBuilds;
+      stats.tolerantParserBuilds = parsed.tolerantBuilds;
+      stats.strictParserHits = parsed.strictHits;
+      stats.tolerantParserHits = parsed.tolerantHits;
+      stats.parserBuilds = parsed.strictBuilds + parsed.tolerantBuilds;
+      stats.parserHits = parsed.strictHits + parsed.tolerantHits;
+      stats.parserEvictions = parsed.evictions;
+      stats.parserEntries = parsed.entries;
+      stats.parserRetainedBytes = parsed.retainedBytes;
+      stats.parserBytes = parsed.retainedBytes;
+      stats.rootEntries = root.entries;
+      stats.rootRetainedBytes = root.retainedBytes;
+      stats.rootAnalysisEvictions = root.evictions;
+      trace.bytesRetained = parsed.retainedBytes + root.retainedBytes;
    }
 };
 
 CompilerSession::CompilerSession() : CompilerSession(IncrementalCacheOptions{}) {}
 
 CompilerSession::CompilerSession(IncrementalCacheOptions cacheOptions)
-   : impl_(std::make_unique<Impl>())
-{
-   impl_->parsedOptions = cacheOptions.parsed;
-   impl_->rootOptions = cacheOptions.root;
-}
+   : impl_(std::make_unique<Impl>(cacheOptions)) {}
 CompilerSession::~CompilerSession() = default;
 
 void CompilerSession::putSource(std::string uri,std::string utf8,std::uint64_t version)
@@ -421,6 +395,9 @@ SourceUpdateResult CompilerSession::updateSource(std::string uri,std::string utf
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
    SourceUpdateResult result = impl_->sources.update(std::move(uri),std::move(utf8),version);
+   impl_->trace = {};
+   impl_->trace.operation = "updateSource";
+   impl_->trace.reasons.push_back(result.current.uri.empty() ? "rejected" : result.current.uri);
    switch (result.kind) {
       case SourceUpdateKind::Added: ++impl_->stats.sourceAdds; break;
       case SourceUpdateKind::Reintroduced: ++impl_->stats.sourceReintroductions; break;
@@ -430,42 +407,80 @@ SourceUpdateResult CompilerSession::updateSource(std::string uri,std::string utf
       case SourceUpdateKind::Rejected: ++impl_->stats.rejectedUpdates; break;
       case SourceUpdateKind::Removed: break;
    }
-   if (result.accepted && (result.kind == SourceUpdateKind::ContentChanged
-      || result.kind == SourceUpdateKind::Reintroduced)) {
-      for (auto iterator = impl_->rootCache.begin(); iterator != impl_->rootCache.end();) {
-         const auto &closure = iterator->second.closure;
-         if (std::find(closure.begin(),closure.end(),result.current.uri) == closure.end()) {
-            ++iterator;
-            continue;
+   if (result.accepted) {
+      std::size_t parserReleased = 0;
+      if (result.kind == SourceUpdateKind::ContentChanged
+         || result.kind == SourceUpdateKind::Reintroduced)
+         parserReleased = impl_->parsedCache.invalidateUri(result.current.uri);
+
+      const auto *source = impl_->sources.get(result.current.uri);
+      const auto *beforeEntry = impl_->modelIndex.byUri(result.current.uri);
+      const std::optional<detail::SourceModelRecord> before = beforeEntry == nullptr
+         ? std::optional<detail::SourceModelRecord>{}
+         : std::optional<detail::SourceModelRecord>(*beforeEntry);
+      detail::SourceImpactAnalyzer impactAnalyzer;
+      if (source != nullptr && result.kind != SourceUpdateKind::Unchanged
+         && result.kind != SourceUpdateKind::VersionOnly) {
+         const auto entry = impl_->ensureParsed(*source,detail::ParseMode::StrictCompiler);
+         if (entry != nullptr && entry->artifact != nullptr) {
+            const auto modelUpdate = impl_->modelIndex.replace(result.current,
+               entry->artifact->header(),entry->artifact->parserDiagnostics().empty());
+            impl_->dependencyIndex.replaceSourceDependencies(result.current.uri,
+               modelUpdate.current.requiredModels);
          }
-         ++impl_->stats.invalidatedRootEntries;
-         iterator = impl_->rootCache.erase(iterator);
       }
+      const auto *after = impl_->modelIndex.byUri(result.current.uri);
+      const auto impact = impactAnalyzer.analyze(result,
+         before == std::nullopt ? nullptr : &*before,after,impl_->rootCache);
+      detail::RootInvalidationResult invalidated;
+      if (result.kind == SourceUpdateKind::ContentChanged
+         || result.kind == SourceUpdateKind::Reintroduced)
+         invalidated = impl_->rootCache.invalidateBySource(result.current.uri);
+      else if (result.kind == SourceUpdateKind::Added) {
+         const auto *record = after;
+         if (impact.invalidateAllRoots || record == nullptr || !record->syntacticallyUsable
+            || record->declaredModels.empty()) {
+            invalidated = impl_->rootCache.invalidateIf(
+               [](const detail::RootAnalysisCacheEntry &) { return true; });
+         }
+         else {
+            invalidated = impl_->rootCache.invalidateIf([&](const detail::RootAnalysisCacheEntry &entry) {
+               for (const auto &model : record->declaredModels) {
+                  if (std::find(entry.missingModels.begin(),entry.missingModels.end(),model)
+                     != entry.missingModels.end()) return true;
+                  if (std::find(entry.resolvedModels.begin(),entry.resolvedModels.end(),model)
+                     != entry.resolvedModels.end()) return true;
+               }
+               return false;
+            });
+         }
+      }
+      impl_->stats.invalidatedRootEntries += invalidated.invalidatedKeyIds.size();
+      impl_->trace.bytesReleased += parserReleased + invalidated.releasedBytes;
+      impl_->trace.invalidatedRoots = invalidated.invalidatedRoots;
    }
-   impl_->trace = {};
-   impl_->trace.operation = "updateSource";
-   impl_->trace.reasons.push_back(result.current.uri.empty() ? "rejected" : result.current.uri);
+   impl_->syncCacheStats();
    return result;
 }
 
 bool CompilerSession::removeSource(const std::string &uri)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
-   const bool removed = impl_->sources.remove(uri);
-   if (!removed) return false;
-   ++impl_->stats.sourceRemoves;
-   for (auto iterator = impl_->rootCache.begin(); iterator != impl_->rootCache.end();) {
-      const auto &closure = iterator->second.closure;
-      if (std::find(closure.begin(),closure.end(),uri) == closure.end()) {
-         ++iterator;
-         continue;
-      }
-      ++impl_->stats.invalidatedRootEntries;
-      iterator = impl_->rootCache.erase(iterator);
-   }
    impl_->trace = {};
    impl_->trace.operation = "removeSource";
    impl_->trace.reasons.push_back(uri);
+   const bool removed = impl_->sources.remove(uri);
+   if (!removed) return false;
+   ++impl_->stats.sourceRemoves;
+   const std::size_t parserReleased = impl_->parsedCache.invalidateUri(uri);
+   impl_->modelIndex.remove(uri);
+   impl_->dependencyIndex.removeSource(uri);
+   const auto invalidated = impl_->rootCache.invalidateIf(
+      [](const detail::RootAnalysisCacheEntry &) { return true; });
+   impl_->stats.invalidatedRootEntries += invalidated.invalidatedKeyIds.size();
+   impl_->trace.bytesReleased = parserReleased + invalidated.releasedBytes;
+   impl_->trace.invalidatedRoots = invalidated.invalidatedRoots;
+   impl_->syncCacheStats();
    return true;
 }
 
@@ -475,50 +490,36 @@ const SourceManager &CompilerSession::sources() const { return impl_->sources; }
 SyntaxSnapshot CompilerSession::parse(const std::string &uri)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
+   impl_->trace = {};
+   impl_->trace.operation = "parse";
+   impl_->trace.roots.push_back(uri);
+   ++impl_->stats.parseRequests;
    const auto *source = impl_->sources.get(uri);
    if (source == nullptr) return detail::SnapshotPipeline(impl_->sources).syntax(uri);
-   const auto identity = identityFor(impl_->sources,uri);
-   const std::string key = uri + "\n" + identity.contentHash + ":" +
-      std::to_string(identity.byteLength);
-   auto found = impl_->parsedCache.find(key);
-   if (found != impl_->parsedCache.end() && found->second.text == source->text) {
-      ++impl_->stats.parserHits;
-      found->second.lastUsed = ++impl_->cacheClock;
-      ++impl_->stats.syntaxMaterializations;
-      return found->second.bundle.syntax;
-   }
-   auto bundle = detail::SnapshotPipeline(impl_->sources).build(uri,true);
-   const SyntaxSnapshot syntax = bundle.syntax;
-   CompilerSession::Impl::ParsedCacheEntry entry{uri,identity.contentHash,source->text,
-      bundle,parsedRetainedBytes(source->text,bundle),++impl_->cacheClock};
-   impl_->retainParsed(key,std::move(entry));
-   ++impl_->stats.parserBuilds;
+   const auto entry = impl_->ensureParsed(*source,detail::ParseMode::StrictCompiler);
    ++impl_->stats.syntaxMaterializations;
+   impl_->syncCacheStats();
+   if (entry == nullptr) return detail::SnapshotPipeline(impl_->sources).syntax(uri);
+   SyntaxSnapshot syntax = entry->syntax;
+   syntax.documentVersion = source->version;
    return syntax;
 }
 
 EditorSnapshot CompilerSession::editorSnapshot(const std::string &uri)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
+   impl_->trace = {};
+   impl_->trace.operation = "editorSnapshot";
+   impl_->trace.roots.push_back(uri);
+   ++impl_->stats.editorSnapshotRequests;
    const auto *source = impl_->sources.get(uri);
    if (source == nullptr) return detail::SnapshotPipeline(impl_->sources).editor(uri);
-   const auto identity = identityFor(impl_->sources,uri);
-   const std::string key = uri + "\n" + identity.contentHash + ":" +
-      std::to_string(identity.byteLength);
-   auto found = impl_->parsedCache.find(key);
-   if (found != impl_->parsedCache.end() && found->second.text == source->text) {
-      ++impl_->stats.parserHits;
-      found->second.lastUsed = ++impl_->cacheClock;
-      ++impl_->stats.editorMaterializations;
-      return found->second.bundle.editor;
-   }
-   auto bundle = detail::SnapshotPipeline(impl_->sources).build(uri,true);
-   const EditorSnapshot editor = bundle.editor;
-   CompilerSession::Impl::ParsedCacheEntry entry{uri,identity.contentHash,source->text,
-      bundle,parsedRetainedBytes(source->text,bundle),++impl_->cacheClock};
-   impl_->retainParsed(key,std::move(entry));
-   ++impl_->stats.parserBuilds;
+   const auto entry = impl_->ensureParsed(*source,detail::ParseMode::TolerantEditor);
    ++impl_->stats.editorMaterializations;
+   impl_->syncCacheStats();
+   if (entry == nullptr) return detail::SnapshotPipeline(impl_->sources).editor(uri);
+   EditorSnapshot editor = entry->editor;
+   editor.documentVersion = source->version;
    return editor;
 }
 
@@ -537,27 +538,17 @@ CompilationAnalysisResult CompilerSession::compileAndAnalyze(const CompilationRe
 CompilationAnalysisResult CompilerSession::compileAndAnalyzeUnlocked(
    const CompilationRequest &request)
 {
+   impl_->trace = {};
+   impl_->trace.operation = "compileAndAnalyze";
+   impl_->trace.roots = request.roots;
+   ++impl_->stats.compileRequests;
+   ++compileInvocationCount_;
+   ++impl_->stats.compilationInvocations;
    const std::string baseKey = requestKey(request);
-   for (auto &entry : impl_->rootCache) {
-      auto &cached = entry.second;
-      if (cached.baseKey != baseKey) continue;
-      if (cached.hadMissingModels && cached.identities.size() != impl_->sources.uris().size()) continue;
-      bool current = true;
-      for (std::size_t index = 0; index < cached.closure.size(); ++index) {
-         const auto *identity = impl_->sources.identity(cached.closure[index]);
-         if (identity == nullptr || index >= cached.identities.size()
-            || identity->contentRevision != cached.identities[index].contentRevision
-            || identity->contentHash != cached.identities[index].contentHash
-            || identity->byteLength != cached.identities[index].byteLength) {
-            current = false;
-            break;
-         }
-      }
-      if (!current) continue;
+   if (auto cached = impl_->rootCache.findExact(baseKey,impl_->sources)) {
       ++impl_->stats.rootAnalysisHits;
-      ++impl_->stats.reusedClosureSources;
-      cached.lastUsed = ++impl_->cacheClock;
-      CompilationAnalysisResult result = cached.result;
+      impl_->stats.reusedClosureSources += cached->closureUris.size();
+      CompilationAnalysisResult result = cached->result;
       for (auto &version : result.semantic.documentVersions)
          if (const auto *source = impl_->sources.get(version.first)) version.second = source->version;
       for (auto &syntax : result.syntax)
@@ -571,62 +562,55 @@ CompilationAnalysisResult CompilerSession::compileAndAnalyzeUnlocked(
             break;
          }
       }
-      impl_->trace = {"compileAndAnalyze","ExactCacheHit",request.roots,cached.closure,{}, {},{}, {"root cache hit"}};
-      ++compileInvocationCount_;
-      ++impl_->stats.compilationInvocations;
+      impl_->trace.planKind = "ExactCacheHit";
+      impl_->trace.closure = cached->closureUris;
+      impl_->trace.reasons.push_back("root cache hit");
+      impl_->syncCacheStats();
       return result;
    }
    ++impl_->stats.rootAnalysisMisses;
+   ++impl_->stats.compileExecutions;
+   const auto parserBefore = impl_->parsedCache.metrics();
    detail::CompilerContext context(impl_->sources,request.options,
       [this](const SourceBuffer &source) { return impl_->parsedArtifact(source); });
-   ++compileInvocationCount_;
-   ++impl_->stats.compilationInvocations;
    CompilationAnalysisResult result;
    std::vector<std::string> compilationSourceUris;
    result.compilation = compileRun(context,request,compilationSourceUris);
    for (const auto &uri : compilationSourceUris) {
       if (impl_->sources.get(uri) == nullptr) continue;
-      const auto identity = identityFor(impl_->sources,uri);
-      const std::string cacheKey = uri + "\n" + identity.contentHash + ":" +
-         std::to_string(identity.byteLength);
-      auto found = impl_->parsedCache.find(cacheKey);
-      if (found != impl_->parsedCache.end() && found->second.text == impl_->sources.get(uri)->text) {
-         ++impl_->stats.parserHits;
-         found->second.lastUsed = ++impl_->cacheClock;
-         ++impl_->stats.syntaxMaterializations;
-         result.syntax.push_back(found->second.bundle.syntax);
-      }
-      else {
-         auto bundle = detail::SnapshotPipeline(impl_->sources).build(uri,true);
-         const SyntaxSnapshot syntax = bundle.syntax;
-         const std::size_t retainedBytes = parsedRetainedBytes(
-            impl_->sources.get(uri)->text,bundle);
-         Impl::ParsedCacheEntry entry{uri,identity.contentHash,impl_->sources.get(uri)->text,
-            std::move(bundle),retainedBytes,++impl_->cacheClock};
-         impl_->retainParsed(cacheKey,std::move(entry));
-         ++impl_->stats.parserBuilds;
-         ++impl_->stats.syntaxMaterializations;
-         result.syntax.push_back(syntax);
-      }
+      const auto entry = impl_->ensureParsed(*impl_->sources.get(uri),detail::ParseMode::StrictCompiler);
+      if (entry == nullptr) continue;
+      ++impl_->stats.syntaxMaterializations;
+      SyntaxSnapshot syntax = entry->syntax;
+      syntax.documentVersion = impl_->sources.get(uri)->version;
+      result.syntax.push_back(std::move(syntax));
    }
    result.semantic = buildSemanticSnapshot(impl_->sources,request,
       result.compilation,compilationSourceUris,&result.syntax,
       &context.models());
    const std::string key = rootKey(baseKey,compilationSourceUris,impl_->sources);
-   Impl::RootCacheEntry cached;
+   detail::RootAnalysisCacheEntry cached;
    cached.baseKey = baseKey;
    cached.key = key;
-   cached.closure = compilationSourceUris;
+   cached.closureUris = compilationSourceUris;
    for (const auto &uri : compilationSourceUris)
       cached.identities.push_back(identityFor(impl_->sources,uri));
    cached.hadMissingModels = !result.compilation.missingModels.empty();
+   cached.missingModels = result.compilation.missingModels;
+   for (const auto &model : result.compilation.models) cached.resolvedModels.push_back(model.name);
    cached.result = result;
-   cached.retainedBytes = sizeof(cached) + result.syntax.size() * sizeof(SyntaxSnapshot);
-   cached.lastUsed = ++impl_->cacheClock;
-   impl_->retainRoot(key,std::move(cached));
+   impl_->rootCache.insert(std::move(cached));
    ++impl_->stats.rootAnalysisBuilds;
-   impl_->stats.reparsedClosureSources += result.compilation.success ? 1 : 0;
-   impl_->trace = {"compileAndAnalyze","RebuildWithParseReuse",request.roots,compilationSourceUris,{},compilationSourceUris,{}, {"root cache miss"}};
+   const auto parserAfter = impl_->parsedCache.metrics();
+   const std::size_t reparsed = static_cast<std::size_t>(
+      parserAfter.strictBuilds - parserBefore.strictBuilds);
+   impl_->stats.reparsedClosureSources += reparsed;
+   impl_->stats.reusedClosureSources += compilationSourceUris.size() > reparsed
+      ? compilationSourceUris.size() - reparsed : 0;
+   impl_->trace.planKind = "RebuildWithParseReuse";
+   impl_->trace.closure = compilationSourceUris;
+   impl_->trace.reasons.push_back("root cache miss");
+   impl_->syncCacheStats();
    return result;
 }
 
@@ -759,19 +743,22 @@ CompilationResult CompilerSession::compile(const CompilationRequest &request)
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
    ++compileInvocationCount_;
+   ++impl_->stats.compileRequests;
+   ++impl_->stats.compileExecutions;
    ++impl_->stats.compilationInvocations;
    detail::CompilerContext context(impl_->sources,request.options,
       [this](const SourceBuffer &source) { return impl_->parsedArtifact(source); });
    std::vector<std::string> compilationSourceUris;
-   return compileRun(context,request,compilationSourceUris);
+   auto result = compileRun(context,request,compilationSourceUris);
+   impl_->syncCacheStats();
+   return result;
 }
 
 IncrementalStats CompilerSession::incrementalStats() const
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
-   IncrementalStats result = impl_->stats;
-   result.parserBytes = impl_->parsedBytes;
-   return result;
+   impl_->syncCacheStats();
+   return impl_->stats;
 }
 
 IncrementalTrace CompilerSession::lastIncrementalTrace() const
@@ -780,15 +767,41 @@ IncrementalTrace CompilerSession::lastIncrementalTrace() const
    return impl_->trace;
 }
 
+IncrementalCacheSnapshot CompilerSession::incrementalCacheSnapshot() const
+{
+   std::lock_guard<std::mutex> lock(impl_->mutex);
+   const auto parsed = impl_->parsedCache.metrics();
+   const auto root = impl_->rootCache.metrics();
+   IncrementalCacheSnapshot snapshot;
+   snapshot.parserEntries = parsed.entries;
+   snapshot.parserRetainedBytes = parsed.retainedBytes;
+   snapshot.parserEvictions = parsed.evictions;
+   snapshot.rootEntries = root.entries;
+   snapshot.rootRetainedBytes = root.retainedBytes;
+   snapshot.rootEvictions = root.evictions;
+   snapshot.parserInvariants = impl_->parsedCache.checkInvariants();
+   snapshot.rootInvariants = impl_->rootCache.checkInvariants();
+   return snapshot;
+}
+
+void CompilerSession::resetIncrementalStats()
+{
+   std::lock_guard<std::mutex> lock(impl_->mutex);
+   impl_->parsedCache.resetMetrics();
+   impl_->rootCache.resetMetrics();
+   impl_->stats.reset();
+   impl_->syncCacheStats();
+}
+
 void CompilerSession::clearIncrementalCaches()
 {
    std::lock_guard<std::mutex> lock(impl_->mutex);
-   impl_->parsedCache.clear();
-   impl_->rootCache.clear();
-   impl_->parsedBytes = 0;
-   impl_->rootBytes = 0;
-   impl_->stats.parserBytes = 0;
+   const std::size_t parsedReleased = impl_->parsedCache.clear();
+   const auto rootReleased = impl_->rootCache.clear();
    impl_->trace = {};
+   impl_->trace.operation = "clearIncrementalCaches";
+   impl_->trace.bytesReleased = parsedReleased + rootReleased.releasedBytes;
+   impl_->syncCacheStats();
 }
 
 const char *version() { return "0.9.9"; }

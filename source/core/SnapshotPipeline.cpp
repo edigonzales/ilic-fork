@@ -30,6 +30,16 @@
 #include <utility>
 
 namespace ilic::detail {
+
+const char *toString(ParseMode mode) noexcept
+{
+   switch (mode) {
+      case ParseMode::StrictCompiler: return "strict-compiler";
+      case ParseMode::TolerantEditor: return "tolerant-editor";
+   }
+   return "unknown";
+}
+
 namespace {
 
 enum class DetectedLanguage { Unknown,Ili1,Ili2 };
@@ -641,10 +651,10 @@ public:
       std::unique_ptr<antlr4::ANTLRInputStream> input,
       std::unique_ptr<Lexer> lexer,std::unique_ptr<TokenStream> tokens,
       std::unique_ptr<Parser> parser,Root *root,bool valid,VisitFunction visit,
-      std::vector<Diagnostic> parserDiagnostics)
+      std::vector<Diagnostic> parserDiagnostics,ParseMode mode)
       : source_(std::move(source)),input_(std::move(input)),lexer_(std::move(lexer)),
         tokens_(std::move(tokens)),parser_(std::move(parser)),root_(root),valid_(valid),
-        visit_(visit),parserDiagnostics_(std::move(parserDiagnostics)) {}
+        visit_(visit),parserDiagnostics_(std::move(parserDiagnostics)),mode_(mode) {}
 
    void setHeader(HeaderFunction header) noexcept { header_ = header; }
 
@@ -658,6 +668,31 @@ public:
       return parserDiagnostics_;
    }
 
+   ParseMode mode() const noexcept override { return mode_; }
+
+   bool supportsMetaModelBuild() const noexcept override
+   {
+      return mode_ == ParseMode::StrictCompiler;
+   }
+
+   std::size_t tokenCount() const noexcept override { return tokenCount_; }
+
+   std::size_t parseTreeNodeCount() const noexcept override { return parseTreeNodeCount_; }
+
+   std::size_t estimatedRetainedBytes() const noexcept override
+   {
+      std::size_t bytes = sizeof(*this) + source_.text.capacity();
+      bytes += tokenCount_ * (sizeof(void *) * 8);
+      bytes += parseTreeNodeCount_ * (sizeof(void *) * 6);
+      for (const auto &diagnostic : parserDiagnostics_) {
+         bytes += sizeof(Diagnostic) + diagnostic.code.capacity()
+            + diagnostic.message.capacity() + diagnostic.source.capacity();
+         bytes += diagnostic.relatedInformation.capacity() * sizeof(RelatedInformation);
+         bytes += diagnostic.notes.capacity() * sizeof(std::string);
+      }
+      return bytes;
+   }
+
    void reportParserDiagnostics(util::Logger &logger) const override
    {
       for (const auto &diagnostic : parserDiagnostics_)
@@ -668,8 +703,14 @@ public:
    void buildMetaModel(metamodel::MetaModelBuilder &builder,
       util::Logger &logger) const override
    {
-      if (valid_ && root_ != nullptr && visit_ != nullptr)
+      if (supportsMetaModelBuild() && valid_ && root_ != nullptr && visit_ != nullptr)
          visit_(source_,root_,builder,logger);
+   }
+
+   void setProjectionCounts(std::size_t tokenCount,std::size_t parseTreeNodeCount) noexcept
+   {
+      tokenCount_ = tokenCount;
+      parseTreeNodeCount_ = parseTreeNodeCount;
    }
 
    Parser *parser() noexcept { return parser_.get(); }
@@ -687,6 +728,9 @@ private:
    VisitFunction visit_ = nullptr;
    HeaderFunction header_ = nullptr;
    std::vector<Diagnostic> parserDiagnostics_;
+   ParseMode mode_ = ParseMode::StrictCompiler;
+   std::size_t tokenCount_ = 0;
+   std::size_t parseTreeNodeCount_ = 0;
 };
 
 ParsedSourceHeader ili2Header(parser::Ili2Parser::Interlis2DefContext *root)
@@ -725,14 +769,22 @@ ParsedSourceHeader ili1Header(parser::Ili1Parser::Interlis1DefContext *root)
    return header;
 }
 
-template<class Parser,class Lexer,class Root>
-SnapshotBundle buildParsed(const SourceBuffer &source,bool includeEditor,Root *root,
+std::size_t countParseTreeNodes(const antlr4::tree::ParseTree *tree)
+{
+   if (tree == nullptr) return 0;
+   std::size_t count = 1;
+   for (const auto *child : tree->children) count += countParseTreeNodes(child);
+   return count;
+}
+
+template<class Parser,class Lexer,class Root,class TokenStream>
+SnapshotBundle buildParsed(const SourceBuffer &source,ParseMode mode,Root *root,
    Parser &parser,Lexer &lexer,antlr4::CommonTokenStream &tokens,
    const SourceRangeMapper &ranges,SnapshotErrorCollector &lexerErrors,
    SnapshotErrorCollector &parserErrors,ParsedSourceArtifactPtr artifact)
 {
-   (void)includeEditor;
    SnapshotBundle bundle;
+   bundle.mode = mode;
    bundle.artifact = std::move(artifact);
    bundle.syntax.uri = source.uri;
    bundle.syntax.documentVersion = source.version;
@@ -793,10 +845,16 @@ SnapshotBundle buildParsed(const SourceBuffer &source,bool includeEditor,Root *r
       if (importClauseUnqualified)
          for (auto &reference : bundle.editor.imports) reference.unqualified = true;
    }
+   auto concrete = std::dynamic_pointer_cast<const ParsedSourceArtifactImpl<Parser,Lexer,
+      TokenStream,Root>>(bundle.artifact);
+   if (concrete != nullptr)
+      const_cast<ParsedSourceArtifactImpl<Parser,Lexer,TokenStream,Root> *>(concrete.get())
+         ->setProjectionCounts(bundle.syntax.tokens.size(),countParseTreeNodes(root));
    return bundle;
 }
 
-SnapshotBundle buildIli2(const SourceBuffer &source,bool includeEditor)
+template<class TokenStream>
+SnapshotBundle buildIli2Impl(const SourceBuffer &source,ParseMode mode,bool recover)
 {
    SourceRangeMapper ranges(source);
    auto input = std::make_unique<antlr4::ANTLRInputStream>(ranges.normalizedUtf8());
@@ -804,15 +862,17 @@ SnapshotBundle buildIli2(const SourceBuffer &source,bool includeEditor)
    SnapshotErrorCollector lexerErrors(ranges,"compiler");
    lexer->removeErrorListeners();
    lexer->addErrorListener(&lexerErrors);
-   auto tokens = std::make_unique<EditorTokenStream>(lexer.get());
-   if (includeEditor) tokens->recoverBareModelHeaders();
+   auto tokens = std::make_unique<TokenStream>(lexer.get());
+   if (recover) {
+      if constexpr (std::is_same_v<TokenStream,EditorTokenStream>) tokens->recoverBareModelHeaders();
+   }
    auto parser = std::make_unique<parser::Ili2Parser>(tokens.get());
    SnapshotErrorCollector parserErrors(ranges,"compiler");
    parser->removeErrorListeners();
    parser->addErrorListener(&parserErrors);
    auto *root = parser->interlis2Def();
    using Artifact = ParsedSourceArtifactImpl<parser::Ili2Parser,lexer::Ili2Lexer,
-      EditorTokenStream,parser::Ili2Parser::Interlis2DefContext>;
+      TokenStream,parser::Ili2Parser::Interlis2DefContext>;
    auto artifact = std::make_shared<Artifact>(source,std::move(input),std::move(lexer),
       std::move(tokens),std::move(parser),root,parserErrors.diagnostics.empty()
          && lexerErrors.diagnostics.empty(),input::visitIli2,
@@ -821,16 +881,24 @@ SnapshotBundle buildIli2(const SourceBuffer &source,bool includeEditor)
          diagnostics.insert(diagnostics.end(),parserErrors.diagnostics.begin(),
             parserErrors.diagnostics.end());
          return diagnostics;
-      }());
+      }(),mode);
    artifact->setHeader(ili2Header);
    auto *artifactParser = artifact->parser();
    auto *artifactLexer = artifact->lexer();
    auto *artifactTokens = artifact->tokens();
-   return buildParsed(source,includeEditor,root,*artifactParser,*artifactLexer,
+   return buildParsed<parser::Ili2Parser,lexer::Ili2Lexer,
+      parser::Ili2Parser::Interlis2DefContext,TokenStream>(source,mode,root,*artifactParser,*artifactLexer,
       *artifactTokens,ranges,lexerErrors,parserErrors,std::move(artifact));
 }
 
-SnapshotBundle buildIli1(const SourceBuffer &source,bool includeEditor)
+SnapshotBundle buildIli2(const SourceBuffer &source,ParseMode mode)
+{
+   return mode == ParseMode::TolerantEditor
+      ? buildIli2Impl<EditorTokenStream>(source,mode,true)
+      : buildIli2Impl<antlr4::CommonTokenStream>(source,mode,false);
+}
+
+SnapshotBundle buildIli1(const SourceBuffer &source,ParseMode mode)
 {
    SourceRangeMapper ranges(source);
    auto input = std::make_unique<antlr4::ANTLRInputStream>(ranges.normalizedUtf8());
@@ -854,12 +922,13 @@ SnapshotBundle buildIli1(const SourceBuffer &source,bool includeEditor)
          diagnostics.insert(diagnostics.end(),parserErrors.diagnostics.begin(),
             parserErrors.diagnostics.end());
          return diagnostics;
-      }());
+      }(),mode);
    artifact->setHeader(ili1Header);
    auto *artifactParser = artifact->parser();
    auto *artifactLexer = artifact->lexer();
    auto *artifactTokens = artifact->tokens();
-   return buildParsed(source,includeEditor,root,*artifactParser,*artifactLexer,
+   return buildParsed<parser::Ili1Parser,lexer::Ili1Lexer,
+      parser::Ili1Parser::Interlis1DefContext,antlr4::CommonTokenStream>(source,mode,root,*artifactParser,*artifactLexer,
       *artifactTokens,ranges,lexerErrors,parserErrors,std::move(artifact));
 }
 
@@ -889,26 +958,28 @@ SyntaxSnapshot missingSyntax(const std::string &uri)
 
 } // namespace
 
-SnapshotBundle SnapshotPipeline::build(const std::string &uri,bool includeEditor) const
+SnapshotBundle SnapshotPipeline::build(const std::string &uri,ParseMode mode) const
 {
    const SourceBuffer *source = sources_.get(uri);
    if (source == nullptr) {
       SnapshotBundle missing;
+      missing.mode = mode;
       missing.syntax = missingSyntax(uri);
-      if (includeEditor) missing.editor = missingEditor(uri);
+      if (mode == ParseMode::TolerantEditor) missing.editor = missingEditor(uri);
       return missing;
    }
-   return build(*source,includeEditor);
+   return build(*source,mode);
 }
 
-SnapshotBundle SnapshotPipeline::build(const SourceBuffer &source,bool includeEditor) const
+SnapshotBundle SnapshotPipeline::build(const SourceBuffer &source,ParseMode mode) const
 {
    try {
       return detectLanguage(source) == DetectedLanguage::Ili1
-         ? buildIli1(source,includeEditor) : buildIli2(source,includeEditor);
+         ? buildIli1(source,mode) : buildIli2(source,mode);
    }
    catch (const std::exception &error) {
       SnapshotBundle failure;
+      failure.mode = mode;
       failure.syntax.uri = source.uri;
       failure.syntax.documentVersion = source.version;
       failure.syntax.iliVersion = "unknown";
@@ -919,7 +990,7 @@ SnapshotBundle SnapshotPipeline::build(const SourceBuffer &source,bool includeEd
       diagnostic.range = SourceRangeMapper(source).eof();
       diagnostic.source = "compiler";
       failure.syntax.diagnostics.push_back(std::move(diagnostic));
-      if (includeEditor) {
+      if (mode == ParseMode::TolerantEditor) {
          failure.editor.uri = source.uri;
          failure.editor.documentVersion = source.version;
          failure.editor.iliVersion = "unknown";
@@ -930,6 +1001,7 @@ SnapshotBundle SnapshotPipeline::build(const SourceBuffer &source,bool includeEd
    }
    catch (...) {
       SnapshotBundle failure;
+      failure.mode = mode;
       failure.syntax.uri = source.uri;
       failure.syntax.documentVersion = source.version;
       failure.syntax.iliVersion = "unknown";
@@ -940,7 +1012,7 @@ SnapshotBundle SnapshotPipeline::build(const SourceBuffer &source,bool includeEd
       diagnostic.range = SourceRangeMapper(source).eof();
       diagnostic.source = "compiler";
       failure.syntax.diagnostics.push_back(std::move(diagnostic));
-      if (includeEditor) {
+      if (mode == ParseMode::TolerantEditor) {
          failure.editor.uri = source.uri;
          failure.editor.documentVersion = source.version;
          failure.editor.iliVersion = "unknown";
@@ -953,12 +1025,12 @@ SnapshotBundle SnapshotPipeline::build(const SourceBuffer &source,bool includeEd
 
 SyntaxSnapshot SnapshotPipeline::syntax(const std::string &uri) const
 {
-   return build(uri,false).syntax;
+   return build(uri,ParseMode::StrictCompiler).syntax;
 }
 
 EditorSnapshot SnapshotPipeline::editor(const std::string &uri) const
 {
-   return build(uri,true).editor;
+   return build(uri,ParseMode::TolerantEditor).editor;
 }
 
 } // namespace ilic::detail

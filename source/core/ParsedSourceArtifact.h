@@ -3,6 +3,8 @@
 #include "../../include/ilic/Diagnostic.h"
 
 #include <memory>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -21,6 +23,13 @@ class Logger;
 namespace ilic {
 namespace detail {
 
+enum class ParseMode : std::uint8_t {
+   StrictCompiler,
+   TolerantEditor
+};
+
+const char *toString(ParseMode mode) noexcept;
+
 struct ParsedSourceHeader {
    std::string iliVersion;
    std::vector<std::string> models;
@@ -34,8 +43,13 @@ struct ParsedSourceHeader {
 class ParsedSourceArtifact {
 public:
    virtual ~ParsedSourceArtifact() = default;
+   virtual ParseMode mode() const noexcept = 0;
+   virtual bool supportsMetaModelBuild() const noexcept = 0;
    virtual ParsedSourceHeader header() const = 0;
    virtual const std::vector<Diagnostic> &parserDiagnostics() const noexcept = 0;
+   virtual std::size_t tokenCount() const noexcept = 0;
+   virtual std::size_t parseTreeNodeCount() const noexcept = 0;
+   virtual std::size_t estimatedRetainedBytes() const noexcept = 0;
    virtual void reportParserDiagnostics(util::Logger &logger) const = 0;
    virtual void buildMetaModel(metamodel::MetaModelBuilder &builder,
       util::Logger &logger) const = 0;

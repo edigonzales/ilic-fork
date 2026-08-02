@@ -45,7 +45,11 @@ SourceUpdateResult SourceManager::update(std::string uri,std::string utf8,
       const bool sameBytes = found->second.text.size() == utf8.size()
          && found->second.text == utf8;
       result.current = result.previous;
-      result.current.documentVersion = version;
+      // Version zero means that the caller did not provide a new visible
+      // document version. It must never downgrade an already known version.
+      const std::uint64_t visibleVersion = version == 0
+         ? result.previous.documentVersion : version;
+      result.current.documentVersion = visibleVersion;
       if (sameBytes && version == result.previous.documentVersion) {
          result.kind = SourceUpdateKind::Unchanged;
          result.current = result.previous;
@@ -59,7 +63,7 @@ SourceUpdateResult SourceManager::update(std::string uri,std::string utf8,
             result.accepted = true;
             return result;
          }
-         found->second.version = version;
+         found->second.version = visibleVersion;
          result.current.documentVersion = version;
          result.kind = SourceUpdateKind::VersionOnly;
          result.accepted = true;
@@ -69,6 +73,7 @@ SourceUpdateResult SourceManager::update(std::string uri,std::string utf8,
       result.kind = SourceUpdateKind::ContentChanged;
       result.current.contentRevision = ++nextContentRevision_;
       result.current.sourceGeneration = ++generation_;
+      result.current.documentVersion = visibleVersion;
       result.current.contentHash = hash;
       result.current.byteLength = utf8.size();
       result.accepted = true;

@@ -17,6 +17,15 @@ struct IncrementalStats {
    std::uint64_t sourceReintroductions = 0;
    std::uint64_t rejectedUpdates = 0;
 
+   std::uint64_t parseRequests = 0;
+   std::uint64_t editorSnapshotRequests = 0;
+   std::uint64_t strictParserBuilds = 0;
+   std::uint64_t tolerantParserBuilds = 0;
+   std::uint64_t strictParserHits = 0;
+   std::uint64_t tolerantParserHits = 0;
+   std::uint64_t parserEntries = 0;
+   std::uint64_t parserRetainedBytes = 0;
+
    std::uint64_t parserBuilds = 0;
    std::uint64_t parserHits = 0;
    std::uint64_t parserEvictions = 0;
@@ -28,11 +37,16 @@ struct IncrementalStats {
    std::uint64_t rootAnalysisMisses = 0;
    std::uint64_t rootAnalysisBuilds = 0;
    std::uint64_t rootAnalysisEvictions = 0;
+   std::uint64_t rootEntries = 0;
+   std::uint64_t rootRetainedBytes = 0;
    std::uint64_t invalidatedRootEntries = 0;
    std::uint64_t reusedClosureSources = 0;
    std::uint64_t reparsedClosureSources = 0;
    std::uint64_t compilationInvocations = 0;
    std::uint64_t cancelledPlans = 0;
+
+   std::uint64_t compileRequests = 0;
+   std::uint64_t compileExecutions = 0;
 
    void reset() noexcept { *this = {}; }
 };
@@ -44,13 +58,31 @@ struct IncrementalTrace {
    std::vector<std::string> closure;
    std::vector<std::string> parserHits;
    std::vector<std::string> parserMisses;
+   std::vector<std::string> strictParserHits;
+   std::vector<std::string> strictParserBuilds;
+   std::vector<std::string> tolerantParserHits;
+   std::vector<std::string> tolerantParserBuilds;
    std::vector<std::string> invalidatedRoots;
    std::vector<std::string> reasons;
+   std::size_t bytesRetained = 0;
+   std::size_t bytesReleased = 0;
+};
+
+struct IncrementalCacheSnapshot {
+   std::uint64_t parserEntries = 0;
+   std::uint64_t parserRetainedBytes = 0;
+   std::uint64_t parserEvictions = 0;
+   std::uint64_t rootEntries = 0;
+   std::uint64_t rootRetainedBytes = 0;
+   std::uint64_t rootEvictions = 0;
+   bool parserInvariants = true;
+   bool rootInvariants = true;
 };
 
 struct ParsedSourceCacheOptions {
    std::size_t maxEntries = 512;
    std::size_t maxRetainedBytes = 256 * 1024 * 1024;
+   bool retainOversizedEntry = false;
 };
 
 struct RootAnalysisCacheOptions {

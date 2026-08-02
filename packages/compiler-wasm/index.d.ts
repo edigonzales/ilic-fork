@@ -112,6 +112,9 @@ export interface CompilerCapabilities {
   nativeEditorSnapshot: boolean;
   incrementalSession?: boolean;
   incrementalStats?: boolean;
+  incrementalTrace?: boolean;
+  incrementalCacheSnapshot?: boolean;
+  strictEditorSeparation?: boolean;
 }
 export interface IncrementalStats {
   sourceAdds: number;
@@ -121,6 +124,14 @@ export interface IncrementalStats {
   contentChanges: number;
   sourceReintroductions: number;
   rejectedUpdates: number;
+  parseRequests: number;
+  editorSnapshotRequests: number;
+  strictParserBuilds: number;
+  tolerantParserBuilds: number;
+  strictParserHits: number;
+  tolerantParserHits: number;
+  parserEntries: number;
+  parserRetainedBytes: number;
   parserBuilds: number;
   parserHits: number;
   parserEvictions: number;
@@ -131,11 +142,15 @@ export interface IncrementalStats {
   rootAnalysisMisses: number;
   rootAnalysisBuilds: number;
   rootAnalysisEvictions: number;
+  rootEntries: number;
+  rootRetainedBytes: number;
   invalidatedRootEntries: number;
   reusedClosureSources: number;
   reparsedClosureSources: number;
   compilationInvocations: number;
   cancelledPlans: number;
+  compileRequests: number;
+  compileExecutions: number;
 }
 export interface SemanticSymbol {
   id: string; name: string; qualifiedName: string; kind: string;
@@ -247,6 +262,9 @@ export interface EmscriptenIlicModule {
     source: number, sourceLength: number, version: bigint): number;
   _ilic_session_remove_source(session: number, uri: number, uriLength: number): number;
   _ilic_incremental_stats?(session: number): number;
+  _ilic_incremental_trace?(session: number): number;
+  _ilic_incremental_cache_snapshot?(session: number): number;
+  _ilic_reset_incremental_stats?(session: number): number;
   _ilic_clear_incremental_caches?(session: number): number;
   _ilic_compile(session: number, request: number, requestLength: number): number;
   _ilic_parse(session: number, request: number, requestLength: number): number;
@@ -263,6 +281,9 @@ export class CompilerSession {
   putWorkspace(workspace: ResolvedWorkspace): void;
   removeSource(uri: string): boolean;
   incrementalStats?(): IncrementalStats;
+  incrementalTrace?(): Record<string, unknown>;
+  incrementalCacheSnapshot?(): Record<string, unknown>;
+  resetIncrementalStats?(): void;
   clearIncrementalCaches?(): void;
   compile(request: CompilationRequest): CompilationResult;
   parse(uri: string): SyntaxSnapshot;

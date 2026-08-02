@@ -45,7 +45,9 @@ int main()
    ILIC_REQUIRE(syntax.uri == root);
    ILIC_REQUIRE(syntax.documentVersion == 2);
    auto stats = session.incrementalStats();
-   ILIC_REQUIRE(stats.parserBuilds == 1);
+   ILIC_REQUIRE(stats.parserBuilds == 2);
+   ILIC_REQUIRE(stats.strictParserBuilds == 1);
+   ILIC_REQUIRE(stats.tolerantParserBuilds == 1);
    ILIC_REQUIRE(stats.parserHits >= 1);
    ILIC_REQUIRE(stats.editorMaterializations == 1);
    ILIC_REQUIRE(stats.syntaxMaterializations == 1);

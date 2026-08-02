@@ -184,6 +184,7 @@ test(
     const compiler = await createCompiler();
     assert.equal(compiler.capabilities.incrementalSession, true);
     assert.equal(compiler.capabilities.incrementalStats, true);
+    assert.equal(compiler.capabilities.incrementalCacheSnapshot, true);
     const session = compiler.createSession();
     const uri = "memory:///IncrementalStats.ili";
     session.putSource(
@@ -199,8 +200,14 @@ END IncrementalStats.
     assert.equal(stats.kind, "incremental-stats");
     assert.equal(stats.sourceAdds, 1);
     assert.equal(stats.parserBuilds, 1);
+    const cacheSnapshot = session.incrementalCacheSnapshot();
+    assert.equal(cacheSnapshot.kind, "incremental-cache-snapshot");
+    assert.equal(cacheSnapshot.parserEntries, 1);
+    assert.equal(cacheSnapshot.parserInvariants, true);
+    assert.equal(cacheSnapshot.rootInvariants, true);
     session.clearIncrementalCaches();
     assert.equal(session.incrementalStats().parserBytes, 0);
+    assert.equal(session.incrementalCacheSnapshot().parserRetainedBytes, 0);
     session.dispose();
   },
 );
