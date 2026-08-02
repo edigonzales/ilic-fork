@@ -63,6 +63,16 @@ END AbiModel.
    ILIC_REQUIRE(syntax.find("\"documentVersion\":1") != std::string::npos);
    ILIC_REQUIRE(syntax.find("\"modelDef\"") != std::string::npos);
 
+   const char *invalidSyntaxUri = "memory:///InvalidSyntax.ili";
+   const char *invalidSyntaxSource = "INTERLIS 2.3; MODEL Invalid = @ END Invalid.";
+   ILIC_REQUIRE(put(session,invalidSyntaxUri,invalidSyntaxSource) == 0);
+   const std::string invalidSyntaxRequest =
+      R"json({"schemaVersion":1,"uri":"memory:///InvalidSyntax.ili"})json";
+   const std::string invalidSyntax = resultJson(ilic_parse(
+      session,invalidSyntaxRequest.data(),invalidSyntaxRequest.size()));
+   ILIC_REQUIRE(invalidSyntax.find("\"phase\":\"syntax\"") != std::string::npos);
+   ILIC_REQUIRE(invalidSyntax.find("T__") == std::string::npos);
+
    const std::string editorRequest =
       R"json({"schemaVersion":1,"uri":"memory:///AbiModel.ili"})json";
    std::string editor = resultJson(ilic_editor_snapshot(
@@ -147,6 +157,8 @@ END AbiTranslated.
       != std::string::npos);
    ILIC_REQUIRE(crossFile.find("\"relatedInformation\":[{\"message\":")
       != std::string::npos);
+   ILIC_REQUIRE(crossFile.find("\"phase\":\"translation\"") != std::string::npos);
+   ILIC_REQUIRE(crossFile.find("\"fingerprint\":") != std::string::npos);
 
    ILIC_REQUIRE(ilic_session_remove_source(session,uri,std::strlen(uri)) == 0);
    ilic_session_destroy(session);

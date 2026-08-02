@@ -104,6 +104,12 @@ noch nicht implementiert. Kompilationen verschiedener Sessions werden im
 aktuellen Prozess serialisiert. Source-Verwaltung und Formatierung können
 weiterhin pro Session beziehungsweise pro Aufruf organisiert werden.
 
+Die JSON-Diagnosefelder sind additiv: neben Severity, Code, Message, Range,
+Related Information, Notes und `treatedAsError` können `source`, `phase`,
+`tags`, `helpId` und `fingerprint` erscheinen. Neue native Produzenten sollen
+`DiagnosticBuilder`, `DiagnosticCatalog` und den zentralen Pipeline-Adapter
+verwenden; Meldungstexte sind kein maschinenlesbarer Schlüssel.
+
 ## C++: Formatter
 
 ```cpp

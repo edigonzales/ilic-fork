@@ -17,6 +17,7 @@
 #include "tree/TerminalNode.h"
 
 #include "../util/Logger.h"
+#include "../input/parser/ParserDiagnosticTranslator.h"
 
 #include <algorithm>
 #include <cctype>
@@ -93,11 +94,14 @@ public:
    {
       Diagnostic diagnostic;
       diagnostic.severity = DiagnosticSeverity::Error;
-      diagnostic.code = "ILIC-SYNTAX";
-      diagnostic.message = message;
+      const auto translation = parser::translateParserDiagnostic(message,
+         offendingSymbol == nullptr ? std::string_view{} : offendingSymbol->getText());
+      diagnostic.code = translation.code;
+      diagnostic.message = translation.message;
       diagnostic.range = offendingSymbol == nullptr ? ranges_.eof() : ranges_.token(offendingSymbol);
       if (!diagnostic.range.valid) diagnostic.range = ranges_.eof();
       diagnostic.source = source_;
+      diagnostic.phase = DiagnosticPhase::Syntax;
       diagnostics.push_back(std::move(diagnostic));
    }
 
@@ -371,6 +375,8 @@ public:
          diagnostic.range = ranges_.token(endName);
          diagnostic.relatedInformation.push_back({snapshot_.declarations.back().selectionRange,"Declaration"});
          diagnostic.source = "live";
+         diagnostic.phase = DiagnosticPhase::EditorRecovery;
+         diagnostic.tags.push_back(DiagnosticTag::Recovery);
          snapshot_.diagnostics.push_back(std::move(diagnostic));
          recovered_ = true;
       }
@@ -428,6 +434,8 @@ public:
             diagnostic.range = declaration.selectionRange;
             diagnostic.relatedInformation.push_back({previous->second->selectionRange,"First declaration"});
             diagnostic.source = "live";
+            diagnostic.phase = DiagnosticPhase::EditorRecovery;
+            diagnostic.tags.push_back(DiagnosticTag::Recovery);
             snapshot_.diagnostics.push_back(std::move(diagnostic));
             recovered_ = true;
          }

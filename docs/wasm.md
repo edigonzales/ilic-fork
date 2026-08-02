@@ -4,7 +4,8 @@
 
 `@ilic/compiler-wasm` bindet dieselbe C-ABI ein, die auch nativ verfügbar ist.
 Compilersemantik, Formatter und JSON-Vertrag sind daher nicht in JavaScript
-neu implementiert.
+neu implementiert. Native und WASM verwenden insbesondere denselben additiven
+Diagnosevertrag (`phase`, `tags`, `helpId`, `fingerprint`).
 
 ## Build
 
@@ -90,6 +91,11 @@ liefert zusätzlich `recovered` und `complete`. Bei alten WASM-Artefakten ist
 der native Capability-Schalter `compiler.capabilities.nativeEditorSnapshot`
 `false`; ohne explizite Kompatibilitätsoption wird der Mischbetrieb mit einem
 verständlichen Fehler abgelehnt.
+
+WASM-Diagnosen werden im Language Service nicht nach Meldungstext, sondern
+über Code, Severity, Source, URI/Byte-Range, Related Information und Notes
+dedupliziert. Stale Ergebnisse werden anhand von Run-ID, Dokumentversion,
+Generation und Compilation-Epoch verworfen.
 
 ## Repository-Workspace kompilieren
 

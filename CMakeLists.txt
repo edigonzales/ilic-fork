@@ -56,6 +56,11 @@ set(ILIC_CORE_SOURCES
     source/core/incremental/SourceDependencyIndex.cpp
     source/core/incremental/SourceImpactAnalyzer.cpp
 
+    source/diagnostics/DiagnosticBuilder.cpp
+    source/diagnostics/DiagnosticCatalog.cpp
+    source/diagnostics/DiagnosticPipeline.cpp
+    source/diagnostics/DiagnosticRangeResolver.cpp
+
     source/input/ili1/Ili1Input.cpp
     source/input/ili1/Ili1Input_package.cpp
     source/input/ili1/Ili1Input_table.cpp
@@ -77,6 +82,7 @@ set(ILIC_CORE_SOURCES
     source/input/ili2/InterlisModel.cpp
 
     source/input/parser/IliParserErrorListener.cpp
+    source/input/parser/ParserDiagnosticTranslator.cpp
 
     source/metamodel/MetaModel.cpp
     source/metamodel/MetaModelStore.cpp
@@ -308,6 +314,27 @@ if(BUILD_TESTING)
             COMMAND "${ILIC_NODE_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/test/docs/DocumentationTest.mjs"
                 "${CMAKE_CURRENT_SOURCE_DIR}")
+        add_test(NAME ilic_diagnostic_quality_report
+            COMMAND "${ILIC_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate-diagnostic-quality-report.mjs"
+                --root "${CMAKE_CURRENT_SOURCE_DIR}"
+                --output "${CMAKE_CURRENT_BINARY_DIR}/diagnostic-quality.json")
+        set_tests_properties(ilic_diagnostic_quality_report PROPERTIES LABELS "diagnostics;architecture")
+        add_test(NAME ilic_diagnostic_architecture
+            COMMAND "${ILIC_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-diagnostic-architecture.mjs"
+                "${CMAKE_CURRENT_SOURCE_DIR}")
+        set_tests_properties(ilic_diagnostic_architecture PROPERTIES LABELS "diagnostics;architecture")
+        add_test(NAME ilic_diagnostic_architecture_negative_canary
+            COMMAND "${CMAKE_COMMAND}"
+                "-DILIC_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_diagnostic_guard_canary.cmake")
+        set_tests_properties(ilic_diagnostic_architecture_negative_canary PROPERTIES LABELS "diagnostics;architecture")
+        add_test(NAME ilic_diagnostic_contract_parity
+            COMMAND "${ILIC_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-diagnostic-contract-parity.mjs"
+                "${CMAKE_CURRENT_SOURCE_DIR}")
+        set_tests_properties(ilic_diagnostic_contract_parity PROPERTIES LABELS "diagnostics;wasm")
     endif()
 
     add_executable(ilic_capi_test test/abi/CapiTest.cpp)
@@ -344,6 +371,9 @@ if(BUILD_TESTING)
     add_executable(ilic_diagnostic_quality_test test/core/DiagnosticQualityTest.cpp)
     target_link_libraries(ilic_diagnostic_quality_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_diagnostic_quality COMMAND ilic_diagnostic_quality_test)
+    add_executable(ilic_diagnostic_pipeline_test test/diagnostics/DiagnosticPipelineTest.cpp)
+    target_link_libraries(ilic_diagnostic_pipeline_test PRIVATE ilic-core ilic::test-support)
+    add_test(NAME ilic_diagnostic_pipeline COMMAND ilic_diagnostic_pipeline_test)
     add_executable(ilic_syntax_snapshot_test test/core/SyntaxSnapshotTest.cpp)
     target_link_libraries(ilic_syntax_snapshot_test PRIVATE ilic-core ilic::test-support)
     add_test(NAME ilic_syntax_snapshot COMMAND ilic_syntax_snapshot_test)

@@ -57,6 +57,37 @@ const char *severity(ilic::DiagnosticSeverity value)
    return "error";
 }
 
+const char *phase(ilic::DiagnosticPhase value)
+{
+   switch (value) {
+      case ilic::DiagnosticPhase::Unknown: return "unknown";
+      case ilic::DiagnosticPhase::Lexical: return "lexical";
+      case ilic::DiagnosticPhase::Syntax: return "syntax";
+      case ilic::DiagnosticPhase::EditorRecovery: return "editor-recovery";
+      case ilic::DiagnosticPhase::ModelDiscovery: return "model-discovery";
+      case ilic::DiagnosticPhase::Resolution: return "resolution";
+      case ilic::DiagnosticPhase::Semantic: return "semantic";
+      case ilic::DiagnosticPhase::Translation: return "translation";
+      case ilic::DiagnosticPhase::Repository: return "repository";
+      case ilic::DiagnosticPhase::Formatting: return "formatting";
+      case ilic::DiagnosticPhase::Request: return "request";
+      case ilic::DiagnosticPhase::Internal: return "internal";
+   }
+   return "unknown";
+}
+
+const char *tag(ilic::DiagnosticTag value)
+{
+   switch (value) {
+      case ilic::DiagnosticTag::Primary: return "primary";
+      case ilic::DiagnosticTag::Cascaded: return "cascaded";
+      case ilic::DiagnosticTag::Recovery: return "recovery";
+      case ilic::DiagnosticTag::Deprecated: return "deprecated";
+      case ilic::DiagnosticTag::Unnecessary: return "unnecessary";
+   }
+   return "primary";
+}
+
 const char *level(ilic::LogLevel value)
 {
    switch (value) {
@@ -101,6 +132,15 @@ Value diagnostics(const std::vector<ilic::Diagnostic> &diagnostics)
          {"treatedAsError",diagnostic.treatedAsError}
       };
       if (!diagnostic.source.empty()) item["source"] = diagnostic.source;
+      if (diagnostic.phase != ilic::DiagnosticPhase::Unknown)
+         item["phase"] = phase(diagnostic.phase);
+      if (!diagnostic.tags.empty()) {
+         Value::Array tags;
+         for (const auto value : diagnostic.tags) tags.emplace_back(tag(value));
+         item["tags"] = std::move(tags);
+      }
+      if (!diagnostic.helpId.empty()) item["helpId"] = diagnostic.helpId;
+      if (!diagnostic.fingerprint.empty()) item["fingerprint"] = diagnostic.fingerprint;
       values.push_back(std::move(item));
    }
    return values;
@@ -396,6 +436,28 @@ void appendJsonDiagnostics(std::string &output,const std::vector<ilic::Diagnosti
       if (!diagnostic.source.empty()) {
          appendJsonField(output,first,"source");
          ilic::json::appendQuoted(output,diagnostic.source);
+      }
+      if (diagnostic.phase != ilic::DiagnosticPhase::Unknown) {
+         appendJsonField(output,first,"phase");
+         ilic::json::appendQuoted(output,phase(diagnostic.phase));
+      }
+      if (!diagnostic.tags.empty()) {
+         appendJsonField(output,first,"tags");
+         output.push_back('[');
+         bool firstTag = true;
+         for (const auto value : diagnostic.tags) {
+            appendJsonItemSeparator(output,firstTag);
+            ilic::json::appendQuoted(output,tag(value));
+         }
+         output.push_back(']');
+      }
+      if (!diagnostic.helpId.empty()) {
+         appendJsonField(output,first,"helpId");
+         ilic::json::appendQuoted(output,diagnostic.helpId);
+      }
+      if (!diagnostic.fingerprint.empty()) {
+         appendJsonField(output,first,"fingerprint");
+         ilic::json::appendQuoted(output,diagnostic.fingerprint);
       }
       output.push_back('}');
    }

@@ -3,6 +3,7 @@
 
 #include "CompilerContext.h"
 #include "SnapshotPipeline.h"
+#include "ilic/DiagnosticPipeline.h"
 #include "incremental/ParsedSourceCache.h"
 #include "incremental/RootAnalysisCache.h"
 #include "incremental/SourceDependencyIndex.h"
@@ -634,7 +635,15 @@ CompilationResult compileRun(detail::CompilerContext &context,
       result.warningCount = logger.getWarningCount();
       result.success = result.errorCount == 0 && !result.cancelled;
       appendNewEvents(transcript,transcriptedDiagnostics,transcriptedLogs,logger);
-      result.diagnostics = logger.getDiagnostics();
+      std::vector<DiagnosticCandidate> candidates;
+      candidates.reserve(logger.getDiagnostics().size());
+      for (const auto &diagnostic : logger.getDiagnostics()) {
+         DiagnosticCandidate candidate;
+         candidate.diagnostic = diagnostic;
+         candidate.producer = "logger";
+         candidates.push_back(std::move(candidate));
+      }
+      result.diagnostics = DiagnosticPipeline{}.publish(std::move(candidates)).values;
       result.logs = logger.getLogEvents();
       transcript.push_back("inf:");
       transcript.push_back(completionTranscriptLine(result.errorCount,result.warningCount,

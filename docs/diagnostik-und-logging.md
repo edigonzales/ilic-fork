@@ -66,6 +66,10 @@ zusätzlich den Fehlerzähler.
 `range` kann `null` sein, wenn ein Fehler keinem exakten Token zugeordnet
 werden kann. Zeile und Spalte sind nullbasiert:
 
+Zusätzlich können Diagnosen `phase`, `tags`, `helpId` und einen stabilen
+`fingerprint` enthalten. Diese Felder sind additiv und dürfen von älteren
+Consumern ignoriert werden.
+
 - `line`: Zeile;
 - `character`: derzeit die vom Parser beziehungsweise Semantic Checker
   gelieferte Spalte;
@@ -77,13 +81,10 @@ werden kann. Zeile und Spalte sind nullbasiert:
 UTF-8-Byteoffset zuverlässig die nullbasierte Zeile und eine UTF-16-Spalte. Das
 ist die für LSP benötigte Umrechnung.
 
-Die aktuellen Parser- und Semantic-Diagnostics kennen beim Erzeugen jedoch
-nicht durchgehend den ursprünglichen Byteoffset. In solchen Ranges bleibt
-`byteOffset` deshalb `0`, und `character` wird direkt aus der jeweiligen
-Parser-/Metamodellposition übernommen. Bei ASCII-Text entspricht das der
-LSP-Spalte; bei Nicht-BMP-Zeichen vor der Fehlerstelle ist noch keine allgemeine
-UTF-16-Garantie gegeben. Ein LSP-Adapter soll Ranges daher defensiv validieren,
-bis alle Diagnostics tokenbasierte Byteoffsets liefern.
+`DiagnosticRangeResolver` ist die gemeinsame Stelle für Byte-zu-UTF-16-
+Umrechnung, EOF- und Einfügepositionen sowie das Begrenzen ungültiger Byte-
+Bereiche. Unicode-, CRLF- und EOF-Fälle werden mit demselben Rangevertrag
+veröffentlicht.
 
 ## Severities
 
@@ -126,9 +127,10 @@ Wichtige Codefamilien und Beispiele:
 
 Diagnostic-Texte müssen nicht mit ili2c identisch sein. Anwendungen sollen
 Severity, Code und Range verwenden und den Text für Menschen anzeigen, nicht
-parsen. Die früher provisorisch verwendeten semantischen Sammelcodes wurden vor
-der ersten stabilen Code-Zusage entfernt. Rohe Parserfehler dürfen weiterhin
-den Sammelcode `ILIC-PARSE-SYNTAX` verwenden.
+parsen. Der `DiagnosticCatalog` registriert jeden öffentlichen Code. Neue Codes
+werden dort zuerst mit Severity, Phase, Titel und Dokumentations-ID eingetragen.
+Rohe ANTLR-Meldungen werden durch `ParserDiagnosticTranslator` klassifiziert
+und gelangen nicht unverändert in den öffentlichen Vertrag.
 
 Semantische Primärorte stammen aus der betroffenen Deklaration oder dem
 Referenz-Token. `relatedInformation` trägt den unabhängigen URI und Bereich der
@@ -158,7 +160,7 @@ Kategorien umfassen derzeit insbesondere `imports`, `parser`, `semantic`,
 ```cpp
 ilic::CompilationResult result = session.compile(request);
 for (const auto &diagnostic : result.diagnostics) {
-   // severity, code, message, range, relatedInformation, notes
+   // severity, code, message, range, relatedInformation, notes, phase, tags
 }
 for (const auto &event : result.logs) {
    // level, category, message, context
@@ -181,7 +183,17 @@ for (const diagnostic of result.diagnostics) {
 ```
 
 Ein LSP-Adapter muss die textuellen Severity-Namen auf die numerischen LSP-Enums
-abbilden und die oben beschriebene Unicode-Einschränkung berücksichtigen.
+abbilden und `code`, `source`, `range` und `relatedInformation` erhalten.
+
+Der maschinenlesbare Qualitätsbericht entsteht mit:
+
+```sh
+node scripts/generate-diagnostic-quality-report.mjs \
+  --root . --output build/diagnostic-quality.json
+```
+
+Erfasst werden unter anderem registrierte Codes, Rangequalität, Related
+Information, Duplikate und Implementierungsleaks.
 
 ## Verhalten bei internen Fehlern
 

@@ -283,3 +283,178 @@ jobs:
         run: |
           node scripts/prepare-npm-snapshot.mjs --timestamp 20260101000000
           node scripts/test-npm-packages.mjs
+
+  diagnostic-catalog:
+    name: P6 Diagnostic Catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Check catalog registration and diagnostic leaks
+        run: node scripts/check-diagnostic-architecture.mjs .
+      - name: Check native/WASM contract parity
+        run: node scripts/check-diagnostic-contract-parity.mjs .
+
+  diagnostic-quality:
+    name: P6 Diagnostic Quality Report
+    needs: diagnostic-catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Configure diagnostics build
+        run: >-
+          cmake -S . -B build/diagnostics -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DILIC_ENABLE_NATIVE_REPOSITORY=OFF
+          -DBUILD_TESTING=ON
+      - name: Build diagnostics tests
+        run: cmake --build build/diagnostics --parallel
+      - name: Run diagnostics tests and report
+        run: |
+          ctest --test-dir build/diagnostics --output-on-failure -L 'diagnostics|wasm'
+          node scripts/generate-diagnostic-quality-report.mjs . --output build/diagnostic-quality.json
+      - name: Upload diagnostic quality report
+        uses: actions/upload-artifact@v6
+        with:
+          name: ilic-diagnostic-quality-${{ github.sha }}
+          path: build/diagnostic-quality.json
+          if-no-files-found: error
+
+  diagnostic-decision-lock:
+    name: P6 Decision Lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reject conformance baseline changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code origin/main...HEAD -- conformance/known-failures.json
+
+  diagnostic-native-wasm-parity:
+    name: P6 Native/WASM Diagnostics
+    needs: diagnostic-catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+      - name: Configure native ABI and diagnostic tests
+        run: >-
+          cmake -S . -B build/native-wasm-parity -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DILIC_ENABLE_NATIVE_REPOSITORY=OFF
+          -DBUILD_TESTING=ON
+      - name: Build native ABI and diagnostics
+        run: cmake --build build/native-wasm-parity --parallel
+      - name: Run native C-ABI and diagnostics tests
+        run: ctest --test-dir build/native-wasm-parity --output-on-failure -R 'ilic_(capi|diagnostic)'
+      - name: Run checked-in WASM package tests
+        run: npm test --prefix packages/compiler-wasm
+      - name: Check contract parity
+        run: node scripts/check-diagnostic-contract-parity.mjs .
+
+  diagnostic-language-tools:
+    name: P6 Language Tools Diagnostics
+    needs: diagnostic-catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: edigonzales/interlis-language-tools
+          path: interlis-language-tools
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: interlis-language-tools/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: interlis-language-tools
+      - run: pnpm build:packages
+        working-directory: interlis-language-tools
+      - run: pnpm typecheck && pnpm lint && pnpm test
+        working-directory: interlis-language-tools
+
+  diagnostic-web-ide:
+    name: P6 Web IDE Diagnostics
+    needs: diagnostic-language-tools
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: edigonzales/interlis-language-tools
+          path: interlis-language-tools
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          repository: edigonzales/interlis-web-ide
+          path: interlis-web-ide
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: |
+            interlis-language-tools/pnpm-lock.yaml
+            interlis-web-ide/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile && pnpm pack:verify
+        working-directory: interlis-language-tools
+      - run: pnpm install --no-frozen-lockfile --force --update-checksums
+        working-directory: interlis-web-ide
+      - run: pnpm typecheck && pnpm test && pnpm build
+        working-directory: interlis-web-ide
+
+  diagnostic-architecture-guards:
+    name: P6 Architecture Guards
+    needs: diagnostic-catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Run positive guards
+        run: |
+          node scripts/check-diagnostic-architecture.mjs .
+          node scripts/generate-diagnostic-quality-report.mjs . --output diagnostic-quality.json
+      - name: Run negative guard canary
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-diagnostic-architecture.mjs . --canary
+          status=$?
+          test "$status" -ne 0

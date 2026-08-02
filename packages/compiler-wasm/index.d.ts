@@ -1,6 +1,25 @@
 export type DiagnosticSeverity = "error" | "warning" | "information" | "hint";
 export interface Position { line: number; character: number; byteOffset: number; }
 export interface SourceRange { uri: string; start: Position; end: Position; }
+export type DiagnosticPhase =
+  | "unknown"
+  | "lexical"
+  | "syntax"
+  | "editor-recovery"
+  | "model-discovery"
+  | "resolution"
+  | "semantic"
+  | "translation"
+  | "repository"
+  | "formatting"
+  | "request"
+  | "internal";
+export type DiagnosticTag =
+  | "primary"
+  | "cascaded"
+  | "recovery"
+  | "deprecated"
+  | "unnecessary";
 export interface Diagnostic {
   severity: DiagnosticSeverity;
   code: string;
@@ -10,7 +29,10 @@ export interface Diagnostic {
   notes: string[];
   treatedAsError: boolean;
   source?: "compiler" | "live" | "lint";
-  tags?: Array<"unnecessary" | "deprecated">;
+  phase?: DiagnosticPhase;
+  tags?: Array<DiagnosticTag>;
+  helpId?: string;
+  fingerprint?: string;
 }
 export interface LogEvent {
   level: "trace" | "debug" | "information" | "warning" | "error";

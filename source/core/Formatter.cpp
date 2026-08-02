@@ -5,6 +5,7 @@
 
 #include "ANTLRErrorListener.h"
 #include "CommonTokenStream.h"
+#include "../input/parser/ParserDiagnosticTranslator.h"
 
 #include <algorithm>
 #include <cctype>
@@ -17,18 +18,23 @@ class SyntaxErrorCollector final : public antlr4::ANTLRErrorListener {
 public:
    explicit SyntaxErrorCollector(std::string uri) : uri_(std::move(uri)) {}
 
-   void syntaxError(antlr4::Recognizer *,antlr4::Token *,size_t line,size_t column,
+   void syntaxError(antlr4::Recognizer *,antlr4::Token *offendingSymbol,size_t line,size_t column,
       const std::string &message,std::exception_ptr) override
    {
       Diagnostic diagnostic;
-      diagnostic.code = "ILIC-PARSE-SYNTAX";
-      diagnostic.message = message;
+      const auto translation = parser::translateParserDiagnostic(message,
+         offendingSymbol == nullptr ? std::string_view{} : offendingSymbol->getText());
+      diagnostic.code = translation.code;
+      diagnostic.message = translation.message;
       diagnostic.range.valid = true;
       diagnostic.range.uri = uri_;
       diagnostic.range.start.line = line == 0 ? 0 : line - 1;
       diagnostic.range.start.character = column;
       diagnostic.range.end = diagnostic.range.start;
-      ++diagnostic.range.end.character;
+      diagnostic.range.end.character += offendingSymbol == nullptr ? 1 :
+         std::max<std::size_t>(1,offendingSymbol->getText().size());
+      diagnostic.source = "compiler";
+      diagnostic.phase = DiagnosticPhase::Syntax;
       diagnostics.push_back(std::move(diagnostic));
    }
 
