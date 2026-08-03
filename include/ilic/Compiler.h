@@ -13,6 +13,10 @@
 
 namespace ilic {
 
+namespace detail {
+class CompilerSessionState;
+}
+
 struct SemanticSnapshot;
 struct CompilationAnalysisResult;
 
@@ -88,10 +92,9 @@ public:
    void clearIncrementalCaches();
 
 private:
-   struct Impl;
    friend struct CompilerSessionTestAccess;
    CompilationAnalysisResult compileAndAnalyzeUnlocked(const CompilationRequest &request);
-   std::unique_ptr<Impl> impl_;
+   std::unique_ptr<detail::CompilerSessionState> impl_;
    std::uint64_t compileInvocationCount_ = 0;
 };
 
