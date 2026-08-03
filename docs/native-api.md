@@ -100,9 +100,9 @@ struct CompilationResult {
 ```
 
 `cancelled` ist für den stabilen Vertrag reserviert; eine aktive Cancel-API ist
-noch nicht implementiert. Kompilationen verschiedener Sessions werden im
-aktuellen Prozess serialisiert. Source-Verwaltung und Formatierung können
-weiterhin pro Session beziehungsweise pro Aufruf organisiert werden.
+noch nicht implementiert. Operationen derselben `CompilerSession` werden durch
+deren Mutex serialisiert; verschiedene Sessions können parallel kompilieren.
+Unabhängige Formatierungsaufrufe können ebenfalls parallel laufen.
 
 Die JSON-Diagnosefelder sind additiv: neben Severity, Code, Message, Range,
 Related Information, Notes und `treatedAsError` können `source`, `phase`,

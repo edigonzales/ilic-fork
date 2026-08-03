@@ -14,9 +14,14 @@ function(ilic_configure_repository_dependencies curl_target xml_target)
         add_library(ilic-pugixml STATIC
             "${ilic_pugixml_SOURCE_DIR}/src/pugixml.cpp"
         )
-        target_include_directories(ilic-pugixml PUBLIC
+        target_include_directories(ilic-pugixml SYSTEM PUBLIC
             "${ilic_pugixml_SOURCE_DIR}/src"
         )
+        if(MSVC)
+            target_compile_options(ilic-pugixml PRIVATE /W0)
+        else()
+            target_compile_options(ilic-pugixml PRIVATE -w)
+        endif()
         add_library(pugixml::pugixml ALIAS ilic-pugixml)
     endif()
 

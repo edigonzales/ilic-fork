@@ -29,7 +29,8 @@ END AnyClassRegression.
    ILIC_REQUIRE(result.success);
    ILIC_REQUIRE(result.errorCount == 0);
    ILIC_REQUIRE(!result.models.empty());
-   ILIC_REQUIRE(session.sources().position(uri, 0).line == 0);
+   const auto &sources = static_cast<const ilic::CompilerSession &>(session).sources();
+   ILIC_REQUIRE(sources.position(uri, 0).line == 0);
 
    const char *invalidUri = "memory:///UnknownDomain.ili";
    session.putSource(invalidUri, R"ili(INTERLIS 2.3;

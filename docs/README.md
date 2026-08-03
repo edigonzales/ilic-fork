@@ -48,6 +48,7 @@ node docs/examples/wasm-session.mjs
 | Modell-Repositories, Auflösung und Cache    | [Repositories](repositories.md)                                      |
 | Fehlerpositionen und strukturierte Logs     | [Diagnostik und Logging](diagnostik-und-logging.md)                  |
 | C++-API, C-ABI und JSON-Protokoll           | [Native APIs](native-api.md)                                         |
+| Verantwortlichkeiten der Kernmodule         | [Modulgrenzen](architecture/module-boundaries.md)                    |
 | Dateiweise und semantische Inkrementalität  | [Inkrementelle Compiler-Sessions](architecture/incremental-compilation.md) |
 | Versionierte Syntax-/Semantik-Snapshots     | [Language-Tooling-Snapshots](language-tooling-snapshots.md)          |
 | WebAssembly, Node, Browser, Worker und LSP  | [WASM](wasm.md)                                                      |
@@ -80,5 +81,5 @@ WASM-Modul unabhängig von einer bestimmten Host-Plattform.
 
 - Die Sprachhandbücher und Metamodelldokumente bleiben unter [`../doc`](../doc/).
 - Die versionierten JSON-Schemas liegen unter [`../schemas`](../schemas/).
-- Die öffentliche Conformance-Suite ist auf
-  [Codeberg](https://codeberg.org/edigonzales/interlis-compiler-conformance) verfügbar.
+- Die massgebliche Compiler-Testsuite ist auf
+  [Codeberg](https://codeberg.org/edigonzales/interlis-compiler-testsuite) verfügbar.

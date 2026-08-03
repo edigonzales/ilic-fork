@@ -2,75 +2,66 @@
 
 [Dokumentationsindex](README.md) · [Funktionsumfang](funktionsumfang.md)
 
-Die unabhängige Suite liegt im Schwesterprojekt
-[`interlis-compiler-conformance`](https://codeberg.org/edigonzales/interlis-compiler-conformance).
-Dieses Compiler-Repository enthält keine Conformance-Fixtures, keinen Manifest-Importer
-und keinen Conformance-Runner mehr.
+Die einzige massgebliche, compilerübergreifende Referenz ist die externe
+[`interlis-compiler-testsuite`](https://codeberg.org/edigonzales/interlis-compiler-testsuite).
+Sie enthält den Runner, die kanonischen Testfälle, deren erwartetes Ergebnis und
+die dazugehörigen Verweise auf die Testmodelle. Dieses Repository dupliziert
+weder die Suite noch den Runner.
 
-## Grundmodell
+## Verantwortungsgrenze
 
-Das Schwesterprojekt versioniert ein gemeinsames Referenzset. `ili2c` und `ilic`
-werden unabhängig daran gemessen. Das Referenzset enthält mindestens die erwartete
-Compilerentscheidung `true` oder `false`; geprüfte semantische Diagnoseerwartungen
-können später ergänzt werden. Der aktuelle Datensatz umfasst 1049 Inventarfälle
-und 620 ausführbare Referenzset-Fälle. Solange die fachliche Prüfung noch nicht
-abgeschlossen ist, trägt das Set seine Herkunft (`ili2c`) und `reviewed: false`
-sichtbar in `reference/reference-set.json`.
+Die externe Suite umfasst aktuell 610 geprüfte Outcome-Fälle für INTERLIS 1.0,
+2.3 und 2.4. Für jeden Fall wird als portables Muss-Kriterium geprüft, ob der
+Compiler das Modell annimmt oder ablehnt. Neue geeignete Fälle aus `ili2c`
+werden zentral in diese Suite aufgenommen. In `ilic-fork` bleiben nur fokussierte
+Unit-, Integrations- und Regressionstests für das Verhalten der eigenen
+Komponenten.
 
-`reviewed: false` bedeutet, dass die Erwartungen noch nicht für jeden Fall manuell
-bestätigt sind. Ein aktueller `ili2c`-Lauf kann daher `REFERENCE_MISMATCH` melden.
-Das sind offene Fragen zum Referenzset und keine automatisch akzeptierten oder
-als XFAIL klassierten `ilic`-Fehler. Die historischen Inventarwerte
-`needs-adjudication` steuern den Lauf nicht.
+`ilic-fork` besitzt genau einen compilerabhängigen Teil des Conformance-Vertrags:
+[`../conformance/known-failures.json`](../conformance/known-failures.json). Diese
+Baseline beschreibt die elf derzeit akzeptierten Abweichungen. Sie ändert weder
+die Erwartungen der Suite noch verbirgt sie Ergebnisse:
 
-Die wichtigsten Ergebnisgruppen sind:
+- `PASS`: Das tatsächliche Ergebnis entspricht der Suite.
+- `XFAIL`: Eine in der Baseline dokumentierte Abweichung besteht weiterhin.
+- `FAIL`: Eine neue, nicht akzeptierte Abweichung ist aufgetreten.
+- `XPASS`: Eine erwartete Abweichung ist verschwunden; die Baseline muss bewusst
+  geprüft werden.
+- `ERROR`: Runner, Compiler, Timeout oder Testinfrastruktur sind fehlgeschlagen.
 
-- `CONFORMANT`: Compilerentscheidung entspricht dem Referenzset.
-- `ACCEPTS_INVALID`: Referenz erwartet Ablehnung, Compiler akzeptiert.
-- `REJECTS_VALID`: Referenz erwartet Annahme, Compiler lehnt ab.
-- `DIAGNOSTIC_MISMATCH`: Entscheidung stimmt, aber eine geprüfte Diagnosesemantik weicht ab.
-- `REFERENCE_MISMATCH`: `ili2c` selbst weicht vom noch offenen Referenzset ab.
-- `INFRASTRUCTURE_ERROR`: Timeout, Absturz, fehlendes Programm oder Adapterfehler.
+Die elf Baseline-Einträge bleiben vorerst unverändert. Änderungen an der
+Baseline erfordern eine ausdrückliche fachliche Prüfung und einen sichtbaren
+Review; ein fehlgeschlagener Lauf darf nicht durch Umklassifizieren grün gemacht
+werden.
 
-Reine Unterschiede im Meldungstext werden nicht automatisch als semantische Abweichung
-gewertet. Ohne geprüfte Diagnoseerwartung zählt nur die Annahme-/Ablehnungsentscheidung.
+## Reproduzierbarer lokaler Lauf
 
-## Expected Deviations, XFAIL und XPASS
-
-Die sechs bekannten aktuellen `ilic`-Abweichungen stehen im Schwesterprojekt in
-`reference/expected-deviations.json`. Dort wird kein einzelner `XFAIL`-Status
-gespeichert. Das Gate berechnet ihn beim Lauf:
-
-- `XFAIL`: Die dokumentierte Abweichung tritt weiterhin auf; die Pipeline bleibt grün.
-- `XPASS`: Die Abweichung ist unerwartet verschwunden; die Pipeline wird rot, bis
-  der Eintrag geprüft und entfernt wurde.
-
-## Reproduzierbarer Lauf
-
-Im Schwesterprojekt werden `ili2c`, ein `ilic`-Checkout und das Referenzset festgelegt:
+Bei einer Geschwisterstruktur aus `ilic-fork` und
+`interlis-compiler-testsuite` wird die identische Suite wie folgt ausgeführt:
 
 ```sh
-cd /pfad/zu/interlis-compiler-conformance
-export ILI2C_JAR=/pfad/zu/ili2c.jar
-export ILIC_EXECUTABLE=/pfad/zu/ilic/build/ilic
-export ILIC_REPO=/pfad/zu/ilic
+cmake -S . -B build/stabilization -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build/stabilization --parallel
 
-./gradlew ciConformance --no-configuration-cache
+java ../interlis-compiler-testsuite/InterlisConformance.java run \
+  --suite ../interlis-compiler-testsuite/suite/test-cases.json \
+  --compiler ilic=build/stabilization/ilic \
+  --baseline ilic=conformance/known-failures.json \
+  --out build/conformance/local
 ```
 
-Der Lauf erzeugt unter `reports/latest/` `results.json`, `summary.json`,
-`summary.md`, `report.html`, `gate.json` und `gate.md`. Die Pipeline blockiert bei
-neuen Abweichungen, Infrastrukturfehlern und unerwarteten Verbesserungen einer
-ausdrücklich erwarteten Abweichung. Bekannte aktuelle Abweichungen bleiben im
-Report sichtbar und werden über `baselines/ilic/current.json` nachvollziehbar gehalten.
+Der erfolgreiche Sollzustand ist derzeit `PASS=599`, `XFAIL=11`, `FAIL=0`,
+`XPASS=0` und `ERROR=0`. Die Zählung dokumentiert den aktuellen Stand; die
+maschinelle Wahrheit bleiben die gepinnte externe Suite und die lokale Baseline.
 
 ## Compiler-CI
 
-Die normale Compiler-CI führt die Unit-, Integrations- und Regressionstests von `ilic`
-aus. Der Conformance-Lauf wird zentral aus dem Schwesterprojekt gegen den jeweiligen
-`ilic`-Commit gestartet. So bleibt der Compiler frei von einer zweiten Test-Suite und
-die Vergleichslogik befindet sich an einer einzigen Stelle.
+Die normale Conformance-CI und der TSan-Job laden denselben explizit gepinnten
+Commit der `interlis-compiler-testsuite` herunter und führen alle 610 Fälle aus.
+Der Pin verhindert, dass Änderungen eines fremden Repositorys einen ansonsten
+unveränderten Compiler-Build unbemerkt beeinflussen. Eine Aktualisierung des Pins
+ist ein eigener, überprüfbarer Wartungsschritt.
 
-Wenn ein neuer `ilic`-Commit geprüft werden soll, wird die Suite mit diesem
-Commit ausgeführt. Der Compiler selbst muss dafür keine Conformance-Dateien oder
-Runner übernehmen.
+Die übrigen CI-Jobs führen zusätzlich die lokalen nativen und paketbezogenen
+Tests aus. Die lokale Baseline wird dabei nicht erzeugt oder automatisch
+aktualisiert.

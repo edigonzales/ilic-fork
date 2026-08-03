@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CTest entry point for the P2 source-level global-state guard."""
+"""CTest entry point for the source-level global-state guard."""
 
 from pathlib import Path
 import subprocess

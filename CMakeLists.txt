@@ -8,6 +8,18 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
+# Generated parser and metamodel headers are included by many otherwise
+# first-party translation units. Suppress only their two characteristic
+# diagnostics; all other project warnings remain visible.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:CXX>:-Wno-extra-semi>
+        $<$<COMPILE_LANGUAGE:CXX>:-Wno-inconsistent-missing-override>
+    )
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-extra-semi>)
+endif()
+
 option(ILIC_ENABLE_NATIVE_REPOSITORY "Build native HTTP and filesystem repository support" ON)
 option(ILIC_STATIC_DISTRIBUTION "Build ilic as a self-contained distribution binary" OFF)
 option(ILIC_ENABLE_SANITIZERS
@@ -33,10 +45,32 @@ add_library(antlr4-runtime STATIC
 
 target_compile_definitions(antlr4-runtime PUBLIC ANTLR4CPP_STATIC)
 
-target_include_directories(antlr4-runtime
+target_include_directories(antlr4-runtime SYSTEM
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/lib/antlr4/include"
 )
+
+# Keep diagnostics from bundled third-party and generated code separate from
+# project warnings. The parser implementations are included into these three
+# translation units, so source-level suppression is the narrowest boundary
+# without restructuring the generated files.
+if(MSVC)
+    target_compile_options(antlr4-runtime PRIVATE /W0)
+    set_source_files_properties(
+        source/input/ili1/Ili1Input.cpp
+        source/input/ili2/Ili2Input.cpp
+        source/util/IliFile.cpp
+        PROPERTIES COMPILE_OPTIONS /W0
+    )
+else()
+    target_compile_options(antlr4-runtime PRIVATE -w)
+    set_source_files_properties(
+        source/input/ili1/Ili1Input.cpp
+        source/input/ili2/Ili2Input.cpp
+        source/util/IliFile.cpp
+        PROPERTIES COMPILE_OPTIONS -w
+    )
+endif()
 
 set(ILIC_CORE_SOURCES
     source/core/Compiler.cpp
@@ -292,11 +326,11 @@ if(BUILD_TESTING)
     )
     set_tests_properties(ilic_native_editor_architecture_negative_canary PROPERTIES LABELS "architecture")
     add_test(
-        NAME ilic_no_javascript_parser
-        COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-native-editor-architecture.py"
+        NAME ilic_architecture_boundaries
+        COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-architecture-boundaries.py"
             "${CMAKE_CURRENT_SOURCE_DIR}"
     )
-    set_tests_properties(ilic_no_javascript_parser PROPERTIES LABELS "architecture")
+    set_tests_properties(ilic_architecture_boundaries PROPERTIES LABELS "architecture")
     add_test(
         NAME ilic_repository_layering
         COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-repository-layering.py"

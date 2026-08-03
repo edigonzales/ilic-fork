@@ -1,5 +1,3 @@
-#pragma once
-
 #include "GmlOutput.h"
 #include "../metamodel/MetaModelOutput.h"
 #include "../util/StringMap.h"

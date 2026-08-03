@@ -2,6 +2,7 @@
 
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import { repositoryPath, verifyRepositoryPathPortability } from "./repository-path.mjs";
 
 const CODE_RE = /\bILIC-[A-Z0-9]+(?:-[A-Z0-9]+)+\b/g;
 
@@ -25,13 +26,19 @@ async function filesUnder(directory) {
 
 async function main() {
   const root = resolve(process.argv[2] ?? process.cwd());
+  verifyRepositoryPathPortability();
   const files = [];
   for (const directory of ["include", "source", "packages"]) {
     files.push(...(await filesUnder(resolve(root, directory))));
   }
   const contents = new Map();
   for (const file of files) contents.set(file, await readFile(file, "utf8"));
-  const catalogFiles = files.filter((file) => file.endsWith("source/util/DiagnosticCode.cpp") || file.endsWith("source/diagnostics/DiagnosticCatalog.cpp"));
+  const sourcePath = (file) => repositoryPath(root, file);
+  const catalogFiles = files.filter((file) => {
+    const candidate = sourcePath(file);
+    return candidate === "source/util/DiagnosticCode.cpp" ||
+      candidate === "source/diagnostics/DiagnosticCatalog.cpp";
+  });
   const catalogCodes = catalogFiles.flatMap((file) => {
     const text = contents.get(file);
     return [
@@ -48,11 +55,12 @@ async function main() {
     }
     if (/T__\d+/.test(text) && /diagnostic|message|error/i.test(text)) errors.push(`ANTLR token name leak in ${file}`);
     if (/typeid\([^)]*\)\.name\(\)/.test(text) && /diagnostic|message/i.test(text)) errors.push(`C++ type-name leak in ${file}`);
-    if (!file.endsWith("source/repository/Md5.cpp") && !file.endsWith("packages/compiler-wasm/ilic.mjs") && /(?:^|["' ])0x[0-9a-f]{6,}/i.test(text) && /diagnostic|message/i.test(text)) errors.push(`pointer-like diagnostic text in ${file}`);
+    const candidate = sourcePath(file);
+    if (candidate !== "source/repository/Md5.cpp" && candidate !== "packages/compiler-wasm/ilic.mjs" && /(?:^|["' ])0x[0-9a-f]{6,}/i.test(text) && /diagnostic|message/i.test(text)) errors.push(`pointer-like diagnostic text in ${file}`);
   }
   const workbench = [...contents.entries()].find(([file]) => file.endsWith("src/workbench/workbench.ts"));
   if (workbench && /textContent\.split\(|innerText\.split\(|rendered.*diagnostic/i.test(workbench[1])) errors.push("Web-IDE derives Problems from rendered text");
-  if (process.argv.includes("--canary")) errors.push("canary: unregistered diagnostic code ILIC-P6-CANARY-UNREGISTERED");
+  if (process.argv.includes("--canary")) errors.push("canary: unregistered diagnostic code ILIC-GUARD-CANARY-UNREGISTERED");
   if (errors.length) {
     for (const error of errors) console.error(error);
     process.exitCode = 1;

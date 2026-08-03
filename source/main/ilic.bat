@@ -1,1 +1,0 @@
-clang --compile --std=c++17 -w --include-directory=c:\shared\flib\opensource\antlr4\runtime\src ilic.cpp

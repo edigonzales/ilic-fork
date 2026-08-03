@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject the process-global compiler state removed by P2.
+"""Reject process-global compiler state.
 
 This is intentionally a small source-level guard.  It is not a C++ parser and
 therefore reports suspicious declarations for human review instead of trying
@@ -158,10 +158,10 @@ def main(root: pathlib.Path) -> int:
             parenthesis_depth += parenthesis_line.count("(") - parenthesis_line.count(")")
 
     if violations:
-        print("P2 compiler global-state guard failed:", file=sys.stderr)
+        print("compiler global-state guard failed:", file=sys.stderr)
         print("\n".join(violations), file=sys.stderr)
         return 1
-    print("P2 compiler global-state guard passed")
+    print("compiler global-state guard passed")
     return 0
 
 

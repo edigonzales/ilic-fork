@@ -1,6 +1,6 @@
 # CompilerContext
 
-P2 trennt drei Lebensdauern: unveränderliche Prozessdaten, eine
+Die Compilerarchitektur trennt drei Lebensdauern: unveränderliche Prozessdaten, eine
 `CompilerSession` mit ihrem `SourceManager` und einen einzelnen
 Kompilationslauf. Jeder Lauf konstruiert intern einen neuen
 `ilic::detail::CompilerContext`. Der Context besitzt Logger, Source-Sicht,

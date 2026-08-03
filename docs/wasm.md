@@ -229,8 +229,8 @@ der Fehlerstelle noch defensiv behandeln; Details stehen unter
 
 ## Grenzen
 
-- Compilation ist innerhalb eines Moduls synchron und derzeit global
-  serialisiert.
+- Compilation ist innerhalb eines Moduls synchron. Aufrufe derselben Session
+  sind serialisiert; verschiedene Sessions können parallel verwendet werden.
 - Es gibt noch keine kooperative Cancel-Funktion in der C-ABI.
 - Worker-Terminierung ist die harte Abbruchgrenze.
 - Repository- und Cache-Fehler entstehen im Host vor dem Compiler und müssen

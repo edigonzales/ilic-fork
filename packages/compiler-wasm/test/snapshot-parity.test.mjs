@@ -10,9 +10,8 @@ const root = resolve(import.meta.dirname, "../../..");
 const modulePath = resolve(import.meta.dirname, "../ilic.mjs");
 const driver = process.env.ILIC_SNAPSHOT_DRIVER
   ?? [
-    resolve(root, "build/p5.1-baseline-release/ilic_snapshot_json_driver"),
+    resolve(root, "build/stabilization/ilic_snapshot_json_driver"),
     resolve(root, "build/ci/ilic_snapshot_json_driver"),
-    resolve(root, "build/p3-baseline/ilic_snapshot_json_driver"),
   ].find(existsSync);
 const fixtures = ["valid.ili", "incomplete.ili", "wrong-end.ili", "crlf.ili"];
 

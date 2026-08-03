@@ -104,19 +104,19 @@ Downloads lokal cachen. Node und Browser erhalten dieselbe Host-Funktion über
 | `@ilic/compiler-wasm` | Node, Browser, Theia und VS Code Web Extensions |
 | Worker-Adapter | Compilerarbeit außerhalb des UI-Threads |
 
-Compilation und Formatierung sind synchron. Kompilationen werden im aktuellen
-Core pro Prozess serialisiert, weil Teile des historischen Metamodells globalen
-Zustand verwenden. Für eine harte Abbruchgrenze im Browser wird ein Worker
+Compilation und Formatierung sind synchron. Operationen derselben Session sind
+serialisiert, verschiedene Sessions und unabhängige Formatierungsaufrufe können
+parallel laufen. Für eine harte Abbruchgrenze im Browser wird ein Worker
 terminiert und neu erzeugt; `CompilationResult.cancelled` wird derzeit nicht
 aktiv durch eine Cancel-API gesetzt.
 
 ## Bewusste Grenzen
 
-- Die externe Suite bewertet aktuell 620 ausführbare Referenzset-Fälle aus einem
-  Inventar von 1049 Fällen. Das Referenzset ist noch nicht manuell freigegeben
-  (`reviewed: false`); offene `REFERENCE_MISMATCH`-Fälle bleiben deshalb sichtbar.
-  Identische Fehlermeldungstexte oder sämtliche `ili2c`-Ausgabefunktionen sind nicht
-  automatisch Bestandteil der Compile-Conformance.
+- Die externe `interlis-compiler-testsuite` bewertet 610 kanonische Outcome-Fälle.
+  Die elf bekannten `ilic`-Abweichungen stehen ausschliesslich in
+  `conformance/known-failures.json`; identische Fehlermeldungstexte oder sämtliche
+  `ili2c`-Ausgabefunktionen sind nicht automatisch Bestandteil der
+  Compile-Conformance.
 - Das WASM-Modul enthält kein HTTP-, Dateisystem- oder Cache-Backend.
 - `@ilic/compiler-wasm` und `@ilic/tools` sind für versionierte npm-Snapshots
   vorbereitet. Ihre tatsächliche Verfügbarkeit beginnt nach dem einmaligen

@@ -46,6 +46,16 @@ Link nicht selbst ein; dafür sorgt `add_library(antlr4-runtime STATIC ...)`.
 Das ANTLR-Makro steuert nur die Export-/Import-Deklarationen der ANTLR-Symbole,
 während `/MT` die Microsoft-C++-Runtime in das Programm einbindet.
 
+Die gebündelte Runtime und pugixml sind in CMake als Third-Party-Code markiert;
+ihre Include-Verzeichnisse sind `SYSTEM` und ihre eigenen Compilerwarnungen
+werden am jeweiligen Target unterdrückt. Die generierten Parserimplementierungen
+werden historisch in drei Übersetzungseinheiten eingebunden. Nur für diese drei
+Dateien (`Ili1Input.cpp`, `Ili2Input.cpp` und `IliFile.cpp`) werden Warnungen
+unterdrückt. Weil generierte Parser- und Metamodellheader von vielen weiteren
+Dateien eingebunden werden, sind zusätzlich nur deren charakteristische
+`extra-semi`- und `inconsistent-missing-override`-Diagnosen deaktiviert.
+Alle übrigen Warnungen im Projektcode bleiben sichtbar.
+
 ## Windows-Build-Stack
 
 Der aktuelle Fork baut Windows x86_64 über CMake und ein daraus generiertes
@@ -59,25 +69,6 @@ Die Prüfung benötigt kein vorher initialisiertes Visual-Studio-Terminal:
 `dumpbin.exe` wird zuerst über `PATH` und andernfalls über `vswhere.exe` aus
 dem Visual-Studio-Installer gesucht. Dafür müssen die Visual-Studio-C++-Tools
 (`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`) installiert sein.
-
-Das ist ein anderer Buildpfad als im ursprünglichen
-[`infogrips/ilic`](https://github.com/infogrips/ilic). Dort beschreibt
-`build/vc2019/ilic.vcxproj` ein handgepflegtes Visual-Studio-Projekt mit dem
-`ClangCL`-Toolset und referenziert vorgebaute
-`antlr4-runtime.lib`-Dateien aus einem `Static`-Verzeichnis. Auch dieser
-Upstream-Pfad ist statisch gelinkt; der Unterschied liegt in der Bereitstellung
-der Runtime und in der Toolchain. Der Fork baut die bereits eingecheckten
-ANTLR-Quellen reproduzierbar selbst und validiert den Windows-Build in der
-CI.
-
-Die Windows-CI hat dadurch Portabilitätsprobleme sichtbar gemacht, die im
-vorbereiteten Upstream-Build nicht auftraten. `C2491` entstand, weil MSVC beim
-Übersetzen der statischen ANTLR-Runtime ohne `ANTLR4CPP_STATIC` fälschlich
-`dllimport`-Deklarationen sah. Der Fehler bei `std::replace` in
-`RepositoryUri.cpp` war eine separate MSVC-Typüberladung zwischen `char` und
-`wchar_t`. Beide Korrekturen betreffen die Kompatibilität des neuen
-CMake/MSVC-Buildpfads und ändern nicht die öffentliche Compiler- oder
-Repository-API.
 
 ## Normaler Build
 
@@ -147,6 +138,13 @@ cmake --build build/native --target check-parser-regeneration
 
 Das Target verwendet den mitgelieferten ANTLR-4.7.1-Generator in einem
 temporären Buildverzeichnis und überschreibt keine eingecheckten Parserdateien.
+
+Die schemaabgeleiteten Metamodell- und IMD-Quellen besitzen zusätzlich ihre
+historischen Generator-Konfigurationen unter `source/metamodel/*.cfg` und
+`source/output/genimd.cfg`. Sie sind keine Buildabhängigkeit, dokumentieren aber
+weiterhin die Ableitung der eingecheckten C++-Quellen. Sicherungskopien und
+Generatorausgaben gehören nicht ins Repository; die Git-Historie bewahrt ältere
+Stände.
 
 ## Emscripten SDK
 

@@ -11,12 +11,12 @@ build/npm/
 packages/compiler-wasm/ilic.mjs
 packages/compiler-wasm/ilic.wasm
 
+# Package-manager output from local package testing
+node_modules/
+packages/*/package-lock.json
+packages/*/pnpm-lock.yaml
+
 build/bin/*
-build/vc2019/.vs/*
-build/vc2019/Debug/*
-build/vc2019/Release/*
-build/vc2019/x64/*
-build/vc2019/*.user
 lib/antlr4/bin/java/antlr-4.7.1-complete.jar
 lib/antlr4/bin/win/x64/Debug Static/antlr4-runtime.lib
 lib/antlr4/bin/win/x86/Debug Static/antlr4-runtime.lib

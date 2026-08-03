@@ -117,9 +117,9 @@ export interface EditorSnapshot {
   compilerVersion: string;
   kind: "editor";
   success: boolean;
-  /** P3 runtime results always include this; optional for legacy fixtures. */
+  /** Current runtime results always include this; optional for legacy fixtures. */
   recovered?: boolean;
-  /** P3 runtime results always include this; optional for legacy fixtures. */
+  /** Current runtime results always include this; optional for legacy fixtures. */
   complete?: boolean;
   uri: string;
   documentVersion: number;

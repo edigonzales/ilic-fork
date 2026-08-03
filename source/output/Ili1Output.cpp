@@ -1,5 +1,3 @@
-#pragma once
-
 #include "Ili1Output.h"
 #include "../metamodel/MetaModelOutput.h"
 #include "../util/TextWriter.h"

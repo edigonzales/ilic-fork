@@ -1,5 +1,3 @@
-#pragma once
-
 #include "Ili2Input.h"
 #include "Ili2Input_helper.h"
 #include "../../metamodel/MetaModelBuilder.h"

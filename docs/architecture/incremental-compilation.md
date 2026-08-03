@@ -1,4 +1,4 @@
-# P5: Inkrementelle Compiler-Sessions
+# Inkrementelle Compiler-Sessions
 
 Eine `ilic::CompilerSession` hält Quellen, Parser-Artefakte und semantische
 Root-Ergebnisse über mehrere Anfragen hinweg. Quellen werden über

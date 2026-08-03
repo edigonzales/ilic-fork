@@ -1,8 +1,8 @@
 # ilic Developer Documentation
 
-> The current user and embedding documentation is maintained in
-> [`../../docs/README.md`](../../docs/README.md). The pages in this directory
-> remain as historical implementation notes.
+> The current user, architecture and embedding documentation is maintained in
+> [`../../docs/README.md`](../../docs/README.md). This directory only retains
+> the still applicable coding and embedding notes.
 
 ## Introduction
 Welcome to the ilic developer documentation. ilic is an INTERLIS compiler written in c++. 
@@ -19,14 +19,7 @@ ilic was completely built from scratch, this is no c++ port of the
 + supported input formats: INTERLIS 1.0, 2.3 and 2.4
 + supported output formats: INTERLIS 1.0, 2.3 and 2.4, imd, xsd, gml
 
-## Historischer Upstream-Windows-Build
-
-Die folgenden Hinweise beschreiben den ursprünglichen Visual-Studio-Pfad des
-Upstream-Repositories. Dafür werden die vorgebauten statischen Bibliotheken aus
-`lib/antlr4/bin.zip` nach `lib/antlr4/bin` entpackt und das vorbereitete Projekt
-unter `build/vc2019` mit Visual Studio verwendet. Dieser Pfad ist für die
-Historie des Projekts dokumentiert, aber nicht der aktuelle CMake-Build des
-Forks.
+## Build und Generatoren
 
 Für den aktuellen lokalen Build, den Windows-CI-Stack und die Erklärung der
 ANTLR-Runtime siehe [Build und Installation](../../docs/build-und-installation.md),
@@ -40,9 +33,6 @@ werden. Die aktuelle, nicht überschreibende Prüfung ist unter
 beschrieben.
 
 ## Additional Information
-+ [ilic overall architecture](./architecture.md)
++ [current architecture and public APIs](../../docs/README.md)
 + [coding conventions](./codingconventions.md)
-+ [general api](./general_api.md)
-+ [input module api](./input_api.md)
-+ [output module api](./output_api.md)
 + [native C ABI, JSON protocol and WebAssembly embedding](./embedding.md)

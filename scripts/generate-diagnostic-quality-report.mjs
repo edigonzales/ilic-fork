@@ -2,6 +2,7 @@
 
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { repositoryPath, verifyRepositoryPathPortability } from "./repository-path.mjs";
 
 const CODE_RE = /\bILIC-[A-Z0-9]+(?:-[A-Z0-9]+)+\b/g;
 const MESSAGE_LEAK_RE = /\bT__\d+\b|(?:^|[\\/])(?:tmp|var\/folders)(?:[\\/]|$)|\b(?:std|ilic|parser)::[A-Za-z_][A-Za-z0-9_:]*|0x[0-9a-f]{6,}/i;
@@ -68,6 +69,7 @@ function validRange(value) {
 
 async function main() {
   const root = resolve(option("--root", process.cwd()));
+  verifyRepositoryPathPortability();
   const output = process.argv.includes("--output")
     ? resolve(option("--output", "diagnostic-quality.json"))
     : null;
@@ -77,12 +79,15 @@ async function main() {
     sourceFiles.push(...(await filesUnder(resolve(root, directory))));
   }
   const source = (await Promise.all(sourceFiles.map((path) => readFile(path, "utf8")))).join("\n");
-  const catalogSource = sourceFiles
-    .filter((path) => path.endsWith("source/util/DiagnosticCode.cpp") || path.endsWith("source/diagnostics/DiagnosticCatalog.cpp"));
+  const catalogSource = sourceFiles.filter((path) => {
+    const candidate = repositoryPath(root, path);
+    return candidate === "source/util/DiagnosticCode.cpp" ||
+      candidate === "source/diagnostics/DiagnosticCatalog.cpp";
+  });
   const catalogText = (await Promise.all(catalogSource.map((path) => readFile(path, "utf8")))).join("\n");
   const catalogCodes = new Set(uniqueCodes(catalogText));
   const productionCodes = new Set(uniqueCodes(source));
-  if (process.argv.includes("--canary")) productionCodes.add("ILIC-P6-CANARY-UNREGISTERED");
+  if (process.argv.includes("--canary")) productionCodes.add("ILIC-GUARD-CANARY-UNREGISTERED");
   const unregisteredCodes = [...productionCodes].filter((code) => !catalogCodes.has(code)).sort();
   const diagnostics = inputPath ? diagnosticValues(await readFile(inputPath, "utf8")) : [];
   const exactIdentities = new Set();

@@ -1,7 +1,7 @@
 import type { EditorSnapshot } from "../index.js";
 
-// This intentionally models a pre-P3 consumer result. The additive P3 fields
-// remain optional in the public type declaration for this compatibility case.
+// This intentionally models a result from an older consumer. The additive
+// fields remain optional in the public type declaration for this compatibility case.
 const legacyFixture: EditorSnapshot = {
   schemaVersion: 1,
   abiVersion: 1,

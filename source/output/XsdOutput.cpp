@@ -1,5 +1,3 @@
-#pragma once
-
 #include "XsdOutput.h"
 
 #include "../metamodel/MetaModelOutput.h"

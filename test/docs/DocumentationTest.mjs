@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 
 const sourceRoot = resolve(process.argv[2] ?? ".");
 const docsRoot = join(sourceRoot,"docs");
+const retiredConformanceRepository = ["interlis","compiler","conformance"].join("-");
 const required = [
   "README.md","funktionsumfang.md","build-und-installation.md","cli.md","formatter.md",
   "repositories.md","diagnostik-und-logging.md","native-api.md","wasm.md","conformance.md",
@@ -41,6 +42,7 @@ const checkedMarkdown = [
   join(sourceRoot,"readme.md"),
   join(sourceRoot,"doc/dev/readme.md"),
   join(sourceRoot,"doc/dev/embedding.md"),
+  join(sourceRoot,"packages/repository-core/README.md"),
   join(sourceRoot,"packages/compiler-wasm/README.md"),
   join(sourceRoot,"packages/tools/README.md")
 ];
@@ -50,6 +52,14 @@ for (const markdown of checkedMarkdown) {
   const fences = text.match(/^```/gm) ?? [];
   assert.equal(fences.length % 2,0,`${markdown}: unclosed fenced code block`);
   assert.doesNotMatch(text,/\/Users\/stefan\//,`${markdown}: contains a machine-specific path`);
+  assert.ok(!text.includes(retiredConformanceRepository),
+    `${markdown}: references the retired conformance repository`);
+  assert.doesNotMatch(text,/\bMetaModelInput\b|\bmetamodel::(?:add|get)_(?:model|import|dependency|axisspec)\b/,
+    `${markdown}: documents a retired internal API`);
+  assert.doesNotMatch(text,/Kompilationen verschiedener Sessions[\s\S]{0,80}serialisiert|Core pro Prozess serialisiert|derzeit global\s+serialisiert/,
+    `${markdown}: contains an obsolete thread-safety statement`);
+  assert.doesNotMatch(text,/^#{1,6}\s+P[0-7](?:\.[0-9]+)?\b/gmi,
+    `${markdown}: contains a phase-prefixed heading`);
   for (const match of text.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
     let target = match[1].trim();
     if (target.startsWith("<") && target.endsWith(">")) target = target.slice(1,-1);
@@ -63,6 +73,37 @@ for (const markdown of checkedMarkdown) {
         `${markdown}: broken heading link ${match[1]}`);
     }
   }
+}
+
+function filesBelow(directory) {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory).flatMap(name => {
+    const path = join(directory,name);
+    return statSync(path).isDirectory() ? filesBelow(path) : [path];
+  });
+}
+
+const artifactPaths = [
+  ...readdirSync(sourceRoot).map(name => join(sourceRoot,name)),
+  ...filesBelow(docsRoot),
+  ...filesBelow(join(sourceRoot,"scripts")),
+  ...filesBelow(join(sourceRoot,".github","workflows")),
+];
+for (const path of artifactPaths) {
+  const relative = path.slice(sourceRoot.length + 1).replaceAll("\\","/");
+  assert.doesNotMatch(relative,/(?:^|[/_.-])p[0-7](?:\.[0-9]+)?(?:[/_.-]|$)/i,
+    `${relative}: phase-prefixed artifact name`);
+}
+
+for (const path of [
+  ...filesBelow(join(sourceRoot,"scripts")),
+  ...filesBelow(join(sourceRoot,".github","workflows")),
+]) {
+  const text = readFileSync(path,"utf8");
+  assert.doesNotMatch(text,/\bP[0-7](?:\.[0-9]+)?\b|ILIC-P[0-7]-/,
+    `${path}: phase marker in active automation`);
+  assert.ok(!text.includes(retiredConformanceRepository),
+    `${path}: references the retired conformance repository`);
 }
 
 const cli = readFileSync(join(docsRoot,"cli.md"),"utf8");
