@@ -40,8 +40,23 @@ target_include_directories(antlr4-runtime
 
 set(ILIC_CORE_SOURCES
     source/core/Compiler.cpp
+    source/core/CompilerSessionState.cpp
     source/core/CompilerContext.cpp
     source/core/CompilationSourceStore.cpp
+    source/core/CompilationKeys.cpp
+    source/core/CompilationTranscript.cpp
+    source/core/ExternalMetaAttributeApplier.cpp
+    source/core/ParsedSourceArtifactFactory.cpp
+    source/core/LanguageDetector.cpp
+    source/core/Ili1EditorProjector.cpp
+    source/core/Ili2EditorProjector.cpp
+    source/core/StrictSourceParser.cpp
+    source/core/TolerantEditorParser.cpp
+    source/core/SnapshotParserSupport.cpp
+    source/core/CompilationRun.cpp
+    source/core/CompilationOrchestrator.cpp
+    source/core/SourceUpdateCoordinator.cpp
+    source/core/SnapshotService.cpp
     source/core/Formatter.cpp
     source/core/SourceManager.cpp
     source/core/SourceRangeMapper.cpp
@@ -132,7 +147,12 @@ target_link_libraries(ilic-core PUBLIC antlr4-runtime)
 add_library(ilic-json STATIC source/abi/Json.cpp)
 target_include_directories(ilic-json PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/source/abi")
 
-add_library(ilic-capi STATIC source/abi/Capi.cpp)
+add_library(ilic-capi STATIC
+    source/abi/Capi.cpp
+    source/abi/CapiJsonProjectors.cpp
+    source/abi/CapiRegistries.cpp
+    source/abi/CapiRequestDecoder.cpp
+)
 add_library(ilic::capi ALIAS ilic-capi)
 target_include_directories(ilic-capi
     PUBLIC
@@ -154,6 +174,9 @@ if(EMSCRIPTEN)
     target_compile_options(ilic-core PRIVATE "-fexceptions")
     add_executable(ilic-wasm
         source/abi/Capi.cpp
+        source/abi/CapiJsonProjectors.cpp
+        source/abi/CapiRegistries.cpp
+        source/abi/CapiRequestDecoder.cpp
         source/abi/Json.cpp
     )
     target_compile_options(ilic-wasm PRIVATE "-fexceptions")

@@ -10,6 +10,10 @@ const declarations = await readFile(
   "utf8",
 );
 const capi = await readFile(resolve(root, "source/abi/Capi.cpp"), "utf8");
+const projectors = await readFile(
+  resolve(root, "source/abi/CapiJsonProjectors.cpp"),
+  "utf8",
+);
 
 const phases = [
   "unknown",
@@ -35,7 +39,7 @@ for (const tag of tags) {
   if (!declarations.includes(`| "${tag}"`)) errors.push(`missing WASM tag ${tag}`);
 }
 for (const required of ["phase", "tags", "helpId", "fingerprint"]) {
-  if (!header.includes(required) || !capi.includes(required)) {
+  if (!header.includes(required) || !(capi + projectors).includes(required)) {
     errors.push(`missing native/C-ABI field ${required}`);
   }
 }
