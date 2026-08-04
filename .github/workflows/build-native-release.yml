@@ -314,63 +314,41 @@ jobs:
               >/dev/null
           done
 
-  publish-npm-release:
-    name: Publish stable npm packages
+  request-npm-release:
+    name: Request stable npm publication
     needs:
       - build-npm-release
       - publish-release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.build-npm-release.result == 'success' &&
+      needs.publish-release.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     permissions:
-      contents: read
-      id-token: write
+      contents: write
     steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v7
-        with:
-          name: ilic-npm-release
-          path: build/npm-release
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-      - name: Install OIDC-capable npm
-        run: npm install --global npm@11.18.0
-      - name: Publish verified tarballs in dependency order
+      - name: Request trusted npm publication
         env:
-          NPM_CONFIG_PROVENANCE: true
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-
-          publish_if_missing() {
-            local package_name="$1"
-            local tarball_name
-            local tarball
-            local existing_git_head
-            tarball_name=$(jq -r --arg name "$package_name" '.packages[$name].tarball' build/npm-release/release-manifest.json)
-            tarball="build/npm-release/tarballs/$tarball_name"
-            if npm view "$package_name@${GITHUB_REF_NAME#v}" version >/dev/null 2>&1; then
-              existing_git_head=$(npm view "$package_name@${GITHUB_REF_NAME#v}" gitHead 2>/dev/null || true)
-              if [[ "$existing_git_head" != "$GITHUB_SHA" ]]; then
-                echo "$package_name@${GITHUB_REF_NAME#v} has gitHead ${existing_git_head:-<missing>}, expected $GITHUB_SHA" >&2
-                exit 1
-              fi
-              echo "Already published from this commit: $package_name@${GITHUB_REF_NAME#v}"
-              return
-            fi
-            npm publish "$tarball" --access public --tag latest
-          }
-
-          publish_if_missing @ilic/repository-core
-          publish_if_missing @ilic/tools
-          publish_if_missing @ilic/compiler-wasm
-
-          for package_name in @ilic/repository-core @ilic/tools @ilic/compiler-wasm; do
-            test "$(npm view "$package_name@latest" version)" = "${GITHUB_REF_NAME#v}"
-          done
+          jq -n \
+            --arg event_type "stable-npm-release-requested" \
+            --arg release_tag "$GITHUB_REF_NAME" \
+            --arg release_run_id "$GITHUB_RUN_ID" \
+            --arg release_sha "$GITHUB_SHA" \
+            '{event_type: $event_type, client_payload: {
+              release_tag: $release_tag,
+              release_run_id: $release_run_id,
+              release_sha: $release_sha
+            }}' \
+            | curl --fail-with-body --silent --show-error \
+                -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/dispatches" \
+                --data-binary @-

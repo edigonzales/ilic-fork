@@ -4,10 +4,13 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  repository_dispatch:
+    types: [stable-npm-release-requested]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
   id-token: write
 
 concurrency:
@@ -18,7 +21,6 @@ jobs:
   publish:
     name: Build, test and publish
     if: >-
-      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
@@ -155,3 +157,198 @@ jobs:
             printf -- '- [@ilic/tools](https://www.npmjs.com/package/@ilic/tools/v/%s)\n' "$SNAPSHOT_VERSION"
             printf -- '- [@ilic/compiler-wasm](https://www.npmjs.com/package/@ilic/compiler-wasm/v/%s)\n' "$SNAPSHOT_VERSION"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-stable:
+    name: Publish stable npm packages
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'repository_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - name: Resolve and validate release run
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_RUN_ID: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.release_run_id || '' }}
+          REQUESTED_TAG: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.release_tag || '' }}
+          REQUESTED_SHA: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.release_sha || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_root="repos/$GITHUB_REPOSITORY"
+
+          validate_run() {
+            local run_id="$1"
+            local run_json
+            local jobs_json
+            local release_json
+            local release_tag
+            local release_sha
+            local tag_json
+            local tag_type
+            local tag_sha
+            run_json=$(gh api "$api_root/actions/runs/$run_id")
+            [[ "$(jq -r '.path' <<<"$run_json")" == ".github/workflows/build-native-release.yml" ]] || return 1
+            [[ "$(jq -r '.event' <<<"$run_json")" == "push" ]] || return 1
+            [[ "$(jq -r '.head_branch' <<<"$run_json")" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+            jobs_json=$(gh api "$api_root/actions/runs/$run_id/jobs?per_page=100")
+            for job_name in \
+              "Validate release contract" \
+              "Build and verify stable npm artifacts" \
+              "build-macos-arm64" \
+              "build-linux-x86_64" \
+              "build-windows-x86_64" \
+              "Publish GitHub release"; do
+              jq -e --arg name "$job_name" \
+                '.jobs[] | select(.name == $name) | .conclusion == "success"' \
+                <<<"$jobs_json" >/dev/null || return 1
+            done
+            release_tag=$(jq -r '.head_branch' <<<"$run_json")
+            release_sha=$(jq -r '.head_sha' <<<"$run_json")
+            [[ "$release_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+            release_json=$(gh api "$api_root/releases/tags/$release_tag") || return 1
+            [[ "$(jq -r '.tag_name' <<<"$release_json")" == "$release_tag" ]] || return 1
+            [[ "$(jq -r '.draft' <<<"$release_json")" == "false" ]] || return 1
+            [[ "$(jq -r '.prerelease' <<<"$release_json")" == "false" ]] || return 1
+            tag_json=$(gh api "$api_root/git/ref/tags/$release_tag") || return 1
+            tag_type=$(jq -r '.object.type' <<<"$tag_json")
+            tag_sha=$(jq -r '.object.sha' <<<"$tag_json")
+            if [[ "$tag_type" == "tag" ]]; then
+              tag_sha=$(gh api "$api_root/git/tags/$tag_sha" --jq '.object.sha') || return 1
+            fi
+            [[ "$tag_sha" == "$release_sha" ]] || return 1
+            return 0
+          }
+
+          selected_run_id="$REQUESTED_RUN_ID"
+          selected_tag="$REQUESTED_TAG"
+          selected_sha="$REQUESTED_SHA"
+
+          if [[ -n "$selected_run_id" ]]; then
+            run_json=$(gh api "$api_root/actions/runs/$selected_run_id")
+            run_tag=$(jq -r '.head_branch' <<<"$run_json")
+            run_sha=$(jq -r '.head_sha' <<<"$run_json")
+            [[ -z "$selected_tag" || "$selected_tag" == "$run_tag" ]] || {
+              echo "Requested release tag does not match the release run" >&2
+              exit 1
+            }
+            [[ -z "$selected_sha" || "$selected_sha" == "$run_sha" ]] || {
+              echo "Requested release SHA does not match the release run" >&2
+              exit 1
+            }
+            selected_tag=${selected_tag:-$run_tag}
+            selected_sha=${selected_sha:-$run_sha}
+            validate_run "$selected_run_id"
+          else
+            candidates=$(gh api --paginate --slurp \
+              "$api_root/actions/runs?per_page=100" \
+              | jq -r 'map(.workflow_runs[])
+                | map(select(.path == ".github/workflows/build-native-release.yml"
+                  and .event == "push"
+                  and (.head_branch | type == "string")
+                  and (.head_branch | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))))
+                | sort_by(.created_at) | reverse
+                | .[] | [.id, .head_branch, .head_sha] | @tsv')
+            while IFS=$'\t' read -r candidate_id candidate_tag candidate_sha; do
+              [[ -n "$candidate_id" ]] || continue
+              if validate_run "$candidate_id"; then
+                selected_run_id="$candidate_id"
+                selected_tag="$candidate_tag"
+                selected_sha="$candidate_sha"
+                break
+              fi
+            done <<<"$candidates"
+          fi
+
+          [[ "$selected_run_id" =~ ^[0-9]+$ ]] || { echo "No eligible native release run found" >&2; exit 1; }
+          [[ "$selected_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid release tag: $selected_tag" >&2; exit 1; }
+          [[ "$selected_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid release SHA: $selected_sha" >&2; exit 1; }
+          echo "Selected release run $selected_run_id: $selected_tag at $selected_sha"
+          {
+            echo "run_id=$selected_run_id"
+            echo "tag=$selected_tag"
+            echo "sha=$selected_sha"
+            echo "version=${selected_tag#v}"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Verify checked-out release commit
+        run: test "$(git rev-parse HEAD)" = "${{ steps.release.outputs.sha }}"
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: ilic-npm-release
+          path: build/npm-release
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.release.outputs.run_id }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install OIDC-capable npm
+        run: npm install --global npm@11.18.0
+
+      - name: Verify release tarballs
+        run: |
+          node scripts/test-npm-packages.mjs \
+            --staging-root build/npm-release \
+            --expected-version "${{ steps.release.outputs.version }}" \
+            --version-kind stable
+
+      - name: Publish verified packages in dependency order
+        env:
+          NPM_CONFIG_PROVENANCE: true
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/npm-publish
+
+          publish_if_missing() {
+            local package_name="$1"
+            local directory_name="$2"
+            local tarball_name
+            local tarball
+            local package_directory="build/npm-publish/$directory_name/package"
+            local existing_git_head
+            tarball_name=$(jq -r --arg name "$package_name" '.packages[$name].tarball' build/npm-release/release-manifest.json)
+            tarball="build/npm-release/tarballs/$tarball_name"
+            mkdir -p "build/npm-publish/$directory_name"
+            tar -xzf "$tarball" -C "build/npm-publish/$directory_name"
+            test -f "$package_directory/package.json"
+
+            if npm view "$package_name@$RELEASE_VERSION" version >/dev/null 2>&1; then
+              existing_git_head=$(npm view "$package_name@$RELEASE_VERSION" gitHead 2>/dev/null || true)
+              if [[ "$existing_git_head" != "$RELEASE_SHA" ]]; then
+                echo "$package_name@$RELEASE_VERSION has gitHead ${existing_git_head:-<missing>}, expected $RELEASE_SHA" >&2
+                exit 1
+              fi
+              echo "Already published from this commit: $package_name@$RELEASE_VERSION"
+              return
+            fi
+            npm publish "$package_directory" --access public --tag latest
+          }
+
+          publish_if_missing @ilic/repository-core repository-core
+          publish_if_missing @ilic/tools tools
+          publish_if_missing @ilic/compiler-wasm compiler-wasm
+
+          for package_name in @ilic/repository-core @ilic/tools @ilic/compiler-wasm; do
+            test "$(npm view "$package_name@$RELEASE_VERSION" version)" = "$RELEASE_VERSION"
+            test "$(npm view "$package_name@$RELEASE_VERSION" gitHead)" = "$RELEASE_SHA"
+            test "$(npm view "$package_name@latest" version)" = "$RELEASE_VERSION"
+          done
