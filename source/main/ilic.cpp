@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "ilic/capi.h"
+#include "ilic/Compiler.h"
 #include "../abi/Json.h"
 #include "../util/os.h"
 #include "../util/StringMap.h"
@@ -59,7 +60,7 @@ string get_program_name()
 
 string get_version()
 {
-   return "0.9.9";
+   return ilic::version();
 }
 
 string get_version_string()

@@ -98,10 +98,19 @@ if [ -f "$wasm_cache" ] || [ -f "$wasm_system" ]; then
   fi
 fi
 
-emcmake cmake -S "$project_dir" -B "$wasm_build_dir" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=OFF \
-  -DILIC_ENABLE_NATIVE_REPOSITORY=OFF
+if [ -n "${ILIC_WASM_VERSION:-}" ]; then
+  emcmake cmake -S "$project_dir" -B "$wasm_build_dir" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_TESTING=OFF \
+    -DILIC_ENABLE_NATIVE_REPOSITORY=OFF \
+    -DILIC_WASM_VERSION="$ILIC_WASM_VERSION"
+else
+  emcmake cmake -S "$project_dir" -B "$wasm_build_dir" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_TESTING=OFF \
+    -DILIC_ENABLE_NATIVE_REPOSITORY=OFF \
+    -DILIC_WASM_VERSION=
+fi
 cmake --build "$wasm_build_dir" --target ilic-wasm --parallel
 cmake -E copy_if_different "$wasm_build_dir/ilic.mjs" \
   "$project_dir/packages/compiler-wasm/ilic.mjs"

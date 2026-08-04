@@ -1,6 +1,16 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+export function readCString(module, pointer) {
+  if (!pointer) return "";
+  let end = pointer;
+  while (end < module.HEAPU8.length && module.HEAPU8[end] !== 0) end += 1;
+  if (end >= module.HEAPU8.length) {
+    throw new Error("ilic returned an unterminated C string");
+  }
+  return decoder.decode(module.HEAPU8.subarray(pointer, end));
+}
+
 export function copyIn(module, value) {
   const bytes = typeof value === "string" ? encoder.encode(value) : value;
   const pointer = module._ilic_alloc(bytes.byteLength || 1);

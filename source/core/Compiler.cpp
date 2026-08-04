@@ -4,6 +4,7 @@
 #include "CompilerSessionState.h"
 #include "SnapshotService.h"
 #include "SourceUpdateCoordinator.h"
+#include "ilic/IlicVersionConfig.h"
 
 #include <mutex>
 
@@ -126,6 +127,6 @@ void CompilerSession::clearIncrementalCaches()
    impl_->syncCacheStats();
 }
 
-const char *version() { return "0.9.9"; }
+const char *version() { return ILIC_VERSION_STRING; }
 
 } // namespace ilic

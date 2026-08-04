@@ -21,28 +21,34 @@ async function createFixture(t) {
   await mkdir(join(root, "packages/compiler-wasm"), { recursive: true });
   await mkdir(join(root, "packages/repository-core"), { recursive: true });
   await writeFile(join(root, "CMakeLists.txt"),
-    "project(ilic VERSION 0.9.9 LANGUAGES C CXX)\n");
+    "project(ilic VERSION 0.9.10 LANGUAGES C CXX)\n");
+  const license = "MIT License\n";
   await writeJson(join(root, "packages/tools/package.json"), {
     name: "@ilic/tools",
-    version: "0.9.9",
-    files: ["README.md", "index.js"]
+    version: "0.9.10",
+    dependencies: { "@ilic/repository-core": "0.9.10" },
+    files: ["LICENSE", "README.md", "index.js"]
   });
+  await writeFile(join(root, "packages/tools/LICENSE"), license);
   await writeFile(join(root, "packages/tools/README.md"), "tools\n");
   await writeFile(join(root, "packages/tools/index.js"), "export {};\n");
   await writeJson(join(root, "packages/compiler-wasm/package.json"), {
     name: "@ilic/compiler-wasm",
-    version: "0.9.9",
-    files: ["README.md", "index.js", "ilic.mjs", "ilic.wasm"]
+    version: "0.9.10",
+    files: ["LICENSE", "THIRD_PARTY_NOTICES.md", "README.md", "index.js", "ilic.mjs", "ilic.wasm"]
   });
+  await writeFile(join(root, "packages/compiler-wasm/LICENSE"), license);
+  await writeFile(join(root, "packages/compiler-wasm/THIRD_PARTY_NOTICES.md"), "ANTLR 4 C++ Runtime\nThe BSD License\n");
   await writeFile(join(root, "packages/compiler-wasm/README.md"), "compiler\n");
   await writeFile(join(root, "packages/compiler-wasm/index.js"), "export {};\n");
   await writeFile(join(root, "packages/compiler-wasm/ilic.mjs"), "export default {};\n");
   await writeFile(join(root, "packages/compiler-wasm/ilic.wasm"), new Uint8Array([0, 97, 115, 109]));
   await writeJson(join(root, "packages/repository-core/package.json"), {
     name: "@ilic/repository-core",
-    version: "0.9.9",
-    files: ["README.md", "index.js"]
+    version: "0.9.10",
+    files: ["LICENSE", "README.md", "index.js"]
   });
+  await writeFile(join(root, "packages/repository-core/LICENSE"), license);
   await writeFile(join(root, "packages/repository-core/README.md"), "core\n");
   await writeFile(join(root, "packages/repository-core/index.js"), "export {}\n");
   return root;
@@ -65,14 +71,18 @@ test("stages both packages with one snapshot version without mutating sources", 
     timestamp: fixedTimestamp
   });
 
-  assert.equal(result.baseVersion, "0.9.9");
-  assert.equal(result.snapshotVersion, `0.9.9-SNAPSHOT.${fixedTimestamp}`);
+  assert.equal(result.baseVersion, "0.9.10");
+  assert.equal(result.snapshotVersion, `0.9.10-SNAPSHOT.${fixedTimestamp}`);
   const staged = await Promise.all([
     readFile(join(result.directories.tools, "package.json"), "utf8"),
     readFile(join(result.directories.compiler_wasm, "package.json"), "utf8"),
     readFile(join(result.directories.repository_core, "package.json"), "utf8")
   ]);
   assert.equal(JSON.parse(staged[0]).version, result.snapshotVersion);
+  assert.equal(
+    JSON.parse(staged[0]).dependencies["@ilic/repository-core"],
+    result.snapshotVersion,
+  );
   assert.equal(JSON.parse(staged[1]).version, result.snapshotVersion);
   assert.deepEqual(await Promise.all([
     readFile(toolsManifest, "utf8"), readFile(compilerManifest, "utf8"), readFile(coreManifest, "utf8")
@@ -88,7 +98,7 @@ test("adds a numeric build ID to both compiler package versions", async t => {
     buildId: "12345"
   });
 
-  assert.equal(result.snapshotVersion, `0.9.9-SNAPSHOT.${fixedTimestamp}.12345`);
+  assert.equal(result.snapshotVersion, `0.9.10-SNAPSHOT.${fixedTimestamp}.12345`);
   const manifest = JSON.parse(await readFile(join(result.directories.tools, "package.json"), "utf8"));
   assert.equal(manifest.version, result.snapshotVersion);
 });

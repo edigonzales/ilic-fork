@@ -1,4 +1,5 @@
 #include "RepositoryTransport.h"
+#include "ilic/Compiler.h"
 
 #if defined(_WIN32) && !defined(NOMINMAX)
 #define NOMINMAX
@@ -67,7 +68,8 @@ TransportResponse CurlRepositoryTransport::get(const std::string &uri)
    curl_easy_setopt(curl,CURLOPT_FAILONERROR,1L);
    curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,15L);
    curl_easy_setopt(curl,CURLOPT_TIMEOUT,60L);
-   curl_easy_setopt(curl,CURLOPT_USERAGENT,"ilic/0.9.9");
+   const std::string userAgent = "ilic/" + std::string(ilic::version());
+   curl_easy_setopt(curl,CURLOPT_USERAGENT,userAgent.c_str());
    curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,writeBody);
    BodySink sink;
    curl_easy_setopt(curl,CURLOPT_WRITEDATA,&sink);

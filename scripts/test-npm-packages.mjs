@@ -22,21 +22,29 @@ function run(command, args, options = {}) {
 function parseArguments(argv) {
   const result = {
     projectRoot: resolve(import.meta.dirname, ".."),
-    stagingRoot: undefined
+    stagingRoot: undefined,
+    expectedVersion: undefined,
+    versionKind: undefined
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     const value = argv[index + 1];
-    if (argument === "--project-root" || argument === "--staging-root") {
+    if (["--project-root", "--staging-root", "--expected-version", "--version-kind"].includes(argument)) {
       if (!value) throw new Error(`${argument} requires a value`);
       index += 1;
       if (argument === "--project-root") result.projectRoot = resolve(value);
-      else result.stagingRoot = resolve(value);
+      else if (argument === "--staging-root") result.stagingRoot = resolve(value);
+      else if (argument === "--expected-version") result.expectedVersion = value;
+      else result.versionKind = value;
     } else {
       throw new Error(`Unknown argument ${argument}`);
     }
   }
   result.stagingRoot ??= resolve(result.projectRoot, "build/npm");
+  if (!result.expectedVersion) throw new Error("--expected-version is required");
+  if (!["stable", "snapshot"].includes(result.versionKind)) {
+    throw new Error("--version-kind must be stable or snapshot");
+  }
   return result;
 }
 
@@ -48,10 +56,15 @@ function expectedFiles(manifest) {
   return ["package.json", ...manifest.files].sort();
 }
 
-async function verifyPackList(directory, expectedName) {
+async function verifyPackList(directory, expectedName, expectedVersion, versionKind) {
   const manifest = JSON.parse(await readFile(resolve(directory, "package.json"), "utf8"));
   assert.equal(manifest.name, expectedName);
-  assert.match(manifest.version, /^\d+\.\d+\.\d+-SNAPSHOT\.\d{14}(?:\.\d+)?$/);
+  assert.equal(manifest.version, expectedVersion);
+  if (versionKind === "stable") {
+    assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
+  } else {
+    assert.match(manifest.version, /^\d+\.\d+\.\d+-SNAPSHOT\.\d{14}(?:\.\d+)?$/);
+  }
   assert.equal(manifest.author, "edigonzales");
   assert.equal(manifest.license, "MIT");
   assert.equal(manifest.repository?.url, "https://github.com/edigonzales/ilic-fork.git");
@@ -69,16 +82,28 @@ async function verifyPackList(directory, expectedName) {
 }
 
 async function main() {
-  const { projectRoot, stagingRoot } = parseArguments(process.argv.slice(2));
+  const { projectRoot, stagingRoot, expectedVersion, versionKind } =
+    parseArguments(process.argv.slice(2));
   const packages = [
     { id: "repository_core", name: "@ilic/repository-core", directory: resolve(stagingRoot, "repository-core") },
     { id: "tools", name: "@ilic/tools", directory: resolve(stagingRoot, "tools") },
     { id: "compiler", name: "@ilic/compiler-wasm", directory: resolve(stagingRoot, "compiler-wasm") }
   ];
   const manifests = [];
-  for (const value of packages) manifests.push(await verifyPackList(value.directory, value.name));
+  for (const value of packages) {
+    manifests.push(
+      await verifyPackList(value.directory, value.name, expectedVersion, versionKind),
+    );
+  }
   assert.equal(manifests[0].version, manifests[1].version,
-    "both packages must use the same snapshot version");
+    "all packages must use the same version");
+  assert.equal(manifests[1].version, manifests[2].version,
+    "all packages must use the same version");
+  assert.equal(
+    manifests[1].dependencies?.["@ilic/repository-core"],
+    expectedVersion,
+    "@ilic/tools must use the exact coordinated repository-core version",
+  );
 
   const tarballDirectory = resolve(stagingRoot, "tarballs");
   const consumerDirectory = resolve(stagingRoot, "consumer");
@@ -136,12 +161,15 @@ assert.deepEqual(workspace.models.map(model => model.metadata.name),
   ["RepositoryBase", "RepositoryRoot"]);
 
 const compiler = await createCompiler();
+assert.equal(compiler.compilerVersion, process.env.ILIC_EXPECTED_VERSION);
+assert.equal(compiler.abiVersion, 1);
 const session = compiler.createSession();
 try {
   session.putWorkspace(workspace);
   const root = workspace.models.find(model => model.metadata.name === "RepositoryRoot");
   const compilation = session.compile({ roots: [root.uri] });
   assert.equal(compilation.success, true, JSON.stringify(compilation.diagnostics));
+  assert.equal(compilation.compilerVersion, process.env.ILIC_EXPECTED_VERSION);
 
   const uri = "memory:///PackageSmoke.ili";
   session.putSource(uri, 'INTERLIS 2.3;\\n!! kept\\nMODEL PackageSmoke AT "https://example.invalid" VERSION "1" =\\nEND PackageSmoke.\\n');
@@ -157,8 +185,28 @@ try {
     "--package-lock=false", ...tarballs], { cwd: consumerDirectory });
   run(process.execPath, ["smoke.mjs"], {
     cwd: consumerDirectory,
-    env: { ILIC_REPOSITORY_FIXTURE: resolve(projectRoot, "test/repository/fixture") }
+    env: {
+      ILIC_REPOSITORY_FIXTURE: resolve(projectRoot, "test/repository/fixture"),
+      ILIC_EXPECTED_VERSION: expectedVersion,
+    }
   });
+  await writeFile(
+    resolve(stagingRoot, "release-manifest.json"),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        version: expectedVersion,
+        packages: Object.fromEntries(
+          packages.map((value, index) => [
+            value.name,
+            { version: expectedVersion, tarball: basename(tarballs[index]) },
+          ]),
+        ),
+      },
+      null,
+      2,
+    )}\n`,
+  );
   process.stdout.write(`verified ${manifests[0].version}: ${tarballs.map(path => basename(path)).join(", ")}\n`);
 }
 

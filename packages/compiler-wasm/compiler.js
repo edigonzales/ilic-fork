@@ -1,4 +1,5 @@
 import { CompilerSession } from "./compiler-session.js";
+import { readCString } from "./wasm-memory.js";
 
 export class Compiler {
   #allowLegacyEditorProjection;
@@ -8,6 +9,9 @@ export class Compiler {
     this.#allowLegacyEditorProjection = allowLegacyEditorProjection;
     this.abiVersion = module._ilic_abi_version();
     if (this.abiVersion !== 1) throw new Error(`unsupported ilic ABI ${this.abiVersion}`);
+    this.compilerVersion = readCString(module, module._ilic_version());
+    if (!/^\d+\.\d+\.\d+(?:[-+].+)?$/.test(this.compilerVersion))
+      throw new Error(`invalid ilic compiler version ${this.compilerVersion}`);
     this.capabilities = Object.freeze({
       nativeEditorSnapshot: typeof module._ilic_editor_snapshot === "function",
       incrementalSession: typeof module._ilic_incremental_stats === "function",

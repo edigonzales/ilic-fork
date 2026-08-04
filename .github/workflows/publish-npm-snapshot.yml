@@ -43,6 +43,17 @@ jobs:
       - name: Install OIDC-capable npm
         run: npm install --global npm@11.18.0
 
+      - name: Prepare immutable snapshot identity
+        id: snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_version=$(node -p "require('./packages/compiler-wasm/package.json').version")
+          timestamp=$(date -u +%Y%m%d%H%M%S)
+          snapshot_version="${base_version}-SNAPSHOT.${timestamp}.${GITHUB_RUN_ID}"
+          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
+          echo "version=$snapshot_version" >> "$GITHUB_OUTPUT"
+
       - name: Install pinned Emscripten SDK
         shell: bash
         run: |
@@ -53,6 +64,8 @@ jobs:
           "$RUNNER_TEMP/emsdk/emsdk" activate "$emscripten_version"
 
       - name: Build WebAssembly package
+        env:
+          ILIC_WASM_VERSION: ${{ steps.snapshot.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
@@ -60,8 +73,11 @@ jobs:
           ./scripts/build-wasm.sh
 
       - name: Test source packages and staging logic
+        env:
+          ILIC_EXPECTED_VERSION: ${{ steps.snapshot.outputs.version }}
         run: |
           npm install --prefix packages/tools --no-save --package-lock=false ./packages/repository-core
+          npm install --prefix packages/compiler-wasm --no-save --package-lock=false ./packages/repository-core ./packages/tools
           npm test --prefix packages/repository-core
           npm test --prefix packages/tools
           npm test --prefix packages/compiler-wasm
@@ -69,10 +85,17 @@ jobs:
 
       - name: Stage snapshot packages
         id: stage
-        run: node scripts/prepare-npm-snapshot.mjs --build-id "$GITHUB_RUN_ID" --github-output "$GITHUB_OUTPUT"
+        run: >-
+          node scripts/prepare-npm-snapshot.mjs
+          --timestamp "${{ steps.snapshot.outputs.timestamp }}"
+          --build-id "$GITHUB_RUN_ID"
+          --github-output "$GITHUB_OUTPUT"
 
       - name: Verify packed and installed packages
-        run: node scripts/test-npm-packages.mjs
+        run: |
+          node scripts/test-npm-packages.mjs \
+            --expected-version "${{ steps.stage.outputs.snapshot_version }}" \
+            --version-kind snapshot
 
       - name: Publish @ilic/repository-core
         run: npm publish "${{ steps.stage.outputs.repository_core_directory }}" --access public --tag snapshot

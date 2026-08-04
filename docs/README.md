@@ -43,6 +43,8 @@ node docs/examples/wasm-session.mjs
 | Unterstützte Sprachversionen und Features   | [Funktionsumfang](funktionsumfang.md)                                |
 | Native und WASM-Builds                      | [Build und Installation](build-und-installation.md)                  |
 | CI, Release-Train und Publikationsgrenzen   | [Build- und Publikationspipeline](build-und-publikationspipeline.md) |
+| Produkt- und Snapshot-Versionen             | [Versionierungsvertrag](versioning.md)                              |
+| Stable-Release-Ablauf                       | [Release 0.9.10](releasing.md)                                     |
 | Alle Parameter von `ilic` und `ilic-format` | [CLI-Referenz](cli.md)                                               |
 | Standardformatierung und Kommentarerhalt    | [Formatter](formatter.md)                                            |
 | Modell-Repositories, Auflösung und Cache    | [Repositories](repositories.md)                                      |
@@ -52,7 +54,7 @@ node docs/examples/wasm-session.mjs
 | Dateiweise und semantische Inkrementalität  | [Inkrementelle Compiler-Sessions](architecture/incremental-compilation.md) |
 | Versionierte Syntax-/Semantik-Snapshots     | [Language-Tooling-Snapshots](language-tooling-snapshots.md)          |
 | WebAssembly, Node, Browser, Worker und LSP  | [WASM](wasm.md)                                                      |
-| npm-Snapshots, OIDC und Bootstrap           | [npm-Publikation](npm-publikation.md)                                |
+| npm Stable/Snapshots, OIDC und Bootstrap    | [npm-Publikation](npm-publikation.md)                                |
 | Externe Compiler-Conformance-Suite             | [Compiler-Conformance](conformance.md)                               |
 | Vollständige, ausführbare Programme         | [Beispiele](examples/README.md)                                      |
 

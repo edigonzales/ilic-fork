@@ -1,10 +1,11 @@
-# npm-Snapshot-Publikation
+# npm-Publikation
 
 [Dokumentationsindex](README.md) · [Build](build-und-installation.md) · [WASM](wasm.md)
 
 Die JavaScript-Pakete werden als öffentliche Vorabversionen unter dem
 npm-Organisations-Scope `@ilic` vorbereitet:
 
+- `@ilic/repository-core`: plattformneutrale Repository-Verträge;
 - `@ilic/compiler-wasm`: Compiler, Formatter, Worker und WASM-Artefakt;
 - `@ilic/tools`: Repository-Auflösung und Caches für Node und Browser.
 
@@ -14,11 +15,11 @@ noch als GitHub Release veröffentlicht.
 ## Version und Dist-Tag
 
 Die Basisversion ist die CMake-Projektversion aus `CMakeLists.txt`, aktuell
-`0.9.9`. Ein koordinierter Publish erhält einen UTC-Zeitstempel und eine
+`0.9.10`. Ein koordinierter Snapshot-Publish erhält einen UTC-Zeitstempel und eine
 eindeutige GitHub-Run-ID:
 
 ```text
-0.9.9-SNAPSHOT.20260718143152.123456789
+0.9.10-SNAPSHOT.20260718143152.123456789
 ```
 
 Der Zeitstempel hat das Format `YYYYMMDDHHmmss`. Beide Pakete erhalten in einem
@@ -76,7 +77,7 @@ Das Skript bricht ab, wenn:
 - insbesondere `ilic.mjs` oder `ilic.wasm` noch nicht gebaut wurden;
 - ein Paket keine explizite Dateiliste besitzt.
 
-Die vollständige lokale Paketprüfung erzeugt echte Tarballs, installiert beide
+Die vollständige lokale Paketprüfung erzeugt echte Tarballs, installiert alle drei
 in ein leeres temporäres Projekt und kompiliert und formatiert über das daraus
 importierte WASM-Paket:
 
@@ -105,7 +106,7 @@ Details stehen unter
 ### 2. Erste Paketversionen publizieren
 
 Ein Trusted Publisher wird in den Einstellungen eines bereits vorhandenen
-Pakets konfiguriert. Die beiden ersten Snapshot-Versionen werden deshalb
+Pakets konfiguriert. Die drei ersten Snapshot-Versionen werden deshalb
 interaktiv gebootstrapped:
 
 ```sh
@@ -119,6 +120,7 @@ node --test test/npm/PrepareNpmSnapshotTest.mjs
 node scripts/prepare-npm-snapshot.mjs
 node scripts/test-npm-packages.mjs
 
+npm publish build/npm/repository-core --access public --tag snapshot
 npm publish build/npm/tools --access public --tag snapshot
 npm publish build/npm/compiler-wasm --access public --tag snapshot
 ```
@@ -128,7 +130,7 @@ Einmalcode werden in Dateien oder GitHub-Secrets geschrieben.
 
 ### 3. Trusted Publisher konfigurieren
 
-Nach dem ersten Publish wird für **jedes** der beiden Pakete auf npmjs.com
+Nach dem ersten Publish wird für **jedes** der drei Pakete auf npmjs.com
 unter `Package → Settings → Trusted Publisher` eingetragen:
 
 | Feld                     | Wert                       |
@@ -141,7 +143,7 @@ unter `Package → Settings → Trusted Publisher` eingetragen:
 | Allowed action           | `npm publish`              |
 
 Der Dateiname muss exakt übereinstimmen; es wird nur der Dateiname und nicht
-`.github/workflows/` eingetragen. Die `repository.url` beider Pakete verweist
+`.github/workflows/` eingetragen. Die `repository.url` aller Pakete verweist
 exakt auf `https://github.com/edigonzales/ilic-fork.git`.
 
 Trusted Publishing tauscht den kurzlebigen GitHub-OIDC-Token während
@@ -169,14 +171,14 @@ Publisher funktioniert weiterhin, traditionelle Publish-Tokens dagegen nicht.
 
 Der Workflow liegt unter `.github/workflows/publish-npm-snapshot.yml`. Nach
 erfolgreicher `main`-CI startet er automatisch über `workflow_run`, checkt den
-exakten geprüften Compiler-SHA aus und publiziert **nur** die beiden Compiler-
+exakten geprüften Compiler-SHA aus und publiziert **nur** die drei Compiler-
 Pakete. Erst nach erfolgreicher npm-Publikation wird
 `interlis-language-tools` mit `compiler_sha` und der bereits publizierten
 `compiler_version` per `repository_dispatch` gestartet.
 
 Dafür muss im Repository ein `RELEASE_DISPATCH_TOKEN` mit Schreibzugriff auf
 das Repository `interlis-language-tools` hinterlegt sein. Der Trusted Publisher
-für beide Compiler-Pakete bleibt dagegen auf `edigonzales/ilic-fork` gesetzt.
+für alle drei Compiler-Pakete bleibt dagegen auf `edigonzales/ilic-fork` gesetzt.
 
 ### `RELEASE_DISPATCH_TOKEN`
 
@@ -210,7 +212,7 @@ Für einen manuellen Compiler-only-Lauf:
 1. GitHub-Repository öffnen.
 2. `Actions → Publish npm snapshot → Run workflow` wählen.
 3. Über GitHubs native Auswahl den gewünschten Branch oder Tag wählen.
-4. Lauf starten und Build, Tests, Paketprüfung und beide Publikationen abwarten.
+4. Lauf starten und Build, Tests, Paketprüfung und alle drei Publikationen abwarten.
 
 Der Workflow muss auf dem Default-Branch `main` vorhanden sein, damit GitHub
 den manuellen Trigger anbietet. Er muss ebenfalls im ausgewählten Branch oder
@@ -236,17 +238,24 @@ Tags löscht keine bereits publizierte npm-Version.
 Trusted Publishing autorisiert ausschliesslich `npm publish` beziehungsweise
 `npm stage publish`, nicht jedoch `npm dist-tag add`. Der Workflow bleibt
 deshalb tokenfrei und verschiebt nur den Tag `snapshot`. Nach jedem
-erfolgreichen Workflow-Lauf werden die beiden veröffentlichten Versionen zuerst
+erfolgreichen Workflow-Lauf werden die drei veröffentlichten Versionen zuerst
 verglichen und `latest` anschliessend lokal mit 2FA nachgezogen:
 
 ```sh
 tools_snapshot_version=$(npm view @ilic/tools@snapshot version)
 compiler_snapshot_version=$(npm view @ilic/compiler-wasm@snapshot version)
+core_snapshot_version=$(npm view @ilic/repository-core@snapshot version)
 
-if [[ "$tools_snapshot_version" != "$compiler_snapshot_version" ]]; then
-  echo "Tools- und Compiler-Snapshot unterscheiden sich" >&2
+if [[ "$tools_snapshot_version" != "$compiler_snapshot_version" || \
+      "$core_snapshot_version" != "$compiler_snapshot_version" ]]; then
+  echo "Compiler-Snapshot-Versionen unterscheiden sich" >&2
   exit 1
 fi
+
+npm dist-tag add \
+  "@ilic/repository-core@$core_snapshot_version" \
+  latest \
+  --auth-type=web
 
 npm dist-tag add \
   "@ilic/tools@$tools_snapshot_version" \
@@ -271,13 +280,14 @@ Danach müssen beide Tags jedes Pakets dieselbe Version melden:
 ```sh
 npm dist-tag ls @ilic/tools
 npm dist-tag ls @ilic/compiler-wasm
+npm dist-tag ls @ilic/repository-core
 ```
 
 ## Token-Alternative
 
 OIDC ist der dauerhafte Standard. Falls Trusted Publishing vorübergehend nicht
 verwendet werden kann, ist ausschliesslich ein kurzlebiger granularer npm-Token
-mit minimalen Schreibrechten für die beiden Pakete zu verwenden:
+mit minimalen Schreibrechten für die drei Pakete zu verwenden:
 
 1. Token interaktiv auf npmjs.com erzeugen.
 2. Unter `GitHub → Settings → Secrets and variables → Actions` als
@@ -299,13 +309,15 @@ ein; siehe
 ## Kontrolle nach einem Publish
 
 ```sh
+npm view @ilic/repository-core@snapshot version
 npm view @ilic/tools@snapshot version
 npm view @ilic/compiler-wasm@snapshot version
+npm dist-tag ls @ilic/repository-core
 npm dist-tag ls @ilic/tools
 npm dist-tag ls @ilic/compiler-wasm
 ```
 
-Beide Pakete müssen dieselbe Snapshot-Version melden; bis zur ersten stabilen
+Alle drei Pakete müssen dieselbe Snapshot-Version melden; bis zur ersten stabilen
 Publikation müssen ausserdem `snapshot` und `latest` pro Paket auf diese Version
 zeigen. Auf den npm-Seiten zeigt der Bereich `Provenance` Repository, Workflow
 und Commit des OIDC-Laufs.
@@ -314,22 +326,24 @@ und Commit des OIDC-Laufs.
 
 Alle Builds, Tests und Tarball-Prüfungen laufen vor dem ersten Publish. npm
 stellt jedoch keine Transaktion über mehrere Pakete bereit. Falls
-`@ilic/tools` erfolgreich publiziert wurde und der nachfolgende Publish von
+`@ilic/repository-core` und `@ilic/tools` erfolgreich publiziert wurden und der nachfolgende Publish von
 `@ilic/compiler-wasm` fehlschlägt:
 
 1. Ursache anhand des Action-Logs beheben;
 2. Workflow erneut starten;
-3. der neue Lauf verwendet einen neuen Zeitstempel und publiziert wieder beide
+3. der neue Lauf verwendet einen neuen Zeitstempel und publiziert wieder alle drei
    Pakete;
 4. nichts automatisch löschen oder unpublishen.
 
-Die Pakete besitzen keine npm-Laufzeitabhängigkeit voneinander. Eine alte,
-nicht mehr getaggte Snapshot-Version von `@ilic/tools` beeinträchtigt deshalb
-den Compiler nicht.
+`@ilic/tools` pinnt `@ilic/repository-core` exakt. Teilstände werden deshalb
+nicht als neuer Dist-Tag beworben; ein Folgelauf verwendet eine neue gemeinsame
+Snapshot-Version und lässt bereits publizierte unveränderliche Versionen bestehen.
 
-## Noch nicht Bestandteil
+## Stabiler Release
 
-- stabile Versionen und deren Release-Automatisierung;
-- automatische Publikation anhand von Release-Tags;
-- GitHub Releases;
-- native Binaries oder native Bibliothekspakete.
+Ein Push von `v0.9.10` verwendet den koordinierten nativen Release-Workflow.
+Er prüft alle nativen Archive, WASM und die drei installierten npm-Tarballs,
+bevor GitHub- oder npm-Publikation beginnt. Details und manuelle Nachkontrollen
+stehen im [Release-Runbook](releasing.md). Installierbare native
+CMake-/Conan-Pakete und eine Shared-Library-ABI sind weiterhin nicht Teil
+dieses Releases.

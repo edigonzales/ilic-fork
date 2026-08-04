@@ -15,6 +15,9 @@ test(
   },
   async () => {
     const compiler = await createCompiler();
+    const expectedVersion = process.env.ILIC_EXPECTED_VERSION ?? "0.9.10";
+    assert.equal(compiler.compilerVersion, expectedVersion);
+    assert.equal(compiler.abiVersion, 1);
     const session = compiler.createSession();
     const uri = "memory:///WasmModel.ili";
     session.putSource(
@@ -36,6 +39,7 @@ END WasmModel.
     assert.ok(result.models.some((model) => model.name === "WasmModel"));
     assert.equal(result.schemaVersion, 1);
     assert.equal(result.abiVersion, 1);
+    assert.equal(result.compilerVersion, compiler.compilerVersion);
     assert.match(
       result.transcript.join("\n"),
       /ilic completed with no errors, no warnings \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/,

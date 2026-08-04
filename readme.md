@@ -9,6 +9,10 @@ On foreign libraries contained in folder /lib some license restrictions may appl
 
 ## Release platforms
 
+The current coordinated product version is `0.9.10`; the native CLI, C++/C
+APIs and npm/WASM packages share that version contract. See
+[Versioning](./docs/versioning.md) and the [release runbook](./docs/releasing.md).
+
 The native release workflow produces self-contained compiler archives for
 macOS ARM64, Linux x86_64 (fully static musl), and Windows x86_64. Runtime
 dependency checks are part of each release job. macOS x86_64 is not a release
@@ -112,7 +116,7 @@ for object-path resolution in graphics and views.
   - see the [native APIs](./docs/native-api.md) and [WASM SDK](./docs/wasm.md) for embedding
   - see the [language-tooling snapshots](./docs/language-tooling-snapshots.md) for editor integrations
   - see the [build and publication pipeline](./docs/build-und-publikationspipeline.md) for CI and the coordinated release train
-  - see [npm snapshot publication](./docs/npm-publikation.md) for package builds and authentication
+  - see [npm publication](./docs/npm-publikation.md) for stable/snapshot package builds and authentication
 + reference material:
   - consult the [changelog](./doc/changelog.txt) for historical changes
   - INTERLIS manuals and legacy documentation remain in `doc/`

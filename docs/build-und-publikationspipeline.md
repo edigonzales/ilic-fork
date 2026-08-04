@@ -3,8 +3,8 @@
 [Dokumentationsindex](README.md) · [Lokaler Build](build-und-installation.md) ·
 [npm-Publikation](npm-publikation.md)
 
-Dieses Repository liefert den nativen INTERLIS-Compiler sowie die beiden
-npm-Pakete `@ilic/tools` und `@ilic/compiler-wasm`. Es ist der Anfang des
+Dieses Repository liefert den nativen INTERLIS-Compiler sowie die drei
+npm-Pakete `@ilic/repository-core`, `@ilic/tools` und `@ilic/compiler-wasm`. Es ist der Anfang des
 koordinierten Release-Trains:
 
 ```mermaid
@@ -18,8 +18,8 @@ flowchart LR
 ```
 
 Die erfolgreiche `main`-CI startet danach den separaten Compiler-Publish-
-Workflow. Dieser publiziert aus diesem Repository nur `@ilic/tools` und
-`@ilic/compiler-wasm`. Erst wenn beide unveränderlichen npm-Versionen vorhanden
+Workflow. Dieser publiziert aus diesem Repository nur `@ilic/repository-core`,
+`@ilic/tools` und `@ilic/compiler-wasm`. Erst wenn alle drei unveränderlichen npm-Versionen vorhanden
 sind, fordert er im Language-Tools-Repository den nächsten Release-Schritt an.
 Das Language-Tools-Repository publiziert anschliessend nur seine fünf eigenen
 Pakete.
@@ -30,7 +30,7 @@ Pakete.
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)                                     | Push auf `main` (ausser reine Markdown-Änderungen), Pull Request (ausser reine Markdown-Änderungen), manuell | Native Matrix, CTest, WASM- und npm-Prüfungen                                        |
 | [`.github/workflows/build-native-release.yml`](../.github/workflows/build-native-release.yml) | manuell oder `v*`-Tag                                                                                        | geprüfte Archive plus stabiler GitHub Release oder beweglicher `snapshot`-Pre-Release |
-| [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | erfolgreiche `CI` auf `main`, manuell                                                                        | Compiler-only-Snapshot der beiden npm-Pakete und Dispatch des exakten Release-Inputs |
+| [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | erfolgreiche `CI` auf `main`, manuell                                                                        | Compiler-only-Snapshot der drei npm-Pakete und Dispatch des exakten Release-Inputs |
 
 Beide Workflows checken ohne persistierte GitHub-Credentials aus. Normale
 Build-Jobs besitzen nur Leserechte auf den Repository-Inhalt. Ausschliesslich
@@ -138,7 +138,7 @@ sendet danach ein GitHub-`repository_dispatch` mit dem Ereignis
 ```json
 {
   "compiler_sha": "<vollständiger GITHUB_SHA>",
-  "compiler_version": "0.9.9-SNAPSHOT.<timestamp>.<publish-run-id>",
+  "compiler_version": "0.9.10-SNAPSHOT.<timestamp>.<publish-run-id>",
   "compiler_publish_run_id": "<GitHub-Run-ID>",
   "compiler_ci_run_id": "<GitHub-Run-ID>"
 }
@@ -171,19 +171,22 @@ dokumentiert.
 
 ## Manueller Compiler-only-Publish
 
-`Publish npm snapshot` ist bewusst kein normaler Release-Weg. Er publiziert
-nur `@ilic/tools` und `@ilic/compiler-wasm` und stößt weder Language Tools noch
-Web IDE an. Der über die GitHub-Oberfläche ausgewählte Branch oder Tag bestimmt
+`Publish npm snapshot` ist bewusst kein stabiler Release-Weg. Er publiziert
+nur `@ilic/repository-core`, `@ilic/tools` und `@ilic/compiler-wasm` und stößt den
+koordinierten Language-Tools-Train erst nach erfolgreicher Paketprüfung an; der
+stabile Tag-Pfad dispatcht Consumer dagegen bewusst nicht automatisch. Die
+Web IDE wird vom Language-Tools-Repository angestoßen. Der ausgewählte
+Branch oder Tag bestimmt
 Checkout, Commit und npm-Provenance.
 
 Der Job verwendet Node 24, npm 11.18.0 und die gepinnte Emscripten-Version. Die
 Reihenfolge ist:
 
 1. WASM bauen;
-2. Tests beider Quellpakete und der Staging-Logik ausführen;
-3. beide Snapshot-Pakete mit UTC-Zeitstempel und GitHub-Run-ID stagen;
+2. Tests aller drei Quellpakete und der Staging-Logik ausführen;
+3. drei Snapshot-Pakete mit UTC-Zeitstempel und GitHub-Run-ID stagen;
 4. gepackte und neu installierte Pakete prüfen;
-5. `@ilic/tools`, danach `@ilic/compiler-wasm` mit dem Dist-Tag `snapshot`
+5. `@ilic/repository-core`, `@ilic/tools`, danach `@ilic/compiler-wasm` mit dem Dist-Tag `snapshot`
    publizieren;
 6. Commit und Versionen in die GitHub-Step-Summary schreiben.
 
@@ -202,11 +205,11 @@ unveränderte Version. Der Compiler-Publish ergänzt einen UTC-Zeitstempel und
 die Run-ID dieses Publish-Workflows:
 
 ```text
-0.9.9-SNAPSHOT.YYYYMMDDHHmmss.<run-id>
+0.9.10-SNAPSHOT.YYYYMMDDHHmmss.<run-id>
 ```
 
 Staging-Verzeichnisse und Tarballs dieses npm-Publish-Schritts liegen unter
-`build/npm/` und werden nicht eingecheckt. Publiziert werden dort nur die beiden
+`build/npm/` und werden nicht eingecheckt. Publiziert werden dort nur die drei
 öffentlichen npm-Pakete. Der native Compiler wird separat durch
 `build-native-release.yml` als GitHub-Release-Asset veröffentlicht; statische
 Bibliotheken, CTest-Binaries und WASM-Zwischenverzeichnisse werden nicht

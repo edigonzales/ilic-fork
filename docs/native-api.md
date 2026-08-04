@@ -217,7 +217,7 @@ Schema-Versionen und falsche Typen ergeben eine Diagnostic mit
 {
   "schemaVersion": 1,
   "abiVersion": 1,
-  "compilerVersion": "0.9.9",
+  "compilerVersion": "0.9.10",
   "kind": "compilation",
   "success": true,
   "cancelled": false,

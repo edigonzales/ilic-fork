@@ -268,14 +268,19 @@ jobs:
           "$RUNNER_TEMP/emsdk/emsdk" install "$emscripten_version"
           "$RUNNER_TEMP/emsdk/emsdk" activate "$emscripten_version"
       - name: Build WebAssembly package
+        env:
+          ILIC_WASM_VERSION: 0.9.10-SNAPSHOT.20260101000000
         shell: bash
         run: |
           set -euo pipefail
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           ./scripts/build-wasm.sh
       - name: Test JavaScript packages
+        env:
+          ILIC_EXPECTED_VERSION: 0.9.10-SNAPSHOT.20260101000000
         run: |
           npm install --prefix packages/tools --no-save --package-lock=false ./packages/repository-core
+          npm install --prefix packages/compiler-wasm --no-save --package-lock=false ./packages/repository-core ./packages/tools
           npm test --prefix packages/tools
           npm test --prefix packages/compiler-wasm
           node --test test/npm/PrepareNpmSnapshotTest.mjs
@@ -283,7 +288,9 @@ jobs:
       - name: Verify snapshot package consumers
         run: |
           node scripts/prepare-npm-snapshot.mjs --timestamp 20260101000000
-          node scripts/test-npm-packages.mjs
+          node scripts/test-npm-packages.mjs \
+            --expected-version 0.9.10-SNAPSHOT.20260101000000 \
+            --version-kind snapshot
 
   diagnostic-quality:
     name: Diagnostic Quality Report

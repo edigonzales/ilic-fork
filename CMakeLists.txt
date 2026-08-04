@@ -1,12 +1,45 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(ilic VERSION 0.9.9 LANGUAGES C CXX)
+project(ilic VERSION 0.9.10 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
+
+set(_ilic_is_top_level OFF)
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(_ilic_is_top_level ON)
+endif()
+
+option(ILIC_BUILD_CLI
+    "Build ilic and ilic-format command-line programs"
+    ${_ilic_is_top_level}
+)
+option(ILIC_BUILD_TESTS
+    "Build ilic tests when BUILD_TESTING is enabled"
+    ${_ilic_is_top_level}
+)
+unset(_ilic_is_top_level)
+
+set(ILIC_RUNTIME_VERSION "${PROJECT_VERSION}")
+if(DEFINED ILIC_WASM_VERSION AND NOT ILIC_WASM_VERSION STREQUAL "")
+    if(NOT EMSCRIPTEN)
+        message(FATAL_ERROR "ILIC_WASM_VERSION is only valid for an Emscripten build")
+    endif()
+    if(NOT ILIC_WASM_VERSION MATCHES "^${PROJECT_VERSION}(-SNAPSHOT\\.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9](\\.[0-9]+)?)?$")
+        message(FATAL_ERROR
+            "ILIC_WASM_VERSION must be ${PROJECT_VERSION} or a matching snapshot, got ${ILIC_WASM_VERSION}")
+    endif()
+    set(ILIC_RUNTIME_VERSION "${ILIC_WASM_VERSION}")
+endif()
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/IlicVersionConfig.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/ilic/IlicVersionConfig.h"
+    @ONLY
+)
 
 # Generated parser and metamodel headers are included by many otherwise
 # first-party translation units. Suppress only their two characteristic
@@ -175,6 +208,8 @@ endif()
 target_include_directories(ilic-core
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    PRIVATE
+        "${CMAKE_CURRENT_BINARY_DIR}/generated"
 )
 target_link_libraries(ilic-core PUBLIC antlr4-runtime)
 
@@ -194,11 +229,13 @@ target_include_directories(ilic-capi
 )
 target_link_libraries(ilic-capi PUBLIC ilic-core ilic-json)
 
-add_executable(ilic source/main/ilic.cpp)
-target_link_libraries(ilic PRIVATE ilic-capi)
+if(ILIC_BUILD_CLI)
+    add_executable(ilic source/main/ilic.cpp)
+    target_link_libraries(ilic PRIVATE ilic-capi)
 
-add_executable(ilic-format source/main/ilic_format.cpp)
-target_link_libraries(ilic-format PRIVATE ilic-core)
+    add_executable(ilic-format source/main/ilic_format.cpp)
+    target_link_libraries(ilic-format PRIVATE ilic-core)
+endif()
 
 if(EMSCRIPTEN)
     # Parser errors are expected for incomplete editor buffers. Emscripten
@@ -266,17 +303,19 @@ if(ILIC_ENABLE_NATIVE_REPOSITORY AND NOT EMSCRIPTEN)
         PUBLIC ilic-repository-core
         PRIVATE ${ILIC_CURL_TARGET} ${ILIC_XML_TARGET}
     )
-    target_link_libraries(ilic PRIVATE ilic-repository)
-    target_compile_definitions(ilic PRIVATE ILIC_NATIVE_REPOSITORY=1)
-    target_sources(ilic PRIVATE source/main/RepositoryCli.cpp)
-    target_include_directories(ilic PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/main"
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/repository"
-    )
-    ilic_enable_static_distribution(ilic)
+    if(ILIC_BUILD_CLI)
+        target_link_libraries(ilic PRIVATE ilic-repository)
+        target_compile_definitions(ilic PRIVATE ILIC_NATIVE_REPOSITORY=1)
+        target_sources(ilic PRIVATE source/main/RepositoryCli.cpp)
+        target_include_directories(ilic PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/main"
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/repository"
+        )
+        ilic_enable_static_distribution(ilic)
+    endif()
 endif()
 
-if(BUILD_TESTING)
+if(BUILD_TESTING AND ILIC_BUILD_TESTS)
     add_library(ilic-test-support INTERFACE)
     add_library(ilic::test-support ALIAS ilic-test-support)
     target_include_directories(ilic-test-support
@@ -356,7 +395,7 @@ if(BUILD_TESTING)
     add_executable(ilic_snapshot_json_driver test/abi/SnapshotJsonDriver.cpp)
     target_link_libraries(ilic_snapshot_json_driver PRIVATE ilic-capi)
 
-    if(UNIX AND ILIC_ENABLE_NATIVE_REPOSITORY)
+    if(UNIX AND ILIC_ENABLE_NATIVE_REPOSITORY AND ILIC_BUILD_CLI)
         add_test(NAME ilic_docs_cli_examples
             COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples/cli.sh"
                 "$<TARGET_FILE:ilic>"
@@ -402,6 +441,34 @@ if(BUILD_TESTING)
     add_test(NAME ilic_capi_concurrency COMMAND ilic_capi_concurrency_test)
     set_tests_properties(ilic_capi_concurrency PROPERTIES
         LABELS "concurrency;capi;lifetime"
+    )
+    add_executable(ilic_version_contract_test test/core/VersionContractTest.cpp)
+    target_link_libraries(ilic_version_contract_test PRIVATE ilic::core)
+    target_compile_definitions(ilic_version_contract_test PRIVATE
+        ILIC_EXPECTED_VERSION="${PROJECT_VERSION}"
+    )
+    add_test(NAME ilic_version_contract COMMAND ilic_version_contract_test)
+    add_executable(ilic_capi_version_contract_test
+        test/abi/CapiVersionContractTest.c)
+    set_target_properties(ilic_capi_version_contract_test PROPERTIES
+        LINKER_LANGUAGE CXX)
+    target_link_libraries(ilic_capi_version_contract_test PRIVATE ilic::capi)
+    target_compile_definitions(ilic_capi_version_contract_test PRIVATE
+        ILIC_EXPECTED_VERSION="${PROJECT_VERSION}"
+    )
+    add_test(NAME ilic_capi_version_contract
+        COMMAND ilic_capi_version_contract_test)
+    add_test(NAME ilic_source_subproject
+        COMMAND "${CMAKE_COMMAND}"
+            "-DILIC_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DILIC_CONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/test/consumer/source-subproject"
+            "-DILIC_CONSUMER_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/source-subproject-consumer"
+            "-DILIC_CONSUMER_EXE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+            "-DILIC_GENERATOR=${CMAKE_GENERATOR}"
+            "-DILIC_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+            "-DILIC_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+            "-DILIC_BUILD_CONFIG=$<CONFIG>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_source_subproject_test.cmake"
     )
     add_executable(ilic_core_session_test test/core/CompilerSessionTest.cpp)
     target_link_libraries(ilic_core_session_test PRIVATE ilic-core ilic::test-support)
@@ -499,30 +566,33 @@ if(BUILD_TESTING)
             "${CMAKE_CURRENT_SOURCE_DIR}/source/repository")
         target_link_libraries(ilic_repository_cli_config_test PRIVATE ilic-repository ilic::test-support)
         add_test(NAME ilic_repository_cli_config COMMAND ilic_repository_cli_config_test)
-        add_test(NAME ilic_repository_cli COMMAND ilic -no_info -no_warnings
-            -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
-            -models RepositoryRoot --ili-version 2.3 --no-default-repositories)
-        add_test(NAME ilic_repository_cli_import_fallback COMMAND ilic -no_info -no_warnings
-            -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
-            --no-default-repositories
-            "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/import-fallback/RepositoryConsumer.ili")
-        add_test(NAME ilic_repository_cli_no_input COMMAND ilic
-            -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture")
-        set_tests_properties(ilic_repository_cli_no_input PROPERTIES
-            WILL_FAIL TRUE)
-        add_test(NAME ilic_repository_cli_version_no_input COMMAND ilic --ili-version 2.4)
-        set_tests_properties(ilic_repository_cli_version_no_input PROPERTIES
-            WILL_FAIL TRUE)
-        add_test(NAME ilic_repository_cli_no_repositories COMMAND ilic
-            -models DatasetIdx16 --no-default-repositories)
-        set_tests_properties(ilic_repository_cli_no_repositories PROPERTIES
-            WILL_FAIL TRUE)
-        add_test(NAME ilic_repository_cli_invalid_version COMMAND ilic
-            --ili-version 2.2 "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples/models/Legacy.ili")
-        set_tests_properties(ilic_repository_cli_invalid_version PROPERTIES
-            WILL_FAIL TRUE)
+        if(ILIC_BUILD_CLI)
+            add_test(NAME ilic_repository_cli COMMAND ilic -no_info -no_warnings
+                -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
+                -models RepositoryRoot --ili-version 2.3 --no-default-repositories)
+            add_test(NAME ilic_repository_cli_import_fallback COMMAND ilic -no_info -no_warnings
+                -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture"
+                --no-default-repositories
+                "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/import-fallback/RepositoryConsumer.ili")
+            add_test(NAME ilic_repository_cli_no_input COMMAND ilic
+                -repositories "${CMAKE_CURRENT_SOURCE_DIR}/test/repository/fixture")
+            set_tests_properties(ilic_repository_cli_no_input PROPERTIES
+                WILL_FAIL TRUE)
+            add_test(NAME ilic_repository_cli_version_no_input COMMAND ilic --ili-version 2.4)
+            set_tests_properties(ilic_repository_cli_version_no_input PROPERTIES
+                WILL_FAIL TRUE)
+            add_test(NAME ilic_repository_cli_no_repositories COMMAND ilic
+                -models DatasetIdx16 --no-default-repositories)
+            set_tests_properties(ilic_repository_cli_no_repositories PROPERTIES
+                WILL_FAIL TRUE)
+            add_test(NAME ilic_repository_cli_invalid_version COMMAND ilic
+                --ili-version 2.2 "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples/models/Legacy.ili")
+            set_tests_properties(ilic_repository_cli_invalid_version PROPERTIES
+                WILL_FAIL TRUE)
+        endif()
     endif()
 
+    if(ILIC_BUILD_CLI)
     function(add_ilic_regression_test name expected_success)
         set(options)
         set(one_value_args OUTPUT_REGEX ILIDIRS)
@@ -903,6 +973,7 @@ if(BUILD_TESTING)
             "-DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/translation-roundtrip.ili"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ilic_translation_roundtrip.cmake"
     )
+    endif()
 
 endif()
 

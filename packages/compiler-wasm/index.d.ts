@@ -276,6 +276,7 @@ export interface EmscriptenIlicModule {
   HEAPU8: Uint8Array;
   HEAPU32: Uint32Array;
   _ilic_abi_version(): number;
+  _ilic_version(): number;
   _ilic_alloc(length: number): number;
   _ilic_free(pointer: number): void;
   _ilic_session_create(): number;
@@ -319,6 +320,7 @@ export class Compiler {
   constructor(module: EmscriptenIlicModule, options?: { allowLegacyEditorProjection?: boolean });
   readonly module: EmscriptenIlicModule;
   readonly abiVersion: number;
+  readonly compilerVersion: string;
   readonly capabilities: CompilerCapabilities;
   createSession(): CompilerSession;
 }
