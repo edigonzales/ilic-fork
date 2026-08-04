@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           test "$(uname -m)" = "x86_64"
           docker run --rm -v "$PWD:/src" -w /src alpine:3.20.3 sh -euxc '
-            apk add --no-cache build-base cmake ninja perl linux-headers openssl-dev openssl-libs-static file binutils
+            apk add --no-cache build-base cmake ninja perl python3 linux-headers openssl-dev openssl-libs-static file binutils
             cmake -S . -B build/release-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_BUILD_TESTS=ON -DILIC_BUILD_CLI=ON -DILIC_STATIC_DISTRIBUTION=ON
             cmake --build build/release-linux --parallel
             ctest --test-dir build/release-linux --output-on-failure

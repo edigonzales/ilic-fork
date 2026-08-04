@@ -68,8 +68,11 @@ ensure_emscripten() {
   fi
   echo "Activating Emscripten $expected_version ..."
   "$sdk_dir/emsdk" activate "$expected_version"
+  emsdk_previous_dir=$(pwd)
+  cd "$sdk_dir"
   # shellcheck disable=SC1090
-  . "$sdk_dir/emsdk_env.sh"
+  . ./emsdk_env.sh
+  cd "$emsdk_previous_dir"
 
   has_expected_emcc || die "Expected Emscripten $expected_version after SDK activation, found ${actual_version:-unknown}."
   actual_version=$(emcc_version)
