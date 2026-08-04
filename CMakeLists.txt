@@ -194,6 +194,7 @@ set(ILIC_CORE_SOURCES
 
 add_library(ilic-core STATIC ${ILIC_CORE_SOURCES})
 add_library(ilic::core ALIAS ilic-core)
+target_compile_features(ilic-core PUBLIC cxx_std_17)
 # The IlisMeta schema uses role names such as `Type`, `Class`, and
 # `MetaElement` that intentionally match their C++ type names. GCC 13 and
 # newer diagnose these legacy declarations as errors unless this narrowly
