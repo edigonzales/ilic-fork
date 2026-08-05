@@ -109,6 +109,7 @@ endif()
 
 set(ILIC_CORE_SOURCES
     source/core/Compiler.cpp
+    source/core/ModelCompilation.cpp
     source/core/CompilerSessionState.cpp
     source/core/CompilerContext.cpp
     source/core/CompilationSourceStore.cpp
@@ -389,6 +390,10 @@ if(BUILD_TESTING AND ILIC_BUILD_TESTS)
     add_executable(ilic_docs_cpp_example docs/examples/cpp-session.cpp)
     target_link_libraries(ilic_docs_cpp_example PRIVATE ilic-core)
     add_test(NAME ilic_docs_cpp_example COMMAND ilic_docs_cpp_example)
+
+    add_executable(ilic_model_compilation_test test/core/ModelCompilationTest.cpp)
+    target_link_libraries(ilic_model_compilation_test PRIVATE ilic::core ilic::test-support)
+    add_test(NAME ilic_model_compilation COMMAND ilic_model_compilation_test)
 
     add_executable(ilic_docs_c_example docs/examples/c-api.c)
     set_target_properties(ilic_docs_c_example PROPERTIES LINKER_LANGUAGE CXX)
