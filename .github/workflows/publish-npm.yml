@@ -54,7 +54,7 @@ jobs:
           set -euo pipefail
           base_version=$(node -p "require('./packages/compiler-wasm/package.json').version")
           timestamp=$(date -u +%Y%m%d%H%M%S)
-          snapshot_version="${base_version}-SNAPSHOT.${timestamp}.${GITHUB_RUN_ID}"
+          snapshot_version="${base_version}.${timestamp}.${GITHUB_RUN_ID}"
           echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
           echo "version=$snapshot_version" >> "$GITHUB_OUTPUT"
 

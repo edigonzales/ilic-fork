@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(ilic VERSION 0.9.10 LANGUAGES C CXX)
+project(ilic VERSION 0.10.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,7 +23,9 @@ option(ILIC_BUILD_TESTS
 )
 unset(_ilic_is_top_level)
 
-set(ILIC_RUNTIME_VERSION "${PROJECT_VERSION}")
+set(ILIC_VERSION_QUALIFIER "SNAPSHOT")
+set(ILIC_VERSION_STRING "${PROJECT_VERSION}-${ILIC_VERSION_QUALIFIER}")
+set(ILIC_RUNTIME_VERSION "${ILIC_VERSION_STRING}")
 if(DEFINED ILIC_WASM_VERSION AND NOT ILIC_WASM_VERSION STREQUAL "")
     if(NOT EMSCRIPTEN)
         message(FATAL_ERROR "ILIC_WASM_VERSION is only valid for an Emscripten build")
@@ -446,7 +448,7 @@ if(BUILD_TESTING AND ILIC_BUILD_TESTS)
     add_executable(ilic_version_contract_test test/core/VersionContractTest.cpp)
     target_link_libraries(ilic_version_contract_test PRIVATE ilic::core)
     target_compile_definitions(ilic_version_contract_test PRIVATE
-        ILIC_EXPECTED_VERSION="${PROJECT_VERSION}"
+        ILIC_EXPECTED_VERSION="${ILIC_VERSION_STRING}"
     )
     add_test(NAME ilic_version_contract COMMAND ilic_version_contract_test)
     add_executable(ilic_capi_version_contract_test
@@ -455,7 +457,7 @@ if(BUILD_TESTING AND ILIC_BUILD_TESTS)
         LINKER_LANGUAGE CXX)
     target_link_libraries(ilic_capi_version_contract_test PRIVATE ilic::capi)
     target_compile_definitions(ilic_capi_version_contract_test PRIVATE
-        ILIC_EXPECTED_VERSION="${PROJECT_VERSION}"
+        ILIC_EXPECTED_VERSION="${ILIC_VERSION_STRING}"
     )
     add_test(NAME ilic_capi_version_contract
         COMMAND ilic_capi_version_contract_test)

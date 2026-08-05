@@ -127,6 +127,6 @@ void CompilerSession::clearIncrementalCaches()
    impl_->syncCacheStats();
 }
 
-const char *version() { return ILIC_VERSION_STRING; }
+const char *version() { return ILIC_RUNTIME_VERSION; }
 
 } // namespace ilic

@@ -12,6 +12,9 @@ veröffentlicht:
 npm install @ilic/compiler-wasm@snapshot
 ```
 
+Die eingecheckte Source-Basis ist `0.10.0-SNAPSHOT`. Ein konkretes Paket erhält
+eine unveränderliche Version wie `0.10.0-SNAPSHOT.20260805143000`.
+
 ## Kompilieren und formatieren
 
 ```js

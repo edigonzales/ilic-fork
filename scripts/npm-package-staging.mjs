@@ -65,8 +65,7 @@ async function assertRegularFile(path, description) {
   }
 }
 
-export async function readProjectVersion(projectRoot) {
-  const cmake = await readFile(resolve(projectRoot, "CMakeLists.txt"), "utf8");
+export function readCMakeProjectVersions(cmake) {
   const matches = [
     ...cmake.matchAll(
       /project\s*\(\s*ilic\s+VERSION\s+(\d+\.\d+\.\d+)(?=\s|\))/gi,
@@ -77,7 +76,29 @@ export async function readProjectVersion(projectRoot) {
       `Expected exactly one project(ilic VERSION X.Y.Z ...) declaration, found ${matches.length}`,
     );
   }
-  return matches[0][1];
+  const projectVersion = matches[0][1];
+  const qualifier = cmake.match(
+    /set\s*\(\s*ILIC_VERSION_QUALIFIER\s+"([A-Za-z0-9-]+)"\s*\)/i,
+  )?.[1];
+  return {
+    projectVersion,
+    sourceVersion: qualifier
+      ? `${projectVersion}-${qualifier}`
+      : projectVersion,
+  };
+}
+
+export async function readProjectVersions(projectRoot) {
+  const cmake = await readFile(resolve(projectRoot, "CMakeLists.txt"), "utf8");
+  return readCMakeProjectVersions(cmake);
+}
+
+export async function readProjectVersion(projectRoot) {
+  return (await readProjectVersions(projectRoot)).projectVersion;
+}
+
+export async function readProjectSourceVersion(projectRoot) {
+  return (await readProjectVersions(projectRoot)).sourceVersion;
 }
 
 export function validateOutputRoot(
@@ -202,10 +223,11 @@ export async function stageCompilerPackages({
   if (!/^\d+\.\d+\.\d+(?:-SNAPSHOT\.\d{14}(?:\.\d+)?)?$/.test(targetVersion)) {
     throw new Error(`Invalid compiler package target version ${targetVersion}`);
   }
-  const baseVersion = await readProjectVersion(projectRoot);
+  const projectVersion = await readProjectVersion(projectRoot);
+  const sourceVersion = await readProjectSourceVersion(projectRoot);
   const packages = await readAndValidateSourcePackages({
     projectRoot,
-    baseVersion,
+    baseVersion: sourceVersion,
   });
 
   await rm(outputRoot, { recursive: true, force: true });
@@ -228,5 +250,11 @@ export async function stageCompilerPackages({
     );
     directories[spec.id] = destination;
   }
-  return { baseVersion, targetVersion, outputRoot, directories };
+  return {
+    baseVersion: sourceVersion,
+    projectVersion,
+    targetVersion,
+    outputRoot,
+    directories,
+  };
 }

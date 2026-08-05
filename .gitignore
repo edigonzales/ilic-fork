@@ -8,6 +8,7 @@ build/
 build/macos/
 build/wasm/
 build/npm/
+artifacts/
 packages/compiler-wasm/ilic.mjs
 packages/compiler-wasm/ilic.wasm
 

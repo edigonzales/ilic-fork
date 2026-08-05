@@ -4,7 +4,11 @@ import { appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { readProjectVersion, stageCompilerPackages } from "./npm-package-staging.mjs";
+import {
+  readProjectSourceVersion,
+  readProjectVersion,
+  stageCompilerPackages,
+} from "./npm-package-staging.mjs";
 
 export async function prepareNpmRelease({
   projectRoot = resolve(import.meta.dirname, ".."),
@@ -15,6 +19,12 @@ export async function prepareNpmRelease({
   projectRoot = resolve(projectRoot);
   outputRoot = resolve(outputRoot);
   const baseVersion = await readProjectVersion(projectRoot);
+  const sourceVersion = await readProjectSourceVersion(projectRoot);
+  if (sourceVersion.endsWith("-SNAPSHOT")) {
+    throw new Error(
+      `Stable npm release staging is disabled for ${sourceVersion}; use snapshot packaging`,
+    );
+  }
   if (expectedVersion !== undefined && expectedVersion !== baseVersion) {
     throw new Error(
       `Expected release version ${expectedVersion}, but CMake project version is ${baseVersion}`,

@@ -1,6 +1,6 @@
 {
   "name": "@ilic/tools",
-  "version": "0.9.10",
+  "version": "0.10.0-SNAPSHOT",
   "description": "INTERLIS repository resolution and caching for Node.js and browsers.",
   "author": "edigonzales",
   "license": "MIT",
@@ -23,7 +23,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@ilic/repository-core": "0.9.10"
+    "@ilic/repository-core": "0.10.0-SNAPSHOT"
   },
   "exports": {
     ".": {

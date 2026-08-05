@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 
@@ -50,6 +51,22 @@ function parseArguments(argv) {
 
 function npmPack(directory, args = []) {
   return JSON.parse(run("npm", ["pack", "--json", ...args, directory], { capture: true }))[0];
+}
+
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function parseSnapshotVersion(version) {
+  const match = /^(\d+\.\d+\.\d+)-SNAPSHOT\.(\d{14})(?:\.(\d+))?$/.exec(version);
+  if (!match) throw new Error(`Invalid immutable snapshot version ${version}`);
+  const timestamp = match[2];
+  return {
+    baseVersion: `${match[1]}-SNAPSHOT`,
+    snapshotId: match[3] ? `${timestamp}.${match[3]}` : timestamp,
+    createdAt: `${timestamp.slice(0, 4)}-${timestamp.slice(4, 6)}-${timestamp.slice(6, 8)}T` +
+      `${timestamp.slice(8, 10)}:${timestamp.slice(10, 12)}:${timestamp.slice(12, 14)}Z`,
+  };
 }
 
 function expectedFiles(manifest) {
@@ -207,6 +224,27 @@ try {
       2,
     )}\n`,
   );
+  if (versionKind === "snapshot") {
+    const compilerTarball = tarballs[2];
+    const compilerBytes = await readFile(compilerTarball);
+    const snapshot = parseSnapshotVersion(expectedVersion);
+    const sourceRevision = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    }).trim();
+    const manifestPath = resolve(projectRoot, "artifacts/compiler-wasm-snapshot.json");
+    await mkdir(resolve(projectRoot, "artifacts"), { recursive: true });
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify({
+        ...snapshot,
+        resolvedVersion: expectedVersion,
+        sourceRevision,
+        tarball: basename(compilerTarball),
+        sha256: sha256(compilerBytes),
+      }, null, 2)}\n`,
+    );
+  }
   process.stdout.write(`verified ${manifests[0].version}: ${tarballs.map(path => basename(path)).join(", ")}\n`);
 }
 

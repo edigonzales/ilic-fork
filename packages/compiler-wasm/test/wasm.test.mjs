@@ -15,7 +15,7 @@ test(
   },
   async () => {
     const compiler = await createCompiler();
-    const expectedVersion = process.env.ILIC_EXPECTED_VERSION ?? "0.9.10";
+    const expectedVersion = process.env.ILIC_EXPECTED_VERSION ?? "0.10.0-SNAPSHOT";
     assert.equal(compiler.compilerVersion, expectedVersion);
     assert.equal(compiler.abiVersion, 1);
     const session = compiler.createSession();

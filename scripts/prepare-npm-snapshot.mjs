@@ -4,7 +4,10 @@ import { appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { readProjectVersion, stageCompilerPackages } from "./npm-package-staging.mjs";
+import {
+  readProjectSourceVersion,
+  stageCompilerPackages,
+} from "./npm-package-staging.mjs";
 
 function twoDigits(value) {
   return String(value).padStart(2, "0");
@@ -59,7 +62,13 @@ export async function prepareNpmSnapshot({
   outputRoot = resolve(outputRoot);
   validateTimestamp(timestamp);
   const normalizedBuildId = validateBuildId(buildId);
-  const baseVersion = await readProjectVersion(projectRoot);
+  const sourceVersion = await readProjectSourceVersion(projectRoot);
+  if (!sourceVersion.endsWith("-SNAPSHOT")) {
+    throw new Error(
+      `Snapshot packaging requires a -SNAPSHOT source version, got ${sourceVersion}`,
+    );
+  }
+  const baseVersion = sourceVersion.slice(0, -"-SNAPSHOT".length);
   const snapshotVersion =
     `${baseVersion}-SNAPSHOT.${timestamp}` +
     (normalizedBuildId ? `.${normalizedBuildId}` : "");
@@ -69,7 +78,13 @@ export async function prepareNpmSnapshot({
     targetVersion: snapshotVersion,
     allowedProjectDirectory: "npm",
   });
-  return { ...staged, timestamp, snapshotVersion };
+  return {
+    ...staged,
+    baseVersion: sourceVersion,
+    timestamp,
+    snapshotId: `${timestamp}${normalizedBuildId ? `.${normalizedBuildId}` : ""}`,
+    snapshotVersion,
+  };
 }
 
 function parseArguments(argv) {

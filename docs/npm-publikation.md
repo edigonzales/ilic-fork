@@ -14,17 +14,18 @@ noch als GitHub Release veröffentlicht.
 
 ## Version und Dist-Tag
 
-Die Basisversion ist die CMake-Projektversion aus `CMakeLists.txt`, aktuell
-`0.9.10`. Ein koordinierter Snapshot-Publish erhält einen UTC-Zeitstempel und eine
-eindeutige GitHub-Run-ID:
+Die Source-Basisversion ist die CMake-Projektversion plus Qualifier aus
+`CMakeLists.txt`, aktuell `0.10.0-SNAPSHOT`. Ein koordinierter Snapshot-Publish
+erhält einen UTC-Zeitstempel und eine eindeutige GitHub-Run-ID:
 
 ```text
-0.9.10-SNAPSHOT.20260718143152.123456789
+0.10.0-SNAPSHOT.20260805143152.123456789
 ```
 
-Der Zeitstempel hat das Format `YYYYMMDDHHmmss`. Beide Pakete erhalten in einem
-Lauf dieselbe Version. Die eingecheckten `package.json` bleiben dagegen auf der
-Basisversion.
+Der Zeitstempel hat das Format `YYYYMMDDHHmmss`. Alle drei Pakete erhalten in
+einem Lauf dieselbe Version. Die eingecheckten `package.json` bleiben dagegen
+auf `0.10.0-SNAPSHOT`; nur die Staging-Kopie erhält die konkrete
+Artefaktversion.
 
 npm erlaubt nicht, dieselbe Kombination aus Paketname und Version erneut zu
 publizieren. Ein erneuter Lauf verwendet deshalb dieselbe Basisversion und
@@ -36,12 +37,9 @@ npm install @ilic/compiler-wasm@snapshot
 npm install @ilic/tools@snapshot
 ```
 
-Beim ersten Publish eines neuen Pakets erzeugt npm zusätzlich den Dist-Tag
-`latest`. Dieser Tag kann danach nicht vollständig entfernt, sondern nur auf
-eine andere Version verschoben werden. Bis zur ersten stabilen Version werden
-`snapshot` und `latest` deshalb nach jedem Publish auf denselben aktuellen
-Snapshot gesetzt. Danach bezeichnet `latest` die stabile Version, während
-`snapshot` der Vorabkanal bleibt. Siehe
+Für diese Entwicklungszeile wird ausschliesslich der Dist-Tag `snapshot`
+verwendet. `latest` wird weder beim Publish noch beim Verifizieren gesetzt.
+Eine spätere stabile Release-Policy ist ein separater Auftrag. Siehe
 [npm-Dist-Tags](https://docs.npmjs.com/cli/dist-tag/).
 
 ## Lokales Erzeugen und Prüfen
@@ -86,7 +84,10 @@ node scripts/test-npm-packages.mjs
 ```
 
 Die Quell-Manifeste werden bei diesen Schritten nicht verändert. Alle
-generierten Dateien bleiben unter dem ignorierten Verzeichnis `build/npm/`.
+generierten Dateien bleiben unter den ignorierten Verzeichnissen `build/npm/`
+und `artifacts/`. Die Paketprüfung erzeugt
+`artifacts/compiler-wasm-snapshot.json` mit Source-SHA, Erstellungszeitpunkt,
+Tarballname und SHA-256 des Compiler-Tarballs.
 
 ## Einmaliger Bootstrap auf npm
 
@@ -233,13 +234,10 @@ git push origin npm-snapshot-test
 Danach wird dieser Tag in der nativen GitHub-Auswahl verwendet. Das Löschen des
 Tags löscht keine bereits publizierte npm-Version.
 
-## Dist-Tags nach einem Publish synchronisieren
+## Versionen nach einem Publish prüfen
 
-Trusted Publishing autorisiert ausschliesslich `npm publish` beziehungsweise
-`npm stage publish`, nicht jedoch `npm dist-tag add`. Der Workflow bleibt
-deshalb tokenfrei und verschiebt nur den Tag `snapshot`. Nach jedem
-erfolgreichen Workflow-Lauf werden die drei veröffentlichten Versionen zuerst
-verglichen und `latest` anschliessend lokal mit 2FA nachgezogen:
+Nach jedem erfolgreichen Workflow-Lauf werden die drei veröffentlichten
+Versionen verglichen. Es wird nur der Dist-Tag `snapshot` verwendet:
 
 ```sh
 tools_snapshot_version=$(npm view @ilic/tools@snapshot version)
@@ -252,30 +250,9 @@ if [[ "$tools_snapshot_version" != "$compiler_snapshot_version" || \
   exit 1
 fi
 
-npm dist-tag add \
-  "@ilic/repository-core@$core_snapshot_version" \
-  latest \
-  --auth-type=web
-
-npm dist-tag add \
-  "@ilic/tools@$tools_snapshot_version" \
-  latest \
-  --auth-type=web
-
-npm dist-tag add \
-  "@ilic/compiler-wasm@$compiler_snapshot_version" \
-  latest \
-  --auth-type=web
 ```
 
-Das gilt auch für den interaktiven Bootstrap. Beim ersten Publish setzt npm
-`latest` bereits automatisch; die Befehle sind dann eine explizite und
-idempotente Bestätigung der gewählten Tag-Policy. Die Synchronisierung kann
-erst in den Workflow verschoben werden, wenn npm Dist-Tag-Änderungen für
-Trusted Publisher unterstützt. Der aktuelle Stand wird im offenen
-[npm-CLI-Issue #8547](https://github.com/npm/cli/issues/8547) verfolgt.
-
-Danach müssen beide Tags jedes Pakets dieselbe Version melden:
+Danach muss der Snapshot-Dist-Tag jedes Pakets dieselbe Version melden:
 
 ```sh
 npm dist-tag ls @ilic/tools
@@ -317,10 +294,9 @@ npm dist-tag ls @ilic/tools
 npm dist-tag ls @ilic/compiler-wasm
 ```
 
-Alle drei Pakete müssen dieselbe Snapshot-Version melden; bis zur ersten stabilen
-Publikation müssen ausserdem `snapshot` und `latest` pro Paket auf diese Version
-zeigen. Auf den npm-Seiten zeigt der Bereich `Provenance` Repository, Workflow
-und Commit des OIDC-Laufs.
+Alle drei Pakete müssen dieselbe Snapshot-Version melden; `latest` wird in
+dieser Entwicklungszeile nicht verwendet. Auf den npm-Seiten zeigt der Bereich
+`Provenance` Repository, Workflow und Commit des OIDC-Laufs.
 
 ## Teilfehler und Wiederholung
 

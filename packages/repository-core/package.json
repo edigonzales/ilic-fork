@@ -1,6 +1,6 @@
 {
   "name": "@ilic/repository-core",
-  "version": "0.9.10",
+  "version": "0.10.0-SNAPSHOT",
   "description": "Platform-neutral INTERLIS repository resolution core.",
   "author": "edigonzales",
   "license": "MIT",

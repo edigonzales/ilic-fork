@@ -139,7 +139,7 @@ sendet danach ein GitHub-`repository_dispatch` mit dem Ereignis
 ```json
 {
   "compiler_sha": "<vollständiger GITHUB_SHA>",
-  "compiler_version": "0.9.10-SNAPSHOT.<timestamp>.<publish-run-id>",
+  "compiler_version": "0.10.0-SNAPSHOT.<timestamp>.<publish-run-id>",
   "compiler_publish_run_id": "<GitHub-Run-ID>",
   "compiler_ci_run_id": "<GitHub-Run-ID>"
 }
@@ -207,7 +207,7 @@ unveränderte Version. Der Compiler-Publish ergänzt einen UTC-Zeitstempel und
 die Run-ID dieses Publish-Workflows:
 
 ```text
-0.9.10-SNAPSHOT.YYYYMMDDHHmmss.<run-id>
+0.10.0-SNAPSHOT.YYYYMMDDHHmmss.<run-id>
 ```
 
 Staging-Verzeichnisse und Tarballs dieses npm-Publish-Schritts liegen unter

@@ -269,7 +269,7 @@ jobs:
           "$RUNNER_TEMP/emsdk/emsdk" activate "$emscripten_version"
       - name: Build WebAssembly package
         env:
-          ILIC_WASM_VERSION: 0.9.10-SNAPSHOT.20260101000000
+          ILIC_WASM_VERSION: 0.10.0-SNAPSHOT.20260101000000
         shell: bash
         run: |
           set -euo pipefail
@@ -277,7 +277,7 @@ jobs:
           ./scripts/build-wasm.sh
       - name: Test JavaScript packages
         env:
-          ILIC_EXPECTED_VERSION: 0.9.10-SNAPSHOT.20260101000000
+          ILIC_EXPECTED_VERSION: 0.10.0-SNAPSHOT.20260101000000
         run: |
           npm install --prefix packages/tools --no-save --package-lock=false ./packages/repository-core
           npm install --prefix packages/compiler-wasm --no-save --package-lock=false ./packages/repository-core ./packages/tools
@@ -289,7 +289,7 @@ jobs:
         run: |
           node scripts/prepare-npm-snapshot.mjs --timestamp 20260101000000
           node scripts/test-npm-packages.mjs \
-            --expected-version 0.9.10-SNAPSHOT.20260101000000 \
+            --expected-version 0.10.0-SNAPSHOT.20260101000000 \
             --version-kind snapshot
 
   diagnostic-quality:

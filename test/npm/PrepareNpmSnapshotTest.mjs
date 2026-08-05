@@ -21,12 +21,13 @@ async function createFixture(t) {
   await mkdir(join(root, "packages/compiler-wasm"), { recursive: true });
   await mkdir(join(root, "packages/repository-core"), { recursive: true });
   await writeFile(join(root, "CMakeLists.txt"),
-    "project(ilic VERSION 0.9.10 LANGUAGES C CXX)\n");
+    "project(ilic VERSION 0.10.0 LANGUAGES C CXX)\n" +
+    "set(ILIC_VERSION_QUALIFIER \"SNAPSHOT\")\n");
   const license = "MIT License\n";
   await writeJson(join(root, "packages/tools/package.json"), {
     name: "@ilic/tools",
-    version: "0.9.10",
-    dependencies: { "@ilic/repository-core": "0.9.10" },
+    version: "0.10.0-SNAPSHOT",
+    dependencies: { "@ilic/repository-core": "0.10.0-SNAPSHOT" },
     files: ["LICENSE", "README.md", "index.js"]
   });
   await writeFile(join(root, "packages/tools/LICENSE"), license);
@@ -34,7 +35,7 @@ async function createFixture(t) {
   await writeFile(join(root, "packages/tools/index.js"), "export {};\n");
   await writeJson(join(root, "packages/compiler-wasm/package.json"), {
     name: "@ilic/compiler-wasm",
-    version: "0.9.10",
+    version: "0.10.0-SNAPSHOT",
     files: ["LICENSE", "THIRD_PARTY_NOTICES.md", "README.md", "index.js", "ilic.mjs", "ilic.wasm"]
   });
   await writeFile(join(root, "packages/compiler-wasm/LICENSE"), license);
@@ -45,7 +46,7 @@ async function createFixture(t) {
   await writeFile(join(root, "packages/compiler-wasm/ilic.wasm"), new Uint8Array([0, 97, 115, 109]));
   await writeJson(join(root, "packages/repository-core/package.json"), {
     name: "@ilic/repository-core",
-    version: "0.9.10",
+    version: "0.10.0-SNAPSHOT",
     files: ["LICENSE", "README.md", "index.js"]
   });
   await writeFile(join(root, "packages/repository-core/LICENSE"), license);
@@ -71,8 +72,8 @@ test("stages both packages with one snapshot version without mutating sources", 
     timestamp: fixedTimestamp
   });
 
-  assert.equal(result.baseVersion, "0.9.10");
-  assert.equal(result.snapshotVersion, `0.9.10-SNAPSHOT.${fixedTimestamp}`);
+  assert.equal(result.baseVersion, "0.10.0-SNAPSHOT");
+  assert.equal(result.snapshotVersion, `0.10.0-SNAPSHOT.${fixedTimestamp}`);
   const staged = await Promise.all([
     readFile(join(result.directories.tools, "package.json"), "utf8"),
     readFile(join(result.directories.compiler_wasm, "package.json"), "utf8"),
@@ -98,7 +99,7 @@ test("adds a numeric build ID to both compiler package versions", async t => {
     buildId: "12345"
   });
 
-  assert.equal(result.snapshotVersion, `0.9.10-SNAPSHOT.${fixedTimestamp}.12345`);
+  assert.equal(result.snapshotVersion, `0.10.0-SNAPSHOT.${fixedTimestamp}.12345`);
   const manifest = JSON.parse(await readFile(join(result.directories.tools, "package.json"), "utf8"));
   assert.equal(manifest.version, result.snapshotVersion);
 });

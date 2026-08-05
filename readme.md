@@ -9,8 +9,9 @@ On foreign libraries contained in folder /lib some license restrictions may appl
 
 ## Release platforms
 
-The current coordinated product version is `0.9.10`; the native CLI, C++/C
-APIs and npm/WASM packages share that version contract. See
+The current development line is `0.10.0-SNAPSHOT`; the native CLI, C++/C APIs
+and source npm/WASM manifests share that base version. Immutable packaged
+snapshots add a UTC timestamp and optional build ID. See
 [Versioning](./docs/versioning.md) and the [release runbook](./docs/releasing.md).
 
 The native release workflow produces self-contained compiler archives for
