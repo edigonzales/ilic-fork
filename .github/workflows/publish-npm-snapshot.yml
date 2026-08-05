@@ -367,8 +367,33 @@ jobs:
           publish_if_missing @ilic/tools tools
           publish_if_missing @ilic/compiler-wasm compiler-wasm
 
+          wait_for_registry() {
+            local package_name="$1"
+            local attempt=1
+            local max_attempts=12
+            local retry_delay=5
+            local package_version
+            local package_git_head
+            local latest_version
+            while (( attempt <= max_attempts )); do
+              package_version=$(npm view "$package_name@$RELEASE_VERSION" version 2>/dev/null || true)
+              package_git_head=$(npm view "$package_name@$RELEASE_VERSION" gitHead 2>/dev/null || true)
+              latest_version=$(npm view "$package_name@latest" version 2>/dev/null || true)
+              if [[ "$package_version" == "$RELEASE_VERSION" &&
+                    "$package_git_head" == "$RELEASE_SHA" &&
+                    "$latest_version" == "$RELEASE_VERSION" ]]; then
+                return 0
+              fi
+              if (( attempt == max_attempts )); then
+                echo "$package_name registry metadata did not converge: version=${package_version:-<missing>} gitHead=${package_git_head:-<missing>} latest=${latest_version:-<missing>}" >&2
+                return 1
+              fi
+              echo "Waiting for $package_name@$RELEASE_VERSION to become visible on npm (attempt $attempt/$max_attempts)" >&2
+              sleep "$retry_delay"
+              attempt=$((attempt + 1))
+            done
+          }
+
           for package_name in @ilic/repository-core @ilic/tools @ilic/compiler-wasm; do
-            test "$(npm view "$package_name@$RELEASE_VERSION" version)" = "$RELEASE_VERSION"
-            test "$(npm view "$package_name@$RELEASE_VERSION" gitHead)" = "$RELEASE_SHA"
-            test "$(npm view "$package_name@latest" version)" = "$RELEASE_VERSION"
+            wait_for_registry "$package_name"
           done
