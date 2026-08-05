@@ -395,6 +395,10 @@ if(BUILD_TESTING AND ILIC_BUILD_TESTS)
     target_link_libraries(ilic_model_compilation_test PRIVATE ilic::core ilic::test-support)
     add_test(NAME ilic_model_compilation COMMAND ilic_model_compilation_test)
 
+    add_executable(ilic_geometry_metadata_test test/core/GeometryMetadataTest.cpp)
+    target_link_libraries(ilic_geometry_metadata_test PRIVATE ilic::core ilic::test-support)
+    add_test(NAME ilic_geometry_metadata COMMAND ilic_geometry_metadata_test)
+
     add_executable(ilic_docs_c_example docs/examples/c-api.c)
     set_target_properties(ilic_docs_c_example PROPERTIES LINKER_LANGUAGE CXX)
     target_link_libraries(ilic_docs_c_example PRIVATE ilic-capi)
