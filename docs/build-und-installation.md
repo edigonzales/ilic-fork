@@ -126,7 +126,7 @@ Unterstützte Release-Artefakte:
 
 Die Prüfskripte sind `scripts/check-macos-runtime-deps.sh`,
 `scripts/check-linux-static.sh` und `scripts/check-windows-runtime-deps.ps1`.
-Der Workflow `.github/workflows/build-native-release.yml` baut, testet,
+Der Workflow `.github/workflows/release-native.yml` baut, testet,
 smoke-testet und paketiert alle drei Plattformen. macOS x86_64 gehört nicht zur
 Release-Matrix.
 

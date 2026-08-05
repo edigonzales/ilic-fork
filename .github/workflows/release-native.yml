@@ -1,6 +1,10 @@
-name: Build native release
+name: Release native compiler
 
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
   push:
     tags: ["v*"]
@@ -15,6 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
@@ -30,11 +35,15 @@ jobs:
 
   build-macos-arm64:
     needs: validate-release
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: macos-14
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           persist-credentials: false
       - name: Verify ARM64 runner
         run: test "$(uname -m)" = "arm64"
@@ -47,7 +56,8 @@ jobs:
         run: |
           scripts/check-macos-runtime-deps.sh build/release/ilic
           build/release/ilic -version | tee ilic-version.txt
-          grep -q '^ilic 0.9.10 ' ilic-version.txt
+          expected_version=$(sed -nE 's/.*project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+          grep -q "^ilic ${expected_version} " ilic-version.txt
           build/release/ilic -silent docs/examples/models/Legacy.ili
           build/release/ilic -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
           build/release/ilic -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
@@ -61,11 +71,15 @@ jobs:
 
   build-linux-x86_64:
     needs: validate-release
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           persist-credentials: false
       - name: Build and verify in pinned musl image
         shell: bash
@@ -79,7 +93,8 @@ jobs:
             ctest --test-dir build/release-linux --output-on-failure
             scripts/check-linux-static.sh build/release-linux/ilic
             build/release-linux/ilic -version | tee ilic-version.txt
-            grep -q "^ilic 0.9.10 " ilic-version.txt
+            expected_version=$(sed -nE 's/.*project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+            grep -q "^ilic ${expected_version} " ilic-version.txt
             build/release-linux/ilic -silent docs/examples/models/Legacy.ili
             build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
             build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
@@ -93,11 +108,15 @@ jobs:
 
   build-windows-x86_64:
     needs: validate-release
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           persist-credentials: false
       - name: Verify x86_64 runner
         shell: pwsh
@@ -116,8 +135,9 @@ jobs:
           ./scripts/check-windows-runtime-deps.ps1 -Binary build/release/Release/ilic.exe
           $versionOutput = build/release/Release/ilic.exe -version
           $versionOutput
-          if ($versionOutput[0] -notmatch '^ilic 0\.9\.10 ') {
-            throw "ilic.exe did not report version 0.9.10"
+          $cmakeVersion = Select-String -Path CMakeLists.txt -Pattern 'project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          if ($versionOutput[0] -notmatch "^ilic $cmakeVersion ") {
+            throw "ilic.exe did not report version $cmakeVersion"
           }
           build/release/Release/ilic.exe -silent docs/examples/models/Legacy.ili
           build/release/Release/ilic.exe -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
@@ -140,6 +160,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
@@ -189,8 +210,7 @@ jobs:
       needs.build-macos-arm64.result == 'success' &&
       needs.build-linux-x86_64.result == 'success' &&
       needs.build-windows-x86_64.result == 'success' &&
-      (github.event_name == 'workflow_dispatch' ||
-       needs.build-npm-release.result == 'success')
+      (github.event_name != 'push' || needs.build-npm-release.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -221,23 +241,24 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
           api_root="repos/$GITHUB_REPOSITORY"
           release_id=
 
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
             release_tag=snapshot
             release_title="ilic snapshot"
             release_notes=$(printf 'Moving snapshot built from `%s` ([workflow run](%s/actions/runs/%s)).\n' \
-              "$GITHUB_SHA" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+              "$SOURCE_SHA" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
 
             if gh api --silent "$api_root/git/ref/tags/$release_tag" >/dev/null 2>&1; then
               gh api --method PATCH "$api_root/git/refs/tags/$release_tag" \
-                -f sha="$GITHUB_SHA" -F force=true >/dev/null
+                -f sha="$SOURCE_SHA" -F force=true >/dev/null
             else
               gh api --method POST "$api_root/git/refs" \
-                -f ref="refs/tags/$release_tag" -f sha="$GITHUB_SHA" >/dev/null
+                -f ref="refs/tags/$release_tag" -f sha="$SOURCE_SHA" >/dev/null
             fi
 
             if release_id=$(gh api "$api_root/releases/tags/$release_tag" --jq .id 2>/dev/null); then
@@ -278,7 +299,7 @@ jobs:
             fi
           fi
 
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
             while IFS=$'\t' read -r existing_asset_id existing_asset_name; do
               [[ -n "$existing_asset_id" ]] || continue
               gh api --method DELETE "$api_root/releases/assets/$existing_asset_id" >/dev/null

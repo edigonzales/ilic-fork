@@ -138,7 +138,7 @@ unter `Package → Settings → Trusted Publisher` eingetragen:
 | Provider                 | GitHub Actions             |
 | GitHub user/organization | `edigonzales`              |
 | Repository               | `ilic-fork`                |
-| Workflow filename        | `publish-npm-snapshot.yml` |
+| Workflow filename        | `publish-npm.yml` |
 | Environment              | leer                       |
 | Allowed action           | `npm publish`              |
 
@@ -169,7 +169,7 @@ Publisher funktioniert weiterhin, traditionelle Publish-Tokens dagegen nicht.
 
 ## GitHub Action starten
 
-Der Workflow liegt unter `.github/workflows/publish-npm-snapshot.yml`. Nach
+Der Workflow liegt unter `.github/workflows/publish-npm.yml`. Nach
 erfolgreicher `main`-CI startet er automatisch über `workflow_run`, checkt den
 exakten geprüften Compiler-SHA aus und publiziert **nur** die drei Compiler-
 Pakete. Erst nach erfolgreicher npm-Publikation wird
@@ -210,7 +210,7 @@ Compiler-SHA und die exakte npm-Version weiter.
 Für einen manuellen Compiler-only-Lauf:
 
 1. GitHub-Repository öffnen.
-2. `Actions → Publish npm snapshot → Run workflow` wählen.
+2. `Actions → Publish ilic npm packages → Run workflow` wählen.
 3. Über GitHubs native Auswahl den gewünschten Branch oder Tag wählen.
 4. Lauf starten und Build, Tests, Paketprüfung und alle drei Publikationen abwarten.
 

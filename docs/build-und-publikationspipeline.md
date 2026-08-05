@@ -29,8 +29,8 @@ Pakete.
 | Workflow                                                                                      | Trigger                                                                                                      | Ergebnis                                                                             |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)                                     | Push auf `main` (ausser reine Markdown-Änderungen), Pull Request (ausser reine Markdown-Änderungen), manuell | Native Matrix, CTest, WASM- und npm-Prüfungen                                        |
-| [`.github/workflows/build-native-release.yml`](../.github/workflows/build-native-release.yml) | manuell oder `v*`-Tag                                                                                        | geprüfte Archive plus stabiler GitHub Release oder beweglicher `snapshot`-Pre-Release |
-| [`.github/workflows/publish-npm-snapshot.yml`](../.github/workflows/publish-npm-snapshot.yml) | erfolgreiche `CI` auf `main`, manuell                                                                        | Compiler-only-Snapshot der drei npm-Pakete und Dispatch des exakten Release-Inputs |
+| [`.github/workflows/release-native.yml`](../.github/workflows/release-native.yml) | erfolgreiche `CI` auf `main`, manuell oder `v*`-Tag | native Archive im beweglichen `snapshot`-Pre-Release oder in einer stabilen GitHub Release |
+| [`.github/workflows/publish-npm.yml`](../.github/workflows/publish-npm.yml) | erfolgreiche `CI` auf `main`, Stable-Dispatch, manuell | npm-Snapshots oder stabile npm-Pakete und Release-Train-Dispatch |
 
 Beide Workflows checken ohne persistierte GitHub-Credentials aus. Normale
 Build-Jobs besitzen nur Leserechte auf den Repository-Inhalt. Ausschliesslich
@@ -129,7 +129,8 @@ tatsächlich auslieferbare Paketoberfläche geprüft.
 
 ## Übergabe an den koordinierten Release-Train
 
-Nach erfolgreichem `CI`-Workflow auf `main` startet `publish-npm-snapshot.yml`
+Nach erfolgreichem `CI`-Workflow auf `main` starten `release-native.yml` und
+`publish-npm.yml`
 über `workflow_run`. Der Publish-Workflow checkt den exakten
 `workflow_run.head_sha` aus, baut und prüft die Compiler-Pakete nochmals und
 sendet danach ein GitHub-`repository_dispatch` mit dem Ereignis
@@ -171,11 +172,12 @@ dokumentiert.
 
 ## Manueller Compiler-only-Publish
 
-`Publish npm snapshot` ist bewusst kein stabiler Release-Weg. Er publiziert
-nur `@ilic/repository-core`, `@ilic/tools` und `@ilic/compiler-wasm` und stößt den
-koordinierten Language-Tools-Train erst nach erfolgreicher Paketprüfung an; der
-stabile Tag-Pfad dispatcht Consumer dagegen bewusst nicht automatisch. Die
-Web IDE wird vom Language-Tools-Repository angestoßen. Der ausgewählte
+`Publish ilic npm packages` publiziert nur `@ilic/repository-core`,
+`@ilic/tools` und `@ilic/compiler-wasm`. Der Snapshot-Pfad publiziert mit dem
+Dist-Tag `snapshot`; der stabile Tag-Pfad publiziert mit `latest`, prüft die
+unveränderliche GitHub Release und dispatcht danach automatisch den
+Language-Tools-Train. Die Web IDE wird weiterhin vom Language-Tools-Repository
+angestoßen. Der ausgewählte
 Branch oder Tag bestimmt
 Checkout, Commit und npm-Provenance.
 
@@ -211,7 +213,7 @@ die Run-ID dieses Publish-Workflows:
 Staging-Verzeichnisse und Tarballs dieses npm-Publish-Schritts liegen unter
 `build/npm/` und werden nicht eingecheckt. Publiziert werden dort nur die drei
 öffentlichen npm-Pakete. Der native Compiler wird separat durch
-`build-native-release.yml` als GitHub-Release-Asset veröffentlicht; statische
+`release-native.yml` als GitHub-Release-Asset veröffentlicht; statische
 Bibliotheken, CTest-Binaries und WASM-Zwischenverzeichnisse werden nicht
 publiziert.
 
