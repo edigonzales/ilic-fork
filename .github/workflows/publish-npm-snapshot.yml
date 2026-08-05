@@ -292,6 +292,26 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ steps.release.outputs.run_id }}
 
+      - name: Reconstruct release staging from tarballs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for package_spec in \
+            "@ilic/repository-core repository-core" \
+            "@ilic/tools tools" \
+            "@ilic/compiler-wasm compiler-wasm"; do
+            read -r package_name directory_name <<<"$package_spec"
+            tarball_name=$(jq -er \
+              --arg name "$package_name" \
+              '.packages[$name].tarball' \
+              build/npm-release/release-manifest.json)
+            tarball="build/npm-release/tarballs/$tarball_name"
+            destination="build/npm-release/$directory_name"
+            mkdir -p "$destination"
+            tar -xzf "$tarball" --strip-components=1 -C "$destination"
+            test -f "$destination/package.json"
+          done
+
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
