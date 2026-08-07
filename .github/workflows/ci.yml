@@ -31,10 +31,21 @@ jobs:
             static: "ON"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Set up MSVC developer command prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
       - name: Verify Linux architecture
         if: runner.os == 'Linux'
         run: test "$(uname -m)" = "x86_64"
@@ -53,18 +64,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes libcurl4-openssl-dev ninja-build
       - name: Configure native build (Unix)
         if: runner.os != 'Windows'
-        run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=${{ matrix.static }}
+        run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=${{ matrix.static }}
       - name: Configure native build (Windows)
         if: runner.os == 'Windows'
-        run: cmake -S . -B build/ci -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=${{ matrix.static }}
+        run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DILIC_STATIC_DISTRIBUTION=${{ matrix.static }}
       - name: Build native compiler and tests
-        run: cmake --build build/ci --config Release --parallel
+        run: cmake --build build/ci --parallel
       - name: Run native tests
-        run: ctest --test-dir build/ci -C Release --output-on-failure
+        run: ctest --test-dir build/ci --output-on-failure
       - name: Verify Windows runtime dependencies
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/check-windows-runtime-deps.ps1 -Binary build/ci/Release/ilic.exe
+        run: ./scripts/check-windows-runtime-deps.ps1 -Binary build/ci/ilic.exe
+      - name: Show sccache statistics
+        if: always()
+        run: sccache --show-stats
   conformance:
     name: Compiler Conformance (ilic)
     runs-on: ubuntu-latest
