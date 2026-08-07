@@ -57,6 +57,8 @@ jobs:
           scripts/check-macos-runtime-deps.sh build/release/ilic
           build/release/ilic -version | tee ilic-version.txt
           expected_version=$(sed -nE 's/.*project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+          qualifier=$(sed -nE 's/.*set\(ILIC_VERSION_QUALIFIER "([^"]*)".*/\1/p' CMakeLists.txt)
+          if [ -n "$qualifier" ]; then expected_version="$expected_version-$qualifier"; fi
           grep -q "^ilic ${expected_version} " ilic-version.txt
           build/release/ilic -silent docs/examples/models/Legacy.ili
           build/release/ilic -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
@@ -94,6 +96,8 @@ jobs:
             scripts/check-linux-static.sh build/release-linux/ilic
             build/release-linux/ilic -version | tee ilic-version.txt
             expected_version=$(sed -nE "s/.*project\\(ilic VERSION ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p" CMakeLists.txt)
+            qualifier=$(sed -nE "s/.*set\\(ILIC_VERSION_QUALIFIER \"([^\"]*)\".*/\\1/p" CMakeLists.txt)
+            if [ -n "$qualifier" ]; then expected_version="$expected_version-$qualifier"; fi
             grep -q "^ilic ${expected_version} " ilic-version.txt
             build/release-linux/ilic -silent docs/examples/models/Legacy.ili
             build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
@@ -136,8 +140,13 @@ jobs:
           $versionOutput = build/release/Release/ilic.exe -version
           $versionOutput
           $cmakeVersion = Select-String -Path CMakeLists.txt -Pattern 'project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
-          if ($versionOutput[0] -notmatch "^ilic $cmakeVersion ") {
-            throw "ilic.exe did not report version $cmakeVersion"
+          $cmakeQualifier = Select-String -Path CMakeLists.txt -Pattern 'set\(ILIC_VERSION_QUALIFIER "([^"]*)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $expectedVersion = $cmakeVersion
+          if (-not [string]::IsNullOrEmpty($cmakeQualifier)) {
+            $expectedVersion = "$cmakeVersion-$cmakeQualifier"
+          }
+          if ($versionOutput[0] -notmatch "^ilic $expectedVersion ") {
+            throw "ilic.exe did not report version $expectedVersion"
           }
           build/release/Release/ilic.exe -silent docs/examples/models/Legacy.ili
           build/release/Release/ilic.exe -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
