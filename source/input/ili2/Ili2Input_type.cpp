@@ -909,7 +909,7 @@ antlrcpp::Any Ili2Input::visitCoordinateType(parser::Ili2Parser::CoordinateTypeC
    // C3
    if (ctx->numtype3 != nullptr) {
 
-      n = visitNumericType(ctx->numtype2);
+      n = visitNumericType(ctx->numtype3);
       n->Name = "C3";
       n->ElementInPackage = nullptr;
       n->_other_type = t;

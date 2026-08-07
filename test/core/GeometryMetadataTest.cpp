@@ -20,6 +20,11 @@ MODEL GeometryMeta (en) AT "https://example.test" VERSION "1.0" =
       0.00 .. 1000.00,
       0.00 .. 1000.00;
 
+    Coord3 = COORD
+      0.00 .. 1000.00,
+      0.00 .. 1000.00,
+      0.00 .. 100.00;
+
     SurfaceDomain = SURFACE WITH (STRAIGHTS, ARCS)
       VERTEX Coord2
       WITHOUT OVERLAPS > 0.02;
@@ -38,6 +43,7 @@ MODEL GeometryMeta (en) AT "https://example.test" VERSION "1.0" =
       Geometry : SurfaceDomain;
       AreaGeometry : AreaDomain;
       LocalGeometry : POLYLINE WITH (STRAIGHTS) VERTEX Coord2;
+      Point3D : Coord3;
       CustomGeometry : POLYLINE WITH (CustomForm) VERTEX Coord2
         LINE ATTRIBUTES BoundaryAttributes;
     END Feature;
@@ -80,6 +86,16 @@ metamodel::LineType *lineType(metamodel::Class *klass,const char *name)
    return nullptr;
 }
 
+metamodel::CoordType *coordType(metamodel::Class *klass,const char *name)
+{
+   if (klass == nullptr) return nullptr;
+   for (auto *attribute : klass->ClassAttribute) {
+      if (attribute == nullptr || attribute->Name != name) continue;
+      return dynamic_cast<metamodel::CoordType *>(attribute->Type);
+   }
+   return nullptr;
+}
+
 } // namespace
 
 int main()
@@ -117,6 +133,14 @@ int main()
    ILIC_REQUIRE(local != nullptr);
    ILIC_REQUIRE(local->Kind == metamodel::LineType::Polyline);
    ILIC_REQUIRE(local->MaxOverlap.empty());
+
+   auto *point3D = coordType(compiledFeature,"Point3D");
+   ILIC_REQUIRE(point3D != nullptr);
+   ILIC_REQUIRE(point3D->Axis.size() == 3);
+   ILIC_REQUIRE(point3D->Axis.front()->Name == "C1");
+   ILIC_REQUIRE(point3D->Axis.back()->Name == "C3");
+   ILIC_REQUIRE(point3D->Axis.back()->Min == "0.00");
+   ILIC_REQUIRE(point3D->Axis.back()->Max == "100.00");
 
    auto *custom = lineType(compiledFeature,"CustomGeometry");
    ILIC_REQUIRE(custom != nullptr);

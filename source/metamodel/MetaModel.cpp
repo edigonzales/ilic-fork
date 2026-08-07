@@ -555,6 +555,7 @@ namespace metamodel {
       clone->NullAxis = org->NullAxis;
       clone->PiHalfAxis = org->PiHalfAxis;
       clone->Multi = org->Multi;
+      clone->Axis = org->Axis;
 
    }
 
