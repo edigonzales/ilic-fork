@@ -88,15 +88,31 @@ jobs:
       - name: Show sccache statistics
         if: always()
         run: sccache --show-stats
+
   conformance:
     name: Compiler Conformance (ilic)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
     steps:
       - name: Check out ilic
         uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore conformance sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-conformance-linux-x64-${{ github.sha }}
+          restore-keys: |
+            sccache-v1-conformance-linux-x64-
       - name: Download conformance suite
         shell: bash
         run: |
@@ -124,6 +140,8 @@ jobs:
         run: |
           cmake -S . -B build/conformance-ilic -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DILIC_ENABLE_NATIVE_REPOSITORY=OFF \
             -DILIC_STATIC_DISTRIBUTION=OFF \
             -DBUILD_TESTING=OFF
@@ -149,38 +167,78 @@ jobs:
           name: ilic-conformance
           path: build/conformance/
           if-no-files-found: warn
+      - name: Show conformance sccache statistics
+        if: always()
+        run: sccache --show-stats
       - name: Enforce conformance result
         if: always()
         shell: bash
         run: exit "${{ steps.conformance.outputs.exit_code || '2' }}"
+
   native-debug-linux:
     name: Native Debug (Linux x86_64)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore debug sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-debug-linux-x64-${{ github.sha }}
+          restore-keys: |
+            sccache-v1-debug-linux-x64-
       - name: Install Linux dependencies
         run: sudo apt-get update && sudo apt-get install --yes libcurl4-openssl-dev ninja-build
       - name: Configure native debug build
         run: >-
           cmake -S . -B build/debug -G Ninja
           -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           -DBUILD_TESTING=ON
           -DILIC_STATIC_DISTRIBUTION=OFF
       - name: Build native compiler and tests
         run: cmake --build build/debug --parallel
       - name: Run native debug tests
         run: ctest --test-dir build/debug --output-on-failure
+      - name: Show debug sccache statistics
+        if: always()
+        run: sccache --show-stats
+
   native-sanitizers-linux:
     name: Native ASan+UBSan (Linux x86_64)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore ASan+UBSan sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-asan-ubsan-linux-x64-${{ github.sha }}
+          restore-keys: |
+            sccache-v1-asan-ubsan-linux-x64-
       - name: Install Linux sanitizer dependencies
         run: sudo apt-get update && sudo apt-get install --yes clang libcurl4-openssl-dev ninja-build
       - name: Configure sanitizer build
@@ -189,6 +247,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_COMPILER=clang
           -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           -DBUILD_TESTING=ON
           -DILIC_ENABLE_SANITIZERS=ON
           -DILIC_STATIC_DISTRIBUTION=OFF
@@ -200,14 +260,33 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
           LSAN_OPTIONS: exitcode=23
         run: ctest --test-dir build/sanitizers --output-on-failure -j2
+      - name: Show ASan+UBSan sccache statistics
+        if: always()
+        run: sccache --show-stats
+
   native-thread-sanitizer-linux:
     name: Native TSan (Linux x86_64)
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore TSan sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-tsan-linux-x64-${{ github.sha }}
+          restore-keys: |
+            sccache-v1-tsan-linux-x64-
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install --yes clang libcurl4-openssl-dev ninja-build
       - name: Set up Java
@@ -221,6 +300,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_COMPILER=clang
           -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           -DBUILD_TESTING=ON
           -DILIC_ENABLE_NATIVE_REPOSITORY=ON
           -DILIC_STATIC_DISTRIBUTION=OFF
@@ -266,10 +347,14 @@ jobs:
           name: ilic-conformance-tsan
           path: build/conformance-tsan/
           if-no-files-found: warn
+      - name: Show TSan sccache statistics
+        if: always()
+        run: sccache --show-stats
       - name: Enforce TSan conformance result
         if: always()
         shell: bash
         run: exit "${{ steps.conformance-tsan.outputs.exit_code || '2' }}"
+
   wasm-and-packages:
     name: WASM and JavaScript packages
     runs-on: ubuntu-latest
@@ -319,6 +404,10 @@ jobs:
     name: Diagnostic Quality Report
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -326,10 +415,23 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore diagnostics sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-diagnostics-linux-x64-${{ github.sha }}
+          restore-keys: |
+            sccache-v1-diagnostics-linux-x64-
       - name: Configure diagnostics build
         run: >-
           cmake -S . -B build/diagnostics -G Ninja
           -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           -DILIC_ENABLE_NATIVE_REPOSITORY=OFF
           -DBUILD_TESTING=ON
       - name: Build diagnostics tests
@@ -338,6 +440,9 @@ jobs:
         run: |
           ctest --test-dir build/diagnostics --output-on-failure -L 'diagnostics|wasm'
           node scripts/generate-diagnostic-quality-report.mjs . --output build/diagnostic-quality.json
+      - name: Show diagnostics sccache statistics
+        if: always()
+        run: sccache --show-stats
       - name: Upload diagnostic quality report
         uses: actions/upload-artifact@v6
         with:
