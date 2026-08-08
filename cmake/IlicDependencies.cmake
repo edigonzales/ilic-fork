@@ -1,28 +1,38 @@
 include(FetchContent)
 
+option(ILIC_USE_SYSTEM_PUGIXML
+    "Use an externally provided pugixml CMake package"
+    OFF
+)
+
 function(ilic_configure_repository_dependencies curl_target xml_target)
-    # pugixml is intentionally compiled from an immutable source archive so
-    # repository XML never adds a runtime library dependency.
-    FetchContent_Declare(ilic_pugixml
-        URL https://github.com/zeux/pugixml/archive/refs/tags/v1.14.tar.gz
-        URL_HASH SHA256=610f98375424b5614754a6f34a491adbddaaec074e9044577d965160ec103d2e
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-        SOURCE_SUBDIR ilic-no-cmake-project
-    )
-    FetchContent_MakeAvailable(ilic_pugixml)
-    if(NOT TARGET ilic-pugixml)
-        add_library(ilic-pugixml STATIC
-            "${ilic_pugixml_SOURCE_DIR}/src/pugixml.cpp"
+    if(ILIC_USE_SYSTEM_PUGIXML)
+        find_package(pugixml CONFIG REQUIRED)
+    else()
+        # Keep the existing self-contained behavior for normal source builds.
+        # Package managers such as vcpkg can opt into their own pugixml package
+        # with ILIC_USE_SYSTEM_PUGIXML=ON and avoid a nested network download.
+        FetchContent_Declare(ilic_pugixml
+            URL https://github.com/zeux/pugixml/archive/refs/tags/v1.14.tar.gz
+            URL_HASH SHA256=610f98375424b5614754a6f34a491adbddaaec074e9044577d965160ec103d2e
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            SOURCE_SUBDIR ilic-no-cmake-project
         )
-        target_include_directories(ilic-pugixml SYSTEM PUBLIC
-            "${ilic_pugixml_SOURCE_DIR}/src"
-        )
-        if(MSVC)
-            target_compile_options(ilic-pugixml PRIVATE /W0)
-        else()
-            target_compile_options(ilic-pugixml PRIVATE -w)
+        FetchContent_MakeAvailable(ilic_pugixml)
+        if(NOT TARGET ilic-pugixml)
+            add_library(ilic-pugixml STATIC
+                "${ilic_pugixml_SOURCE_DIR}/src/pugixml.cpp"
+            )
+            target_include_directories(ilic-pugixml SYSTEM PUBLIC
+                "${ilic_pugixml_SOURCE_DIR}/src"
+            )
+            if(MSVC)
+                target_compile_options(ilic-pugixml PRIVATE /W0)
+            else()
+                target_compile_options(ilic-pugixml PRIVATE -w)
+            endif()
+            add_library(pugixml::pugixml ALIAS ilic-pugixml)
         endif()
-        add_library(pugixml::pugixml ALIAS ilic-pugixml)
     endif()
 
     if(ILIC_STATIC_DISTRIBUTION)
