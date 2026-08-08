@@ -32,7 +32,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      SCCACHE_DIR: ${{ runner.temp }}/sccache
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
       SCCACHE_CACHE_SIZE: "2G"
       SCCACHE_BASEDIRS: ${{ github.workspace }}
     steps:
@@ -46,7 +46,7 @@ jobs:
       - name: Restore sccache cache
         uses: actions/cache@v5
         with:
-          path: ${{ runner.temp }}/sccache
+          path: ${{ env.SCCACHE_DIR }}
           key: sccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.static }}-${{ github.sha }}
           restore-keys: |
             sccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.static }}-
