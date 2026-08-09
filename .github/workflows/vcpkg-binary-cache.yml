@@ -1,0 +1,195 @@
+name: Publish vcpkg binary cache
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "vcpkg/**"
+      - ".github/workflows/vcpkg-binary-cache.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish ilic (${{ matrix.triplet }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            triplet: x64-linux
+          - os: macos-14
+            triplet: arm64-osx
+          - os: windows-latest
+            triplet: x64-windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      ILIC_VCPKG_ROOT: ${{ github.workspace }}/build/vcpkg-cache
+      VCPKG_TRIPLET: ${{ matrix.triplet }}
+      VCPKG_DOWNLOADS: ${{ github.workspace }}/.cache/vcpkg/downloads
+      VCPKG_DISABLE_METRICS: "1"
+      VCPKG_FEED_URL: https://nuget.pkg.github.com/edigonzales/index.json
+      VCPKG_BINARY_SOURCES: clear;nuget,https://nuget.pkg.github.com/edigonzales/index.json,readwrite
+      VCPKG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Check out ilic
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Check out pinned vcpkg
+        uses: actions/checkout@v6
+        with:
+          repository: microsoft/vcpkg
+          ref: 2026.05.25
+          path: build/vcpkg-cache
+          persist-credentials: false
+
+      - name: Set up MSVC developer command prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Mono for NuGet (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if ! command -v mono >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes mono-complete
+          fi
+
+      - name: Install Mono for NuGet (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if ! command -v mono >/dev/null 2>&1; then
+            brew install mono
+          fi
+
+      - name: Prepare vcpkg downloads directory
+        shell: bash
+        if: runner.os != 'Windows'
+        run: mkdir -p "$VCPKG_DOWNLOADS"
+
+      - name: Prepare vcpkg downloads directory (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path $env:VCPKG_DOWNLOADS | Out-Null
+
+      - name: Bootstrap vcpkg (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          "$ILIC_VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Bootstrap vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '& "$env:ILIC_VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics'
+
+      - name: Authenticate NuGet source (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          NUGET_PATH="$("$ILIC_VCPKG_ROOT/vcpkg" fetch nuget | tail -n 1)"
+          mono "$NUGET_PATH" sources add \
+            -Source "$VCPKG_FEED_URL" \
+            -StorePasswordInClearText \
+            -Name GitHubPackages \
+            -UserName "${GITHUB_ACTOR}" \
+            -Password "$VCPKG_GITHUB_TOKEN"
+          mono "$NUGET_PATH" setapikey "$VCPKG_GITHUB_TOKEN" \
+            -Source "$VCPKG_FEED_URL"
+
+      - name: Authenticate NuGet source (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $nuget = (& "$env:ILIC_VCPKG_ROOT\vcpkg.exe" fetch nuget | Select-Object -Last 1)
+          & $nuget sources add `
+            -Source "$env:VCPKG_FEED_URL" `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName "$env:GITHUB_ACTOR" `
+            -Password "$env:VCPKG_GITHUB_TOKEN"
+          & $nuget setapikey "$env:VCPKG_GITHUB_TOKEN" `
+            -Source "$env:VCPKG_FEED_URL"
+
+      - name: Build and publish ilic binary package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: >-
+          "$ILIC_VCPKG_ROOT/vcpkg" install "ilic:${VCPKG_TRIPLET}"
+          --overlay-ports="$GITHUB_WORKSPACE/vcpkg/ports"
+
+      - name: Build and publish ilic binary package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          & "$env:ILIC_VCPKG_ROOT\vcpkg.exe" install "ilic:$env:VCPKG_TRIPLET"
+          "--overlay-ports=$env:GITHUB_WORKSPACE\vcpkg\ports"
+
+  verify-restore:
+    name: Verify remote restore (x64-linux)
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ILIC_VCPKG_ROOT: ${{ github.workspace }}/build/vcpkg-restore
+      VCPKG_DOWNLOADS: ${{ github.workspace }}/.cache/vcpkg/restore-downloads
+      VCPKG_DISABLE_METRICS: "1"
+      VCPKG_FEED_URL: https://nuget.pkg.github.com/edigonzales/index.json
+      VCPKG_BINARY_SOURCES: clear;nuget,https://nuget.pkg.github.com/edigonzales/index.json,read
+      VCPKG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Check out ilic
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Check out pinned vcpkg
+        uses: actions/checkout@v6
+        with:
+          repository: microsoft/vcpkg
+          ref: 2026.05.25
+          path: build/vcpkg-restore
+          persist-credentials: false
+
+      - name: Install Mono for NuGet
+        shell: bash
+        run: |
+          if ! command -v mono >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes mono-complete
+          fi
+
+      - name: Prepare and bootstrap vcpkg
+        shell: bash
+        run: |
+          mkdir -p "$VCPKG_DOWNLOADS"
+          "$ILIC_VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Authenticate NuGet source
+        shell: bash
+        run: |
+          NUGET_PATH="$("$ILIC_VCPKG_ROOT/vcpkg" fetch nuget | tail -n 1)"
+          mono "$NUGET_PATH" sources add \
+            -Source "$VCPKG_FEED_URL" \
+            -StorePasswordInClearText \
+            -Name GitHubPackages \
+            -UserName "${GITHUB_ACTOR}" \
+            -Password "$VCPKG_GITHUB_TOKEN"
+
+      - name: Restore ilic from GitHub Packages
+        shell: bash
+        run: >-
+          "$ILIC_VCPKG_ROOT/vcpkg" install "ilic:x64-linux"
+          --overlay-ports="$GITHUB_WORKSPACE/vcpkg/ports"
