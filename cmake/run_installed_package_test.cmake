@@ -1,6 +1,7 @@
 if(NOT DEFINED ILIC_BUILD_DIR OR
    NOT DEFINED ILIC_CONSUMER_SOURCE_DIR OR
-   NOT DEFINED ILIC_TEST_ROOT)
+   NOT DEFINED ILIC_TEST_ROOT OR
+   NOT DEFINED ILIC_SOURCE_DIR)
     message(FATAL_ERROR "Installed-package test paths are required")
 endif()
 
@@ -25,6 +26,22 @@ execute_process(
 if(NOT install_result EQUAL 0)
     message(FATAL_ERROR
         "ilic install failed:\n${install_output}\n${install_error}")
+endif()
+
+file(GLOB_RECURSE installed_targets_files
+    "${install_prefix}/*/cmake/ilic/ilicTargets.cmake")
+list(LENGTH installed_targets_files installed_targets_count)
+if(NOT installed_targets_count EQUAL 1)
+    message(FATAL_ERROR
+        "Expected exactly one installed ilicTargets.cmake, found ${installed_targets_count}")
+endif()
+list(GET installed_targets_files 0 installed_targets_file)
+file(READ "${installed_targets_file}" installed_targets_content)
+file(TO_CMAKE_PATH "${ILIC_SOURCE_DIR}" normalized_source_dir)
+string(FIND "${installed_targets_content}" "${normalized_source_dir}" source_dir_position)
+if(NOT source_dir_position EQUAL -1)
+    message(FATAL_ERROR
+        "Installed ilicTargets.cmake leaks the source directory ${normalized_source_dir}")
 endif()
 
 set(configure_command
