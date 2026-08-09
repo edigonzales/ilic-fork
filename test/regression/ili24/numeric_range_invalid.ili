@@ -1,6 +1,0 @@
-INTERLIS 2.4;
-
-MODEL NumericRangeInvalid24 (en) AT "https://example.invalid" VERSION "1" =
-  DOMAIN
-    Inverted = 0..-9;
-END NumericRangeInvalid24.
