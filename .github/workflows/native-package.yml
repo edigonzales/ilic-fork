@@ -1,0 +1,126 @@
+name: Native package compatibility
+
+on:
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "include/**"
+      - "source/**"
+      - "test/consumer/**"
+      - ".github/workflows/native-package.yml"
+  push:
+    branches: [main]
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "include/**"
+      - "source/**"
+      - "test/consumer/**"
+      - ".github/workflows/native-package.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Installed SDK (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            exe_suffix: ""
+          - name: macOS ARM64
+            os: macos-14
+            exe_suffix: ""
+          - name: Windows x86_64
+            os: windows-latest
+            exe_suffix: ".exe"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+
+      - name: Restore package sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-package-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            sccache-v1-package-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Set up MSVC developer command prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Verify Linux architecture
+        if: runner.os == 'Linux'
+        run: test "$(uname -m)" = "x86_64"
+
+      - name: Verify macOS architecture
+        if: runner.os == 'macOS'
+        run: test "$(uname -m)" = "arm64"
+
+      - name: Verify Windows architecture
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
+            throw "x86_64 Windows is required"
+          }
+
+      - name: Install Linux build dependency
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes ninja-build
+
+      - name: Configure installable SDK
+        run: >-
+          cmake -S . -B build/package -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          -DCMAKE_INSTALL_LIBDIR=lib
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DBUILD_TESTING=OFF
+          -DILIC_BUILD_TESTS=OFF
+          -DILIC_BUILD_CLI=OFF
+          -DILIC_ENABLE_NATIVE_REPOSITORY=OFF
+          -DILIC_STATIC_DISTRIBUTION=OFF
+          -DILIC_ENABLE_INSTALL=ON
+
+      - name: Build installable SDK
+        run: cmake --build build/package --parallel
+
+      - name: Show package sccache statistics
+        if: always()
+        run: sccache --show-stats
+
+      - name: Verify installed CMake package in clean consumers
+        run: >-
+          cmake
+          -DILIC_BUILD_DIR=${{ github.workspace }}/build/package
+          -DILIC_CONSUMER_SOURCE_DIR=${{ github.workspace }}/test/consumer/installed-package
+          -DILIC_TEST_ROOT=${{ github.workspace }}/build/package-smoke
+          -DILIC_SOURCE_DIR=${{ github.workspace }}
+          -DILIC_CONSUMER_EXE_SUFFIX=${{ matrix.exe_suffix }}
+          -DILIC_GENERATOR=Ninja
+          -DILIC_GENERATOR_PLATFORM=
+          -DILIC_GENERATOR_TOOLSET=
+          -DILIC_BUILD_CONFIG=Release
+          -P cmake/run_installed_package_test.cmake
