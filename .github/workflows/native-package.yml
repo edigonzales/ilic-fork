@@ -188,6 +188,15 @@ jobs:
         shell: pwsh
         run: '& "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics'
 
+      - name: Report ilic source archive SHA512
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 \
+            "https://github.com/edigonzales/ilic-fork/archive/bb284a67d62d10e62ada2491ed9db0f6ef446535.tar.gz" \
+            --output "$RUNNER_TEMP/ilic-source.tar.gz"
+          sha512sum "$RUNNER_TEMP/ilic-source.tar.gz"
+
       - name: Install ilic through overlay (Unix)
         if: runner.os != 'Windows'
         shell: bash
