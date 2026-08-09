@@ -89,17 +89,28 @@ if(NOT build_result EQUAL 0)
         "Installed-package consumer build failed:\n${build_output}\n${build_error}")
 endif()
 
+# Do not assume a generator-specific runtime output directory. In particular,
+# Windows toolchains can place executables below a configuration directory even
+# when the outer package build itself uses Ninja. Locate the freshly built
+# consumer by its exact filename inside the clean consumer build tree.
 function(run_installed_consumer target_name)
-    set(consumer_executable
-        "${consumer_build_dir}/${target_name}${ILIC_CONSUMER_EXE_SUFFIX}")
-    if(NOT EXISTS "${consumer_executable}" AND
-       NOT ILIC_BUILD_CONFIG STREQUAL "")
-        set(consumer_executable
-            "${consumer_build_dir}/${ILIC_BUILD_CONFIG}/${target_name}${ILIC_CONSUMER_EXE_SUFFIX}")
-    endif()
-    if(NOT EXISTS "${consumer_executable}")
+    set(expected_name "${target_name}${ILIC_CONSUMER_EXE_SUFFIX}")
+    file(GLOB_RECURSE consumer_outputs
+        LIST_DIRECTORIES FALSE
+        "${consumer_build_dir}/*")
+
+    set(consumer_executable "")
+    foreach(candidate IN LISTS consumer_outputs)
+        get_filename_component(candidate_name "${candidate}" NAME)
+        if(candidate_name STREQUAL expected_name)
+            set(consumer_executable "${candidate}")
+            break()
+        endif()
+    endforeach()
+
+    if(consumer_executable STREQUAL "")
         message(FATAL_ERROR
-            "Installed-package consumer ${target_name} was not produced")
+            "Installed-package consumer ${expected_name} was not produced below ${consumer_build_dir}")
     endif()
 
     execute_process(
