@@ -259,7 +259,10 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:strict_string_checks=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
           LSAN_OPTIONS: exitcode=23
-        run: ctest --test-dir build/sanitizers --output-on-failure -j2
+          ILIC_TEST_NO_DEFAULT_REPOSITORIES: "1"
+        run: >-
+          ctest --test-dir build/sanitizers --output-on-failure -j2
+          -E '^ilic_source_subproject$'
       - name: Show ASan+UBSan sccache statistics
         if: always()
         run: sccache --show-stats
@@ -312,10 +315,19 @@ jobs:
       - name: Show TSan sccache statistics
         if: always()
         run: sccache --show-stats
-      - name: Run TSan tests
+      - name: Run non-concurrency TSan tests
         env:
           TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
-        run: ctest --test-dir build/tsan --output-on-failure
+          ILIC_TEST_NO_DEFAULT_REPOSITORIES: "1"
+        run: >-
+          ctest --test-dir build/tsan --output-on-failure -j2
+          -E '^(ilic_source_subproject|ilic_capi_concurrency|ilic_compiler_concurrency)$'
+      - name: Run concurrency TSan tests exclusively
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: >-
+          ctest --test-dir build/tsan --output-on-failure
+          -R '^(ilic_capi_concurrency|ilic_compiler_concurrency)$'
       - name: Download pinned conformance suite
         shell: bash
         run: |
