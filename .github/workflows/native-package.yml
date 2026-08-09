@@ -1,0 +1,242 @@
+name: Native package compatibility
+
+on:
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "include/**"
+      - "source/**"
+      - "test/consumer/**"
+      - "vcpkg/**"
+      - ".github/workflows/native-package.yml"
+  push:
+    branches: [main]
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "include/**"
+      - "source/**"
+      - "test/consumer/**"
+      - "vcpkg/**"
+      - ".github/workflows/native-package.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Installed SDK (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            exe_suffix: ""
+          - name: macOS ARM64
+            os: macos-14
+            exe_suffix: ""
+          - name: Windows x86_64
+            os: windows-latest
+            exe_suffix: ".exe"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+
+      - name: Restore package sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-package-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            sccache-v1-package-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Set up MSVC developer command prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Verify Linux architecture
+        if: runner.os == 'Linux'
+        run: test "$(uname -m)" = "x86_64"
+
+      - name: Verify macOS architecture
+        if: runner.os == 'macOS'
+        run: test "$(uname -m)" = "arm64"
+
+      - name: Verify Windows architecture
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
+            throw "x86_64 Windows is required"
+          }
+
+      - name: Install Linux build dependency
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes ninja-build
+
+      - name: Configure installable SDK
+        run: >-
+          cmake -S . -B build/package -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          -DCMAKE_INSTALL_LIBDIR=lib
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DBUILD_TESTING=OFF
+          -DILIC_BUILD_TESTS=OFF
+          -DILIC_BUILD_CLI=OFF
+          -DILIC_ENABLE_NATIVE_REPOSITORY=OFF
+          -DILIC_STATIC_DISTRIBUTION=OFF
+          -DILIC_ENABLE_INSTALL=ON
+
+      - name: Build installable SDK
+        run: cmake --build build/package --parallel
+
+      - name: Show package sccache statistics
+        if: always()
+        run: sccache --show-stats
+
+      - name: Verify installed CMake package in clean consumers
+        run: >-
+          cmake
+          -DILIC_BUILD_DIR=${{ github.workspace }}/build/package
+          -DILIC_CONSUMER_SOURCE_DIR=${{ github.workspace }}/test/consumer/installed-package
+          -DILIC_TEST_ROOT=${{ github.workspace }}/build/package-smoke
+          -DILIC_SOURCE_DIR=${{ github.workspace }}
+          -DILIC_CONSUMER_EXE_SUFFIX=${{ matrix.exe_suffix }}
+          -DILIC_GENERATOR=Ninja
+          -DILIC_GENERATOR_PLATFORM=
+          -DILIC_GENERATOR_TOOLSET=
+          -DILIC_BUILD_CONFIG=Release
+          -P cmake/run_installed_package_test.cmake
+
+  vcpkg:
+    name: vcpkg overlay (${{ matrix.triplet }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            triplet: x64-linux
+          - os: macos-14
+            triplet: arm64-osx
+          - os: windows-latest
+            triplet: x64-windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      ILIC_VCPKG_ROOT: ${{ github.workspace }}/build/vcpkg
+      VCPKG_TRIPLET: ${{ matrix.triplet }}
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.cache/vcpkg/archives
+      VCPKG_DOWNLOADS: ${{ github.workspace }}/.cache/vcpkg/downloads
+      VCPKG_DISABLE_METRICS: "1"
+
+    steps:
+      - name: Check out ilic
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Check out pinned vcpkg
+        uses: actions/checkout@v6
+        with:
+          repository: microsoft/vcpkg
+          ref: 2026.05.25
+          path: build/vcpkg
+          persist-credentials: false
+
+      - name: Restore vcpkg caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+            ${{ env.VCPKG_DOWNLOADS }}
+          key: vcpkg-v1-2026.05.25-${{ matrix.triplet }}-${{ hashFiles('vcpkg/ports/ilic/**') }}
+          restore-keys: |
+            vcpkg-v1-2026.05.25-${{ matrix.triplet }}-
+
+      - name: Set up MSVC developer command prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Prepare vcpkg cache directories (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE" "$VCPKG_DOWNLOADS"
+
+      - name: Prepare vcpkg cache directories (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DOWNLOADS | Out-Null
+
+      - name: Bootstrap vcpkg (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          "$ILIC_VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Bootstrap vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '& "$env:ILIC_VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics'
+
+      - name: Report ilic source archive SHA512
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 \
+            "https://github.com/edigonzales/ilic-fork/archive/bb284a67d62d10e62ada2491ed9db0f6ef446535.tar.gz" \
+            --output "$RUNNER_TEMP/ilic-source.tar.gz"
+          sha512sum "$RUNNER_TEMP/ilic-source.tar.gz"
+
+      - name: Install ilic through overlay (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: >-
+          "$ILIC_VCPKG_ROOT/vcpkg" install "ilic:${VCPKG_TRIPLET}"
+          --overlay-ports="$GITHUB_WORKSPACE/vcpkg/ports"
+
+      - name: Install ilic through overlay (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          & "$env:ILIC_VCPKG_ROOT\vcpkg.exe" install "ilic:$env:VCPKG_TRIPLET"
+          "--overlay-ports=$env:GITHUB_WORKSPACE\vcpkg\ports"
+
+      - name: Configure vcpkg consumer
+        run: >-
+          cmake
+          -S test/consumer/installed-package
+          -B build/vcpkg-consumer
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.ILIC_VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+
+      - name: Build vcpkg consumer
+        run: cmake --build build/vcpkg-consumer --parallel
+
+      - name: Run vcpkg consumer smoke tests
+        run: ctest --test-dir build/vcpkg-consumer --output-on-failure

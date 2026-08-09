@@ -14,3 +14,9 @@ function(ilic_enable_static_distribution target)
         target_link_options(${target} PRIVATE -static)
     endif()
 endfunction()
+
+# Distribution setup is included before the ilic targets are declared. The
+# packaging module uses a deferred callback and is top-level-only by default,
+# so embedded add_subdirectory/FetchContent consumers keep their current
+# target and dependency behavior.
+include("${CMAKE_CURRENT_LIST_DIR}/IlicPackaging.cmake")
