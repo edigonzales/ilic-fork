@@ -38,12 +38,11 @@ target_link_libraries(app PRIVATE ilic::core)
 
 ## Next packaging step
 
-The overlay is the recipe-validation stage. The intended next step is to move
-this recipe into a small git-backed INTERLIS vcpkg registry and publish vcpkg
-binary-cache packages for the supported triplets. That will let downstream
+The overlay is the recipe-validation stage. The next step is to publish this
+port in a small git-backed INTERLIS vcpkg registry and use a shared GitHub
+Packages/NuGet binary cache for the supported triplets. That will let downstream
 repositories restore matching ilic binaries instead of rebuilding ilic.
 
-The repository currently has no project-level `LICENSE` file. The overlay
-therefore does not claim an SPDX license and temporarily skips vcpkg's
-copyright-file post-build check. This must be resolved before treating the
-port as a generally redistributable registry package.
+ilic is licensed under the MIT License. The vcpkg port declares `MIT` and
+installs the corresponding copyright file, so it no longer relies on a
+copyright-check bypass.

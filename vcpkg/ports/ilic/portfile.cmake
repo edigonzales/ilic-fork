@@ -29,9 +29,5 @@ vcpkg_cmake_config_fixup(
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
 file(INSTALL "${CMAKE_CURRENT_LIST_DIR}/usage"
     DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
-
-# The source repository currently has no project-level LICENSE file. Do not
-# invent a license in the package recipe. This temporary policy is acceptable
-# for the in-repository overlay validation, but must be removed before moving
-# ilic into a public/custom registry intended for general redistribution.
-set(VCPKG_POLICY_SKIP_COPYRIGHT_CHECK enabled)
+file(INSTALL "${CMAKE_CURRENT_LIST_DIR}/copyright"
+    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
