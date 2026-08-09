@@ -142,7 +142,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      VCPKG_ROOT: ${{ github.workspace }}/build/vcpkg
+      ILIC_VCPKG_ROOT: ${{ github.workspace }}/build/vcpkg
       VCPKG_TRIPLET: ${{ matrix.triplet }}
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.cache/vcpkg/archives
       VCPKG_DOWNLOADS: ${{ github.workspace }}/.cache/vcpkg/downloads
@@ -178,16 +178,29 @@ jobs:
         with:
           arch: x64
 
+      - name: Prepare vcpkg cache directories (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE" "$VCPKG_DOWNLOADS"
+
+      - name: Prepare vcpkg cache directories (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DOWNLOADS | Out-Null
+
       - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          "$ILIC_VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
 
       - name: Bootstrap vcpkg (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: '& "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics'
+        run: '& "$env:ILIC_VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics'
 
       - name: Report ilic source archive SHA512
         if: runner.os == 'Linux'
@@ -202,14 +215,14 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: >-
-          "$VCPKG_ROOT/vcpkg" install "ilic:${VCPKG_TRIPLET}"
+          "$ILIC_VCPKG_ROOT/vcpkg" install "ilic:${VCPKG_TRIPLET}"
           --overlay-ports="$GITHUB_WORKSPACE/vcpkg/ports"
 
       - name: Install ilic through overlay (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: >-
-          & "$env:VCPKG_ROOT\vcpkg.exe" install "ilic:$env:VCPKG_TRIPLET"
+          & "$env:ILIC_VCPKG_ROOT\vcpkg.exe" install "ilic:$env:VCPKG_TRIPLET"
           "--overlay-ports=$env:GITHUB_WORKSPACE\vcpkg\ports"
 
       - name: Configure vcpkg consumer
@@ -219,7 +232,7 @@ jobs:
           -B build/vcpkg-consumer
           -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.ILIC_VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
       - name: Build vcpkg consumer
