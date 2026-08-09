@@ -250,6 +250,7 @@ jobs:
       VCPKG_DOWNLOADS: ${{ github.workspace }}/.cache/vcpkg/registry-downloads
       VCPKG_DISABLE_METRICS: "1"
       ILIC_REGISTRY_BASELINE: bdea3604ddc70981c33394be3dba87082e54c1c2
+      VCPKG_BUILTIN_BASELINE: d015e31e90838a4c9dfa3eed45979bc70d9357fc
     steps:
       - name: Check out ilic
         uses: actions/checkout@v6
@@ -285,11 +286,15 @@ jobs:
           EOF
           cat > test/consumer/installed-package/vcpkg-configuration.json <<EOF
           {
-            "default-registry": null,
+            "default-registry": {
+              "kind": "builtin",
+              "baseline": "$VCPKG_BUILTIN_BASELINE"
+            },
             "registries": [
               {
                 "kind": "git",
                 "repository": "https://github.com/edigonzales/ilic-fork.git",
+                "reference": "vcpkg-registry",
                 "baseline": "$ILIC_REGISTRY_BASELINE",
                 "packages": ["ilic"]
               }
