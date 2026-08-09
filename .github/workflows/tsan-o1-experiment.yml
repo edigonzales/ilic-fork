@@ -1,0 +1,111 @@
+name: TSan -O1 experiment
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tsan-o1:
+    name: Native TSan -O1 (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore TSan -O1 sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-tsan-o1-linux-x64-${{ github.sha }}
+          restore-keys: |
+            sccache-v1-tsan-o1-linux-x64-
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install --yes clang libcurl4-openssl-dev ninja-build
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Configure TSan -O1 build
+        run: >-
+          cmake -S . -B build/tsan-o1 -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS_DEBUG="-O1 -g"
+          -DCMAKE_CXX_FLAGS_DEBUG="-O1 -g"
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DBUILD_TESTING=ON
+          -DILIC_ENABLE_NATIVE_REPOSITORY=ON
+          -DILIC_STATIC_DISTRIBUTION=OFF
+          -DILIC_ENABLE_SANITIZERS=OFF
+          -DILIC_ENABLE_THREAD_SANITIZER=ON
+      - name: Build TSan -O1 compiler and tests
+        run: cmake --build build/tsan-o1 --parallel
+      - name: Show TSan -O1 sccache statistics
+        if: always()
+        run: sccache --show-stats
+      - name: Run non-concurrency TSan -O1 tests
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+          ILIC_TEST_NO_DEFAULT_REPOSITORIES: "1"
+        run: >-
+          ctest --test-dir build/tsan-o1 --output-on-failure -j2
+          -E '^(ilic_source_subproject|ilic_capi_concurrency|ilic_compiler_concurrency)$'
+      - name: Run concurrency TSan -O1 tests exclusively
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: >-
+          ctest --test-dir build/tsan-o1 --output-on-failure
+          -R '^(ilic_capi_concurrency|ilic_compiler_concurrency)$'
+      - name: Download pinned conformance suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          suite_commit=88576ffc4cd491dd72d2375eb897ea9f3f55d2c3
+          archive="$RUNNER_TEMP/interlis-conformance-suite.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://codeberg.org/edigonzales/interlis-compiler-testsuite/archive/${suite_commit}.tar.gz" \
+            --output "$archive"
+          mkdir -p conformance-suite
+          tar --extract --gzip --strip-components=1 --file="$archive" --directory=conformance-suite
+      - name: Run full conformance suite under TSan -O1
+        id: conformance-tsan-o1
+        continue-on-error: true
+        shell: bash
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: |
+          set +e
+          java conformance-suite/InterlisConformance.java run \
+            --suite conformance-suite/suite/test-cases.json \
+            --compiler ilic=build/tsan-o1/ilic \
+            --baseline ilic=conformance/known-failures.json \
+            --out build/conformance-tsan-o1
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Upload TSan -O1 conformance reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ilic-conformance-tsan-o1
+          path: build/conformance-tsan-o1/
+          if-no-files-found: warn
+      - name: Enforce TSan -O1 conformance result
+        if: always()
+        shell: bash
+        run: exit "${{ steps.conformance-tsan-o1.outputs.exit_code || '2' }}"
