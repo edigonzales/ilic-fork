@@ -101,6 +101,7 @@ function(ilic_configure_packaging)
                 "-DILIC_BUILD_DIR=${PROJECT_BINARY_DIR}"
                 "-DILIC_CONSUMER_SOURCE_DIR=${PROJECT_SOURCE_DIR}/test/consumer/installed-package"
                 "-DILIC_TEST_ROOT=${PROJECT_BINARY_DIR}/installed-package-test"
+                "-DILIC_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
                 "-DILIC_CONSUMER_EXE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
                 "-DILIC_GENERATOR=${CMAKE_GENERATOR}"
                 "-DILIC_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
