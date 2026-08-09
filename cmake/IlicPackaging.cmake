@@ -1,15 +1,9 @@
 include_guard(GLOBAL)
 
-set(_ilic_install_default OFF)
-if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR AND
-   NOT ILIC_STATIC_DISTRIBUTION)
-    set(_ilic_install_default ON)
-endif()
 option(ILIC_ENABLE_INSTALL
     "Generate install rules and CMake package metadata"
-    ${_ilic_install_default}
+    OFF
 )
-unset(_ilic_install_default)
 
 function(ilic_configure_packaging)
     if(NOT ILIC_ENABLE_INSTALL OR EMSCRIPTEN)
@@ -119,8 +113,8 @@ function(ilic_configure_packaging)
 endfunction()
 
 # The project defines its libraries after the distribution helper is included.
-# Defer install/export setup until all targets exist. Embedded add_subdirectory,
-# FetchContent, and static-distribution users keep this disabled by default.
+# Defer install/export setup until all targets exist. Source embedding remains
+# unchanged unless a consumer explicitly opts into install rules.
 if(ILIC_ENABLE_INSTALL AND NOT EMSCRIPTEN)
     cmake_language(DEFER CALL ilic_configure_packaging)
 endif()
