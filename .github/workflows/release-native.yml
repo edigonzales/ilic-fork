@@ -160,6 +160,123 @@ jobs:
           path: ilic-windows-x86_64.zip
           if-no-files-found: error
 
+  build-native-sdk:
+    name: Build native SDK (${{ matrix.name }})
+    needs: validate-release
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            archive: ilic-sdk-linux-x86_64.tar.gz
+            exe_suffix: ""
+          - name: macOS ARM64
+            os: macos-14
+            archive: ilic-sdk-macos-arm64.tar.gz
+            exe_suffix: ""
+          - name: Windows x86_64
+            os: windows-latest
+            archive: ilic-sdk-windows-x86_64.zip
+            exe_suffix: ".exe"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore native SDK sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v1-package-${{ runner.os }}-${{ runner.arch }}-${{ env.SOURCE_SHA }}
+          restore-keys: |
+            sccache-v1-package-${{ runner.os }}-${{ runner.arch }}-
+      - name: Set up MSVC developer command prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Verify Linux architecture
+        if: runner.os == 'Linux'
+        run: test "$(uname -m)" = "x86_64"
+      - name: Verify macOS architecture
+        if: runner.os == 'macOS'
+        run: test "$(uname -m)" = "arm64"
+      - name: Verify Windows architecture
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
+            throw "x86_64 Windows is required"
+          }
+      - name: Install Linux build dependency
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes ninja-build
+      - name: Configure native SDK
+        run: >-
+          cmake -S . -B build/sdk -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          -DCMAKE_INSTALL_LIBDIR=lib
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DBUILD_TESTING=OFF
+          -DILIC_BUILD_TESTS=OFF
+          -DILIC_BUILD_CLI=OFF
+          -DILIC_ENABLE_NATIVE_REPOSITORY=OFF
+          -DILIC_STATIC_DISTRIBUTION=OFF
+          -DILIC_ENABLE_INSTALL=ON
+      - name: Build native SDK
+        run: cmake --build build/sdk --parallel
+      - name: Show native SDK sccache statistics
+        if: always()
+        run: sccache --show-stats
+      - name: Verify installed SDK in clean consumers
+        run: >-
+          cmake
+          -DILIC_BUILD_DIR=${{ github.workspace }}/build/sdk
+          -DILIC_CONSUMER_SOURCE_DIR=${{ github.workspace }}/test/consumer/installed-package
+          -DILIC_TEST_ROOT=${{ github.workspace }}/build/sdk-smoke
+          -DILIC_SOURCE_DIR=${{ github.workspace }}
+          -DILIC_CONSUMER_EXE_SUFFIX=${{ matrix.exe_suffix }}
+          -DILIC_GENERATOR=Ninja
+          -DILIC_GENERATOR_PLATFORM=
+          -DILIC_GENERATOR_TOOLSET=
+          -DILIC_BUILD_CONFIG=Release
+          -P cmake/run_installed_package_test.cmake
+      - name: Install native SDK
+        run: cmake --install build/sdk --prefix build/sdk-prefix --config Release
+      - name: Package native SDK (Unix)
+        if: runner.os != 'Windows'
+        env:
+          SDK_ARCHIVE: ${{ matrix.archive }}
+        run: tar -czf "$SDK_ARCHIVE" -C build/sdk-prefix .
+      - name: Package native SDK (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          SDK_ARCHIVE: ${{ matrix.archive }}
+        run: Compress-Archive -Path build/sdk-prefix/* -DestinationPath $env:SDK_ARCHIVE
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.archive }}
+          path: ${{ matrix.archive }}
+          if-no-files-found: error
+
   build-npm-release:
     name: Build and verify stable npm artifacts
     needs: validate-release
@@ -213,12 +330,14 @@ jobs:
       - build-macos-arm64
       - build-linux-x86_64
       - build-windows-x86_64
+      - build-native-sdk
       - build-npm-release
     if: >-
       always() &&
       needs.build-macos-arm64.result == 'success' &&
       needs.build-linux-x86_64.result == 'success' &&
       needs.build-windows-x86_64.result == 'success' &&
+      needs.build-native-sdk.result == 'success' &&
       (github.event_name != 'push' || needs.build-npm-release.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -243,6 +362,12 @@ jobs:
         with:
           name: ilic-windows-x86_64
           path: dist
+      - name: Download native SDK archives
+        uses: actions/download-artifact@v7
+        with:
+          pattern: ilic-sdk-*
+          path: dist
+          merge-multiple: true
       - name: Create checksums
         shell: bash
         run: sha256sum dist/ilic-* > dist/SHA256SUMS
