@@ -207,7 +207,7 @@ jobs:
         shell: bash
         run: |
           curl --fail --location --retry 3 \
-            "https://github.com/edigonzales/ilic-fork/archive/bb284a67d62d10e62ada2491ed9db0f6ef446535.tar.gz" \
+            "https://github.com/edigonzales/ilic-fork/archive/d335fcf8f7fbbaf82586a597dfa7944d5e5e8938.tar.gz" \
             --output "$RUNNER_TEMP/ilic-source.tar.gz"
           sha512sum "$RUNNER_TEMP/ilic-source.tar.gz"
 
@@ -249,7 +249,7 @@ jobs:
       ILIC_VCPKG_ROOT: ${{ github.workspace }}/build/registry-vcpkg
       VCPKG_DOWNLOADS: ${{ github.workspace }}/.cache/vcpkg/registry-downloads
       VCPKG_DISABLE_METRICS: "1"
-      ILIC_REGISTRY_BASELINE: bdea3604ddc70981c33394be3dba87082e54c1c2
+      ILIC_REGISTRY_BASELINE: 2f0c5db1a37922fed713d2a3feb3bbbf8c534000
       VCPKG_BUILTIN_BASELINE: d015e31e90838a4c9dfa3eed45979bc70d9357fc
     steps:
       - name: Check out ilic
