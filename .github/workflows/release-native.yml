@@ -604,7 +604,7 @@ jobs:
   request-vcpkg-release:
     name: Request vcpkg publication
     needs: publish-release
-    if: needs.publish-release.result == 'success'
+    if: ${{ always() && needs.publish-release.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
