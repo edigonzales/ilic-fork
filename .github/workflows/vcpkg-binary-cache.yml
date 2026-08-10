@@ -138,7 +138,8 @@ jobs:
       - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
         shell: bash
-        run: "$ILIC_VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+        run: |
+          "$ILIC_VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
 
       - name: Bootstrap vcpkg (Windows)
         if: runner.os == 'Windows'
