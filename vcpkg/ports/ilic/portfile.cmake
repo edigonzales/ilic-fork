@@ -4,7 +4,7 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO edigonzales/ilic-fork
     REF d335fcf8f7fbbaf82586a597dfa7944d5e5e8938
-    SHA512 0
+    SHA512 f2d631549ab658f1e566d5bf557a8e1f570ed0c1087b120999ee155cbe802e1f68f481f5f4df99b7a67423756b66a56bbe0521730e21a91886a93db9be41701d
     HEAD_REF main
 )
 
