@@ -50,6 +50,7 @@ set(configure_command
     -B "${consumer_build_dir}"
     -G "${ILIC_GENERATOR}"
     "-DCMAKE_PREFIX_PATH=${install_prefix}"
+    -DILIC_TEST_METAMODEL_HEADER=ON
 )
 if(NOT ILIC_GENERATOR_PLATFORM STREQUAL "")
     list(APPEND configure_command -A "${ILIC_GENERATOR_PLATFORM}")
