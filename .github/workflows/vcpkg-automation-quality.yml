@@ -46,6 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq 'event_type "vcpkg-release-ready"' .github/workflows/release-native.yml
+          grep -Fq 'always() && needs.publish-release.result' .github/workflows/release-native.yml
           grep -Fq 'types: [vcpkg-release-ready]' .github/workflows/vcpkg-version-publish.yml
           grep -Fq 'event_type: "vcpkg-version-published"' .github/workflows/vcpkg-version-publish.yml
           grep -Fq 'types: [vcpkg-version-published]' .github/workflows/vcpkg-binary-cache.yml
