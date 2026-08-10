@@ -7,6 +7,7 @@ on:
       - "test/release/PrepareVcpkgRegistryPortTest.mjs"
       - "vcpkg/**"
       - ".github/workflows/vcpkg-*.yml"
+      - ".github/workflows/release-native.yml"
   push:
     branches: [main]
     paths:
@@ -14,6 +15,7 @@ on:
       - "test/release/PrepareVcpkgRegistryPortTest.mjs"
       - "vcpkg/**"
       - ".github/workflows/vcpkg-*.yml"
+      - ".github/workflows/release-native.yml"
   workflow_dispatch:
 
 permissions:
@@ -39,6 +41,14 @@ jobs:
           node --test
           test/release/CheckReleaseVersionTest.mjs
           test/release/PrepareVcpkgRegistryPortTest.mjs
+      - name: Validate release dispatch contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'event_type "vcpkg-release-ready"' .github/workflows/release-native.yml
+          grep -Fq 'types: [vcpkg-release-ready]' .github/workflows/vcpkg-version-publish.yml
+          grep -Fq 'event_type: "vcpkg-version-published"' .github/workflows/vcpkg-version-publish.yml
+          grep -Fq 'types: [vcpkg-version-published]' .github/workflows/vcpkg-binary-cache.yml
       - name: Render the real ilic port with synthetic immutable metadata
         shell: bash
         run: |
