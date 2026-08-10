@@ -1,20 +1,74 @@
 name: Publish vcpkg binary cache
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "vcpkg/**"
-      - ".github/workflows/vcpkg-binary-cache.yml"
+  repository_dispatch:
+    types: [vcpkg-version-published]
   workflow_dispatch:
+    inputs:
+      version:
+        description: Immutable ilic vcpkg version to publish
+        required: true
+        type: string
+      registry_baseline:
+        description: vcpkg-registry commit containing the version
+        required: true
+        type: string
+      source_sha:
+        description: Optional ilic source commit for traceability
+        required: false
+        type: string
 
 permissions:
   contents: read
   packages: write
 
 jobs:
+  metadata:
+    name: Validate publication request
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      registry_baseline: ${{ steps.resolve.outputs.registry_baseline }}
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
+    steps:
+      - name: Resolve and validate request
+        id: resolve
+        shell: bash
+        env:
+          EVENT_VERSION: ${{ github.event.client_payload.version }}
+          EVENT_REGISTRY_BASELINE: ${{ github.event.client_payload.registry_baseline }}
+          EVENT_SOURCE_SHA: ${{ github.event.client_payload.source_sha }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_REGISTRY_BASELINE: ${{ inputs.registry_baseline }}
+          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          version=${EVENT_VERSION:-$INPUT_VERSION}
+          registry_baseline=${EVENT_REGISTRY_BASELINE:-$INPUT_REGISTRY_BASELINE}
+          source_sha=${EVENT_SOURCE_SHA:-$INPUT_SOURCE_SHA}
+
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && \
+             [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-snapshot\.[0-9a-f]{8}$ ]]; then
+            echo "Invalid ilic vcpkg version: $version" >&2
+            exit 1
+          fi
+          if [[ ! "$registry_baseline" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid registry baseline: $registry_baseline" >&2
+            exit 1
+          fi
+          if [[ -n "$source_sha" && ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid source SHA: $source_sha" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "registry_baseline=$registry_baseline" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "Publishing binary cache for ilic $version from registry $registry_baseline"
+
   publish:
     name: Publish ilic (${{ matrix.triplet }})
+    needs: metadata
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +84,9 @@ jobs:
     env:
       ILIC_VCPKG_ROOT: ${{ github.workspace }}/build/vcpkg-cache
       VCPKG_TRIPLET: ${{ matrix.triplet }}
+      ILIC_VERSION: ${{ needs.metadata.outputs.version }}
+      ILIC_REGISTRY_BASELINE: ${{ needs.metadata.outputs.registry_baseline }}
+      VCPKG_BUILTIN_BASELINE: d015e31e90838a4c9dfa3eed45979bc70d9357fc
       VCPKG_DOWNLOADS: ${{ github.workspace }}/.cache/vcpkg/downloads
       VCPKG_DISABLE_METRICS: "1"
       VCPKG_FEED_URL: https://nuget.pkg.github.com/edigonzales/index.json
@@ -37,11 +94,6 @@ jobs:
       VCPKG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Check out ilic
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
       - name: Check out pinned vcpkg
         uses: actions/checkout@v6
         with:
@@ -74,8 +126,8 @@ jobs:
           fi
 
       - name: Prepare vcpkg downloads directory
-        shell: bash
         if: runner.os != 'Windows'
+        shell: bash
         run: mkdir -p "$VCPKG_DOWNLOADS"
 
       - name: Prepare vcpkg downloads directory (Windows)
@@ -93,6 +145,78 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: '& "$env:ILIC_VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics'
+
+      - name: Configure registry manifest (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          manifest_root="$GITHUB_WORKSPACE/build/vcpkg-publisher"
+          mkdir -p "$manifest_root"
+          cat > "$manifest_root/vcpkg.json" <<EOF
+          {
+            "name": "ilic-binary-cache-publisher",
+            "version-string": "0",
+            "dependencies": ["ilic"],
+            "overrides": [
+              {
+                "name": "ilic",
+                "version-string": "$ILIC_VERSION"
+              }
+            ]
+          }
+          EOF
+          cat > "$manifest_root/vcpkg-configuration.json" <<EOF
+          {
+            "default-registry": {
+              "kind": "builtin",
+              "baseline": "$VCPKG_BUILTIN_BASELINE"
+            },
+            "registries": [
+              {
+                "kind": "git",
+                "repository": "https://github.com/edigonzales/ilic-fork.git",
+                "reference": "vcpkg-registry",
+                "baseline": "$ILIC_REGISTRY_BASELINE",
+                "packages": ["ilic"]
+              }
+            ]
+          }
+          EOF
+
+      - name: Configure registry manifest (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $manifestRoot = Join-Path $env:GITHUB_WORKSPACE 'build\vcpkg-publisher'
+          New-Item -ItemType Directory -Force -Path $manifestRoot | Out-Null
+          $manifest = @{
+            name = 'ilic-binary-cache-publisher'
+            'version-string' = '0'
+            dependencies = @('ilic')
+            overrides = @(
+              @{
+                name = 'ilic'
+                'version-string' = $env:ILIC_VERSION
+              }
+            )
+          }
+          $configuration = @{
+            'default-registry' = @{
+              kind = 'builtin'
+              baseline = $env:VCPKG_BUILTIN_BASELINE
+            }
+            registries = @(
+              @{
+                kind = 'git'
+                repository = 'https://github.com/edigonzales/ilic-fork.git'
+                reference = 'vcpkg-registry'
+                baseline = $env:ILIC_REGISTRY_BASELINE
+                packages = @('ilic')
+              }
+            )
+          }
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 (Join-Path $manifestRoot 'vcpkg.json')
+          $configuration | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 (Join-Path $manifestRoot 'vcpkg-configuration.json')
 
       - name: Authenticate NuGet source (Unix)
         if: runner.os != 'Windows'
@@ -125,24 +249,31 @@ jobs:
       - name: Build and publish ilic binary package (Unix)
         if: runner.os != 'Windows'
         shell: bash
-        run: >-
-          "$ILIC_VCPKG_ROOT/vcpkg" install "ilic:${VCPKG_TRIPLET}"
-          --overlay-ports="$GITHUB_WORKSPACE/vcpkg/ports"
+        run: |
+          cd "$GITHUB_WORKSPACE/build/vcpkg-publisher"
+          "$ILIC_VCPKG_ROOT/vcpkg" install --triplet "$VCPKG_TRIPLET"
 
       - name: Build and publish ilic binary package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: >-
-          & "$env:ILIC_VCPKG_ROOT\vcpkg.exe" install "ilic:$env:VCPKG_TRIPLET"
-          "--overlay-ports=$env:GITHUB_WORKSPACE\vcpkg\ports"
+        run: |
+          Push-Location (Join-Path $env:GITHUB_WORKSPACE 'build\vcpkg-publisher')
+          try {
+            & "$env:ILIC_VCPKG_ROOT\vcpkg.exe" install "--triplet=$env:VCPKG_TRIPLET"
+          } finally {
+            Pop-Location
+          }
 
   verify-restore:
     name: Verify remote restore (x64-linux)
-    needs: publish
+    needs: [metadata, publish]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
       ILIC_VCPKG_ROOT: ${{ github.workspace }}/build/vcpkg-restore
+      ILIC_VERSION: ${{ needs.metadata.outputs.version }}
+      ILIC_REGISTRY_BASELINE: ${{ needs.metadata.outputs.registry_baseline }}
+      VCPKG_BUILTIN_BASELINE: d015e31e90838a4c9dfa3eed45979bc70d9357fc
       VCPKG_DOWNLOADS: ${{ github.workspace }}/.cache/vcpkg/restore-downloads
       VCPKG_DISABLE_METRICS: "1"
       VCPKG_FEED_URL: https://nuget.pkg.github.com/edigonzales/index.json
@@ -150,11 +281,6 @@ jobs:
       VCPKG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Check out ilic
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
       - name: Check out pinned vcpkg
         uses: actions/checkout@v6
         with:
@@ -177,6 +303,42 @@ jobs:
           mkdir -p "$VCPKG_DOWNLOADS"
           "$ILIC_VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
 
+      - name: Configure registry manifest
+        shell: bash
+        run: |
+          manifest_root="$GITHUB_WORKSPACE/build/vcpkg-restore-consumer"
+          mkdir -p "$manifest_root"
+          cat > "$manifest_root/vcpkg.json" <<EOF
+          {
+            "name": "ilic-binary-cache-restore",
+            "version-string": "0",
+            "dependencies": ["ilic"],
+            "overrides": [
+              {
+                "name": "ilic",
+                "version-string": "$ILIC_VERSION"
+              }
+            ]
+          }
+          EOF
+          cat > "$manifest_root/vcpkg-configuration.json" <<EOF
+          {
+            "default-registry": {
+              "kind": "builtin",
+              "baseline": "$VCPKG_BUILTIN_BASELINE"
+            },
+            "registries": [
+              {
+                "kind": "git",
+                "repository": "https://github.com/edigonzales/ilic-fork.git",
+                "reference": "vcpkg-registry",
+                "baseline": "$ILIC_REGISTRY_BASELINE",
+                "packages": ["ilic"]
+              }
+            ]
+          }
+          EOF
+
       - name: Authenticate NuGet source
         shell: bash
         run: |
@@ -188,8 +350,8 @@ jobs:
             -UserName "${GITHUB_ACTOR}" \
             -Password "$VCPKG_GITHUB_TOKEN"
 
-      - name: Restore ilic from GitHub Packages
+      - name: Restore ilic from GitHub Packages without building
         shell: bash
-        run: >-
-          "$ILIC_VCPKG_ROOT/vcpkg" install "ilic:x64-linux"
-          --overlay-ports="$GITHUB_WORKSPACE/vcpkg/ports"
+        run: |
+          cd "$GITHUB_WORKSPACE/build/vcpkg-restore-consumer"
+          "$ILIC_VCPKG_ROOT/vcpkg" install --triplet x64-linux --only-binarycaching
