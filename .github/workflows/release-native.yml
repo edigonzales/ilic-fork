@@ -40,18 +40,45 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: macos-14
     timeout-minutes: 50
+    env:
+      SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore release sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v2-release-cli-macos-arm64-${{ env.SOURCE_SHA }}
+          restore-keys: |
+            sccache-v1-${{ runner.os }}-${{ runner.arch }}-OFF-${{ env.SOURCE_SHA }}
+            sccache-v2-release-cli-macos-arm64-
       - name: Verify ARM64 runner
         run: test "$(uname -m)" = "arm64"
-      - name: Configure and build
-        run: |
-          cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_BUILD_TESTS=ON -DILIC_BUILD_CLI=ON -DILIC_STATIC_DISTRIBUTION=ON
-          cmake --build build/release --parallel
-          ctest --test-dir build/release --output-on-failure
+      - name: Configure release binary
+        run: >-
+          cmake -S . -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DBUILD_TESTING=OFF
+          -DILIC_BUILD_TESTS=OFF
+          -DILIC_BUILD_CLI=ON
+          -DILIC_STATIC_DISTRIBUTION=ON
+      - name: Build release binary
+        run: cmake --build build/release --target ilic --parallel
+      - name: Show release sccache statistics
+        if: always()
+        run: sccache --show-stats
       - name: Verify and smoke-test binary
         run: |
           scripts/check-macos-runtime-deps.sh build/release/ilic
@@ -78,32 +105,63 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 55
+    env:
+      SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache-musl
+      SCCACHE_CACHE_SIZE: "2G"
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore musl release sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v2-release-musl-linux-x64-${{ env.SOURCE_SHA }}
+          restore-keys: |
+            sccache-v2-release-musl-linux-x64-
       - name: Build and verify in pinned musl image
         shell: bash
         run: |
           set -euo pipefail
           test "$(uname -m)" = "x86_64"
-          docker run --rm -v "$PWD:/src" -w /src alpine:3.20.3 sh -euxc '
-            apk add --no-cache build-base cmake ninja perl python3 linux-headers openssl-dev openssl-libs-static file binutils
-            cmake -S . -B build/release-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_BUILD_TESTS=ON -DILIC_BUILD_CLI=ON -DILIC_STATIC_DISTRIBUTION=ON
-            cmake --build build/release-linux --parallel
-            ctest --test-dir build/release-linux --output-on-failure
-            scripts/check-linux-static.sh build/release-linux/ilic
-            build/release-linux/ilic -version | tee ilic-version.txt
-            expected_version=$(sed -nE "s/.*project\\(ilic VERSION ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p" CMakeLists.txt)
-            qualifier=$(sed -nE "s/.*set\\(ILIC_VERSION_QUALIFIER \"([^\"]*)\".*/\\1/p" CMakeLists.txt)
-            if [ -n "$qualifier" ]; then expected_version="$expected_version-$qualifier"; fi
-            grep -q "^ilic ${expected_version} " ilic-version.txt
-            build/release-linux/ilic -silent docs/examples/models/Legacy.ili
-            build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
-            build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
-            tar -czf ilic-linux-x86_64.tar.gz -C build/release-linux ilic
-          '
+          mkdir -p "$SCCACHE_DIR"
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v "$SCCACHE_DIR:/sccache-cache" \
+            -v "$SCCACHE_PATH:/usr/local/bin/sccache:ro" \
+            -e SCCACHE_DIR=/sccache-cache \
+            -e SCCACHE_CACHE_SIZE=2G \
+            -e SCCACHE_BASEDIRS=/src \
+            -w /src \
+            alpine:3.20.3 sh -euxc '
+              apk add --no-cache build-base cmake ninja perl python3 linux-headers openssl-dev openssl-libs-static file binutils
+              cmake -S . -B build/release-linux -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+                -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+                -DBUILD_TESTING=OFF \
+                -DILIC_BUILD_TESTS=OFF \
+                -DILIC_BUILD_CLI=ON \
+                -DILIC_STATIC_DISTRIBUTION=ON
+              cmake --build build/release-linux --target ilic --parallel
+              sccache --show-stats
+              scripts/check-linux-static.sh build/release-linux/ilic
+              build/release-linux/ilic -version | tee ilic-version.txt
+              expected_version=$(sed -nE "s/.*project\\(ilic VERSION ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p" CMakeLists.txt)
+              qualifier=$(sed -nE "s/.*set\\(ILIC_VERSION_QUALIFIER \"([^\"]*)\".*/\\1/p" CMakeLists.txt)
+              if [ -n "$qualifier" ]; then expected_version="$expected_version-$qualifier"; fi
+              grep -q "^ilic ${expected_version} " ilic-version.txt
+              build/release-linux/ilic -silent docs/examples/models/Legacy.ili
+              build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
+              build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
+              tar -czf ilic-linux-x86_64.tar.gz -C build/release-linux ilic
+            '
       - uses: actions/upload-artifact@v6
         with:
           name: ilic-linux-x86_64
@@ -117,27 +175,58 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
     timeout-minutes: 55
+    env:
+      SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
+      SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_BASEDIRS: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           persist-credentials: false
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.17.0"
+      - name: Restore release sccache cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: sccache-v2-release-cli-windows-x64-${{ env.SOURCE_SHA }}
+          restore-keys: |
+            sccache-v1-${{ runner.os }}-${{ runner.arch }}-ON-${{ env.SOURCE_SHA }}
+            sccache-v2-release-cli-windows-x64-
+      - name: Set up MSVC developer command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
       - name: Verify x86_64 runner
         shell: pwsh
         run: |
           if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
             throw "x86_64 Windows is required"
           }
-      - name: Configure, build and test
-        run: |
-          cmake -S . -B build/release -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DILIC_BUILD_TESTS=ON -DILIC_BUILD_CLI=ON -DILIC_STATIC_DISTRIBUTION=ON
-          cmake --build build/release --config Release --parallel
-          ctest --test-dir build/release -C Release --output-on-failure
+      - name: Configure release binary
+        run: >-
+          cmake -S . -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DBUILD_TESTING=OFF
+          -DILIC_BUILD_TESTS=OFF
+          -DILIC_BUILD_CLI=ON
+          -DILIC_STATIC_DISTRIBUTION=ON
+      - name: Build release binary
+        run: cmake --build build/release --target ilic --parallel
+      - name: Show release sccache statistics
+        if: always()
+        run: sccache --show-stats
       - name: Verify and smoke-test binary
         shell: pwsh
         run: |
-          ./scripts/check-windows-runtime-deps.ps1 -Binary build/release/Release/ilic.exe
-          $versionOutput = build/release/Release/ilic.exe -version
+          ./scripts/check-windows-runtime-deps.ps1 -Binary build/release/ilic.exe
+          $versionOutput = build/release/ilic.exe -version
           $versionOutput
           $cmakeVersion = Select-String -Path CMakeLists.txt -Pattern 'project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
           $cmakeQualifier = Select-String -Path CMakeLists.txt -Pattern 'set\(ILIC_VERSION_QUALIFIER "([^"]*)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
@@ -148,12 +237,12 @@ jobs:
           if ($versionOutput[0] -notmatch "^ilic $expectedVersion ") {
             throw "ilic.exe did not report version $expectedVersion"
           }
-          build/release/Release/ilic.exe -silent docs/examples/models/Legacy.ili
-          build/release/Release/ilic.exe -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
-          build/release/Release/ilic.exe -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
+          build/release/ilic.exe -silent docs/examples/models/Legacy.ili
+          build/release/ilic.exe -silent -repositories test/repository/fixture --no-default-repositories -models RepositoryRoot --ili-version 2.3
+          build/release/ilic.exe -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
       - name: Package
         shell: pwsh
-        run: Compress-Archive -Path build/release/Release/ilic.exe -DestinationPath ilic-windows-x86_64.zip
+        run: Compress-Archive -Path build/release/ilic.exe -DestinationPath ilic-windows-x86_64.zip
       - uses: actions/upload-artifact@v6
         with:
           name: ilic-windows-x86_64
