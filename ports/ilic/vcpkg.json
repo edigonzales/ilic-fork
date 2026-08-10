@@ -1,6 +1,6 @@
 {
   "name": "ilic",
-  "version-string": "0.10.0-snapshot.bb284a67",
+  "version-string": "0.10.0-snapshot.d335fcf8",
   "description": "Native INTERLIS compiler library",
   "homepage": "https://github.com/edigonzales/ilic-fork",
   "license": "MIT",
