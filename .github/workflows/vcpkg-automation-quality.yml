@@ -1,0 +1,54 @@
+name: vcpkg Automation Quality
+
+on:
+  pull_request:
+    paths:
+      - "scripts/prepare-vcpkg-registry-port.mjs"
+      - "test/release/PrepareVcpkgRegistryPortTest.mjs"
+      - "vcpkg/**"
+      - ".github/workflows/vcpkg-*.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/prepare-vcpkg-registry-port.mjs"
+      - "test/release/PrepareVcpkgRegistryPortTest.mjs"
+      - "vcpkg/**"
+      - ".github/workflows/vcpkg-*.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  automation:
+    name: Registry automation tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Test release and vcpkg version helpers
+        run: >-
+          node --test
+          test/release/CheckReleaseVersionTest.mjs
+          test/release/PrepareVcpkgRegistryPortTest.mjs
+      - name: Render the real ilic port with synthetic immutable metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_sha=0123456789abcdef0123456789abcdef01234567
+          sha512=$(printf 'a%.0s' {1..128})
+          node scripts/prepare-vcpkg-registry-port.mjs \
+            --template-dir vcpkg/ports/ilic \
+            --output-dir build/vcpkg-render-smoke/ilic \
+            --version 0.10.0-snapshot.01234567 \
+            --source-sha "$source_sha" \
+            --sha512 "$sha512"
+          grep -Fq "REF $source_sha" build/vcpkg-render-smoke/ilic/portfile.cmake
+          grep -Fq "SHA512 $sha512" build/vcpkg-render-smoke/ilic/portfile.cmake
+          node -e 'const p=require("./build/vcpkg-render-smoke/ilic/vcpkg.json"); if (p["version-string"] !== "0.10.0-snapshot.01234567") process.exit(1)'
