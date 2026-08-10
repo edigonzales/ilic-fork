@@ -1,0 +1,210 @@
+name: Publish vcpkg registry version
+
+on:
+  workflow_run:
+    workflows: ["Release native compiler"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vcpkg-registry-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish immutable registry version
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VCPKG_DISABLE_METRICS: "1"
+    steps:
+      - name: Check out released source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          path: source
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Resolve vcpkg version
+        id: metadata
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid release source SHA: $SOURCE_SHA" >&2
+            exit 1
+          fi
+
+          cmake_version=$(sed -nE 's/.*project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' source/CMakeLists.txt)
+          if [[ ! "$cmake_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Could not resolve the ilic project version" >&2
+            exit 1
+          fi
+
+          if [[ "$TRIGGER_EVENT" == "push" ]]; then
+            mapfile -t stable_tags < <(
+              git -C source tag --list 'v*' |
+                while IFS= read -r tag; do
+                  [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+                  if [[ "$(git -C source rev-list -n 1 "$tag")" == "$SOURCE_SHA" ]]; then
+                    printf '%s\n' "$tag"
+                  fi
+                done
+            )
+            if (( ${#stable_tags[@]} != 1 )); then
+              echo "Expected exactly one stable vX.Y.Z tag at $SOURCE_SHA, found ${#stable_tags[@]}" >&2
+              printf '%s\n' "${stable_tags[@]:-}" >&2
+              exit 1
+            fi
+            release_tag=${stable_tags[0]}
+            version=${release_tag#v}
+            node source/scripts/check-release-version.mjs \
+              --project-root source \
+              --expected-version "$version" \
+              --expected-tag "$release_tag"
+            kind=stable
+          else
+            version="${cmake_version}-snapshot.${SOURCE_SHA:0:8}"
+            kind=snapshot
+          fi
+
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "Publishing ilic $version from $SOURCE_SHA ($kind)"
+
+      - name: Compute source archive SHA512
+        id: archive
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.metadata.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/ilic-${SOURCE_SHA}.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://github.com/${GITHUB_REPOSITORY}/archive/${SOURCE_SHA}.tar.gz" \
+            --output "$archive"
+          sha512=$(sha512sum "$archive" | awk '{print $1}')
+          if [[ ! "$sha512" =~ ^[0-9a-f]{128}$ ]]; then
+            echo "Invalid SHA512: $sha512" >&2
+            exit 1
+          fi
+          echo "sha512=$sha512" >> "$GITHUB_OUTPUT"
+          echo "Source archive SHA512: $sha512"
+
+      - name: Check out vcpkg registry
+        uses: actions/checkout@v6
+        with:
+          ref: vcpkg-registry
+          path: registry
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Check out pinned vcpkg
+        uses: actions/checkout@v6
+        with:
+          repository: microsoft/vcpkg
+          ref: 2026.05.25
+          path: build/vcpkg-version-tool
+          persist-credentials: false
+
+      - name: Bootstrap vcpkg
+        shell: bash
+        run: build/vcpkg-version-tool/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Publish registry version
+        id: registry
+        shell: bash
+        env:
+          VERSION: ${{ steps.metadata.outputs.version }}
+          SOURCE_SHA: ${{ steps.metadata.outputs.source_sha }}
+          SOURCE_SHA512: ${{ steps.archive.outputs.sha512 }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t existing_trees < <(
+            jq -r --arg version "$VERSION" \
+              '.versions[] | select(."version-string" == $version and (."port-version" // 0) == 0) | ."git-tree"' \
+              registry/versions/i-/ilic.json
+          )
+
+          if (( ${#existing_trees[@]} > 1 )); then
+            echo "Registry contains duplicate entries for ilic $VERSION" >&2
+            exit 1
+          fi
+
+          if (( ${#existing_trees[@]} == 1 )); then
+            tree=${existing_trees[0]}
+            git -C registry show "${tree}:vcpkg.json" > "$RUNNER_TEMP/ilic-existing-vcpkg.json"
+            git -C registry show "${tree}:portfile.cmake" > "$RUNNER_TEMP/ilic-existing-portfile.cmake"
+            jq -e --arg version "$VERSION" \
+              '.name == "ilic" and ."version-string" == $version' \
+              "$RUNNER_TEMP/ilic-existing-vcpkg.json" >/dev/null
+            grep -Fq "REF $SOURCE_SHA" "$RUNNER_TEMP/ilic-existing-portfile.cmake"
+            grep -Fq "SHA512 $SOURCE_SHA512" "$RUNNER_TEMP/ilic-existing-portfile.cmake"
+            echo "ilic $VERSION already exists immutably as git-tree $tree"
+          else
+            node source/scripts/prepare-vcpkg-registry-port.mjs \
+              --template-dir source/vcpkg/ports/ilic \
+              --output-dir registry/ports/ilic \
+              --version "$VERSION" \
+              --source-sha "$SOURCE_SHA" \
+              --sha512 "$SOURCE_SHA512"
+
+            git -C registry add ports/ilic
+            (
+              cd registry
+              "$GITHUB_WORKSPACE/build/vcpkg-version-tool/vcpkg" x-add-version \
+                --x-builtin-ports-root="$PWD/ports" \
+                --x-builtin-registry-versions-dir="$PWD/versions" \
+                --verbose \
+                ilic
+            )
+            git -C registry add versions
+
+            baseline_version=$(jq -r '.default.ilic.baseline' registry/versions/baseline.json)
+            if [[ "$baseline_version" != "$VERSION" ]]; then
+              echo "Registry baseline is $baseline_version after publishing $VERSION" >&2
+              exit 1
+            fi
+
+            git -C registry config user.name "github-actions[bot]"
+            git -C registry config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C registry commit -m "publish ilic $VERSION"
+            git -C registry push origin HEAD:vcpkg-registry
+          fi
+
+          registry_baseline=$(git -C registry rev-parse HEAD)
+          echo "baseline=$registry_baseline" >> "$GITHUB_OUTPUT"
+          echo "Registry baseline: $registry_baseline"
+
+      - name: Request binary-cache publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+          SOURCE_SHA: ${{ steps.metadata.outputs.source_sha }}
+          REGISTRY_BASELINE: ${{ steps.registry.outputs.baseline }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg version "$VERSION" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg registry_baseline "$REGISTRY_BASELINE" \
+            '{
+              event_type: "vcpkg-version-published",
+              client_payload: {
+                version: $version,
+                source_sha: $source_sha,
+                registry_baseline: $registry_baseline
+              }
+            }' |
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/dispatches" --input -
