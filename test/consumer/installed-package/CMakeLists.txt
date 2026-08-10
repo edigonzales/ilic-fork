@@ -3,6 +3,10 @@ project(ilic_installed_consumer LANGUAGES C CXX)
 
 enable_testing()
 
+option(ILIC_TEST_METAMODEL_HEADER
+    "Compile the installed concrete metamodel header smoke"
+    OFF)
+
 find_package(ilic CONFIG REQUIRED)
 
 if(NOT TARGET ilic::core)
@@ -13,6 +17,9 @@ if(NOT TARGET ilic::capi)
 endif()
 
 add_executable(cpp_consumer cpp-main.cpp)
+if(ILIC_TEST_METAMODEL_HEADER)
+    target_compile_definitions(cpp_consumer PRIVATE ILIC_TEST_METAMODEL_HEADER=1)
+endif()
 target_link_libraries(cpp_consumer PRIVATE ilic::core)
 add_test(NAME cpp_consumer COMMAND cpp_consumer)
 
