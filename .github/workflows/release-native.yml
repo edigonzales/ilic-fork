@@ -162,6 +162,10 @@ jobs:
               build/release-linux/ilic -silent -repositories test/repository/fixture --no-default-repositories test/repository/import-fallback/RepositoryConsumer.ili
               tar -czf ilic-linux-x86_64.tar.gz -C build/release-linux ilic
             '
+      - name: Normalize musl sccache ownership
+        if: always()
+        shell: bash
+        run: sudo chown -R "$(id -u):$(id -g)" "$SCCACHE_DIR"
       - uses: actions/upload-artifact@v6
         with:
           name: ilic-linux-x86_64
