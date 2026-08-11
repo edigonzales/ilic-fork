@@ -3,8 +3,8 @@ vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO edigonzales/ilic-fork
-    REF 475ecb2d7f9ab85468934e3371716d72ac3d75ae
-    SHA512 e58074e57baeb9a131328e084d78df56a4dab402e416f51cde8fd0f4588c7dd436ecd953c893b7d38bedce9661d79a99c12d8eb512133a8ca91098efeba5e908
+    REF cd74490b1fddfe38ac80288067e1af0dd800e8da
+    SHA512 093feb16c0bea02391380fedc6b1eedcaf067f40bfb82f26e377d69f638443c7c6bb2b857bc0ec17437611ae0ea70508d1524804b7f35c531ebdecf589afc79e
     HEAD_REF main
 )
 
