@@ -70,9 +70,11 @@ function(ilic_configure_packaging)
         FILES_MATCHING PATTERN "*.h"
     )
     # iox-cpp's optional model-aware adapter intentionally consumes the
-    # concrete schema-derived metamodel types. Keep that existing API usable
-    # from the installed SDK without changing source-tree include paths.
-    install(FILES "${PROJECT_SOURCE_DIR}/source/metamodel/MetaModel.h"
+    # concrete schema-derived metamodel types and store. Keep that existing API
+    # usable from the installed SDK without changing source-tree include paths.
+    install(FILES
+        "${PROJECT_SOURCE_DIR}/source/metamodel/MetaModel.h"
+        "${PROJECT_SOURCE_DIR}/source/metamodel/MetaModelStore.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/metamodel"
     )
 
