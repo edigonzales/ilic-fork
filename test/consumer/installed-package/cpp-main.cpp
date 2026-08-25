@@ -3,6 +3,7 @@
 #ifdef ILIC_TEST_METAMODEL_HEADER
 #include "metamodel/MetaModel.h"
 #include "metamodel/MetaModelStore.h"
+#include "metamodel/SemanticChecker.h"
 #endif
 
 #include <string>
