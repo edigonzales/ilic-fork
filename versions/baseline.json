@@ -3,6 +3,10 @@
     "ilic": {
       "baseline": "0.10.0-snapshot.e901af64",
       "port-version": 0
+    },
+    "iox-cpp": {
+      "baseline": "0.2.0-snapshot.c82fd5f5",
+      "port-version": 0
     }
   }
 }
