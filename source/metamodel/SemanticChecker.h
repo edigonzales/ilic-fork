@@ -1,6 +1,8 @@
 #pragma once
 
-#include "../util/Logger.h"
+namespace util {
+   class Logger;
+}
 
 namespace metamodel {
 

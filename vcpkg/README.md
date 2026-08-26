@@ -42,7 +42,10 @@ target_link_libraries(app PRIVATE ilic::core)
 The repository branch `vcpkg-registry` is a git-backed vcpkg registry. A
 consumer selects that branch with the registry `reference` field and pins an
 immutable registry commit in the `baseline` field. Packages not owned by the
-ilic registry continue to come from the pinned builtin vcpkg registry.
+ilic registry continue to come from the pinned builtin vcpkg registry. The
+branch is the shared INTERLIS registry: the iox-cpp publisher adds the
+`iox-cpp` port beside `ilic`, so downstream projects can use one registry
+configuration with `packages: ["ilic", "iox-cpp"]`.
 
 Published versions are immutable. Snapshot versions use
 `X.Y.Z-snapshot.<short-source-sha>` and stable tags `vX.Y.Z` publish the vcpkg
@@ -79,6 +82,11 @@ its version and registry baseline.
 Each build consumes the requested version through the Git registry rather than
 through the mutable in-tree overlay. The top-level temporary manifest uses a
 vcpkg override to pin that exact version.
+
+The shared registry's iox-cpp workflow additionally covers
+`x64-windows-static` and publishes standalone `geos` plus combined
+`ilic,geos` feature variants. Downstream consumers should pin the registry
+commit emitted by that workflow rather than the moving branch head.
 
 The cache uses the GitHub Packages NuGet feed for the `edigonzales` namespace.
 Publishing from this repository uses the workflow `GITHUB_TOKEN` with

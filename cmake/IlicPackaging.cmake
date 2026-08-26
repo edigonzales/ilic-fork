@@ -75,6 +75,7 @@ function(ilic_configure_packaging)
     install(FILES
         "${PROJECT_SOURCE_DIR}/source/metamodel/MetaModel.h"
         "${PROJECT_SOURCE_DIR}/source/metamodel/MetaModelStore.h"
+        "${PROJECT_SOURCE_DIR}/source/metamodel/SemanticChecker.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/metamodel"
     )
 
