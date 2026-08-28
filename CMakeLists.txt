@@ -30,7 +30,7 @@ if(DEFINED ILIC_WASM_VERSION AND NOT ILIC_WASM_VERSION STREQUAL "")
     if(NOT EMSCRIPTEN)
         message(FATAL_ERROR "ILIC_WASM_VERSION is only valid for an Emscripten build")
     endif()
-    if(NOT ILIC_WASM_VERSION MATCHES "^${PROJECT_VERSION}(-SNAPSHOT\\.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9](\\.[0-9]+)?)?$")
+    if(NOT ILIC_WASM_VERSION MATCHES "^${PROJECT_VERSION}(-snapshot\\.g[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f])?$")
         message(FATAL_ERROR
             "ILIC_WASM_VERSION must be ${PROJECT_VERSION} or a matching snapshot, got ${ILIC_WASM_VERSION}")
     endif()

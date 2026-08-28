@@ -1,124 +1,163 @@
-name: Publish vcpkg registry version
+name: Publish shared vcpkg registry version
 
 on:
   repository_dispatch:
-    types: [vcpkg-release-ready]
+    types: [vcpkg-release-ready, vcpkg-port-publication-requested]
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: Port to publish
+        required: true
+        type: choice
+        options: [ilic, iox-cpp]
+      source_sha:
+        description: Exact source commit
+        required: true
+        type: string
+      version:
+        description: X.Y.Z or X.Y.Z-snapshot.g<12 SHA>
+        required: true
+        type: string
+      change_kind:
+        description: New source or packaging-only revision
+        required: true
+        default: source
+        type: choice
+        options: [source, port]
+      sha512:
+        description: Optional expected GitHub source archive SHA512
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: vcpkg-registry-publish
+  group: shared-vcpkg-registry-publish
   cancel-in-progress: false
 
 jobs:
   publish:
-    name: Publish immutable registry version
+    name: Publish immutable shared registry port
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       VCPKG_DISABLE_METRICS: "1"
     steps:
-      - name: Validate release metadata
-        id: release
-        shell: bash
-        env:
-          SOURCE_SHA: ${{ github.event.client_payload.source_sha }}
-          RELEASE_KIND: ${{ github.event.client_payload.release_kind }}
-          RELEASE_TAG: ${{ github.event.client_payload.release_tag }}
-          RELEASE_RUN_ID: ${{ github.event.client_payload.release_run_id }}
-        run: |
-          set -euo pipefail
-          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Invalid release source SHA: $SOURCE_SHA" >&2
-            exit 1
-          fi
-          if [[ "$RELEASE_KIND" != "snapshot" && "$RELEASE_KIND" != "stable" ]]; then
-            echo "Invalid release kind: $RELEASE_KIND" >&2
-            exit 1
-          fi
-          if [[ "$RELEASE_KIND" == "stable" ]]; then
-            if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "Invalid stable release tag: $RELEASE_TAG" >&2
-              exit 1
-            fi
-          elif [[ "$RELEASE_TAG" != "snapshot" ]]; then
-            echo "Snapshot publication must use the snapshot release tag" >&2
-            exit 1
-          fi
-          if [[ ! "$RELEASE_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "Invalid release workflow run id: $RELEASE_RUN_ID" >&2
-            exit 1
-          fi
-          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          echo "release_kind=$RELEASE_KIND" >> "$GITHUB_OUTPUT"
-          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-          echo "Release metadata: $RELEASE_KIND $RELEASE_TAG from $SOURCE_SHA (run $RELEASE_RUN_ID)"
-
-      - name: Check out released source
+      - name: Check out registry automation
         uses: actions/checkout@v6
         with:
-          ref: ${{ steps.release.outputs.source_sha }}
+          path: controller
+          persist-credentials: false
+
+      - name: Validate request
+        id: request
+        shell: bash
+        env:
+          EVENT_PACKAGE: ${{ github.event.client_payload.package_name }}
+          EVENT_SOURCE_SHA: ${{ github.event.client_payload.source_sha }}
+          EVENT_VERSION: ${{ github.event.client_payload.version }}
+          EVENT_CHANGE_KIND: ${{ github.event.client_payload.change_kind }}
+          EVENT_SHA512: ${{ github.event.client_payload.sha512 }}
+          EVENT_RELEASE_KIND: ${{ github.event.client_payload.release_kind }}
+          EVENT_RELEASE_TAG: ${{ github.event.client_payload.release_tag }}
+          INPUT_PACKAGE: ${{ inputs.package_name }}
+          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_CHANGE_KIND: ${{ inputs.change_kind }}
+          INPUT_SHA512: ${{ inputs.sha512 }}
+        run: |
+          set -euo pipefail
+          package_name=${EVENT_PACKAGE:-${INPUT_PACKAGE:-ilic}}
+          source_sha=${EVENT_SOURCE_SHA:-$INPUT_SOURCE_SHA}
+          version=${EVENT_VERSION:-$INPUT_VERSION}
+          change_kind=${EVENT_CHANGE_KIND:-${INPUT_CHANGE_KIND:-source}}
+          expected_sha512=${EVENT_SHA512:-$INPUT_SHA512}
+          case "$package_name" in
+            ilic) source_repository=edigonzales/ilic-fork ;;
+            iox-cpp) source_repository=edigonzales/iox-cpp ;;
+            *) echo "Unsupported port: $package_name" >&2; exit 1 ;;
+          esac
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid source SHA" >&2; exit 1; }
+          [[ "$change_kind" == source || "$change_kind" == port ]] || { echo "Invalid change kind" >&2; exit 1; }
+          [[ -z "$expected_sha512" || "$expected_sha512" =~ ^[0-9a-f]{128}$ ]] || { echo "Invalid SHA512" >&2; exit 1; }
+          {
+            echo "package_name=$package_name"
+            echo "source_repository=$source_repository"
+            echo "source_sha=$source_sha"
+            echo "requested_version=$version"
+            echo "change_kind=$change_kind"
+            echo "expected_sha512=$expected_sha512"
+            echo "release_kind=$EVENT_RELEASE_KIND"
+            echo "release_tag=$EVENT_RELEASE_TAG"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out requested source
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ steps.request.outputs.source_repository }}
+          ref: ${{ steps.request.outputs.source_sha }}
           path: source
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
 
-      - name: Resolve vcpkg version
+      - name: Resolve and validate artifact version
         id: metadata
         shell: bash
         env:
-          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
-          RELEASE_KIND: ${{ steps.release.outputs.release_kind }}
-          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          PACKAGE_NAME: ${{ steps.request.outputs.package_name }}
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+          REQUESTED_VERSION: ${{ steps.request.outputs.requested_version }}
+          RELEASE_KIND: ${{ steps.request.outputs.release_kind }}
+          RELEASE_TAG: ${{ steps.request.outputs.release_tag }}
         run: |
           set -euo pipefail
-          cmake_version=$(sed -nE 's/.*project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' source/CMakeLists.txt)
-          if [[ ! "$cmake_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Could not resolve the ilic project version" >&2
+          case "$PACKAGE_NAME" in
+            ilic) base_version=$(sed -nE 's/.*project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' source/CMakeLists.txt) ;;
+            iox-cpp) base_version=$(sed -nE 's/.*project\(iox-cpp VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' source/CMakeLists.txt) ;;
+          esac
+          [[ "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid project base version" >&2; exit 1; }
+          version=$REQUESTED_VERSION
+          if [[ -z "$version" ]]; then
+            if [[ "$RELEASE_KIND" == stable ]]; then
+              version=${RELEASE_TAG#v}
+            else
+              version="${base_version}-snapshot.g${SOURCE_SHA:0:12}"
+            fi
+          fi
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            [[ "$version" == "$base_version" ]] || { echo "Stable version does not match project" >&2; exit 1; }
+            expected_tag="v$version"
+            tag_sha=$(git -C source rev-list -n 1 "$expected_tag" 2>/dev/null || true)
+            [[ "$tag_sha" == "$SOURCE_SHA" ]] || { echo "$expected_tag does not resolve to $SOURCE_SHA" >&2; exit 1; }
+          elif [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-snapshot\.g[0-9a-f]{12}$ ]]; then
+            [[ "$version" == "${base_version}-snapshot.g${SOURCE_SHA:0:12}" ]] || { echo "Snapshot version does not match source" >&2; exit 1; }
+          else
+            echo "New versions must use X.Y.Z or X.Y.Z-snapshot.g<12 SHA>" >&2
             exit 1
           fi
-
-          if [[ "$RELEASE_KIND" == "stable" ]]; then
-            tag_sha=$(git -C source rev-list -n 1 "$RELEASE_TAG")
-            if [[ "$tag_sha" != "$SOURCE_SHA" ]]; then
-              echo "Stable tag $RELEASE_TAG points at $tag_sha, expected $SOURCE_SHA" >&2
-              exit 1
-            fi
-            version=${RELEASE_TAG#v}
-            node source/scripts/check-release-version.mjs \
-              --project-root source \
-              --expected-version "$version" \
-              --expected-tag "$RELEASE_TAG"
-          else
-            version="${cmake_version}-snapshot.${SOURCE_SHA:0:8}"
-          fi
-
-          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "kind=$RELEASE_KIND" >> "$GITHUB_OUTPUT"
-          echo "Publishing ilic $version from $SOURCE_SHA ($RELEASE_KIND)"
 
-      - name: Compute source archive SHA512
+      - name: Compute and verify source archive SHA512
         id: archive
         shell: bash
         env:
-          SOURCE_SHA: ${{ steps.metadata.outputs.source_sha }}
+          SOURCE_REPOSITORY: ${{ steps.request.outputs.source_repository }}
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+          EXPECTED_SHA512: ${{ steps.request.outputs.expected_sha512 }}
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/ilic-${SOURCE_SHA}.tar.gz"
+          archive="$RUNNER_TEMP/source-$SOURCE_SHA.tar.gz"
           curl --fail --location --retry 3 \
-            "https://github.com/${GITHUB_REPOSITORY}/archive/${SOURCE_SHA}.tar.gz" \
+            "https://github.com/$SOURCE_REPOSITORY/archive/$SOURCE_SHA.tar.gz" \
             --output "$archive"
           sha512=$(sha512sum "$archive" | awk '{print $1}')
-          if [[ ! "$sha512" =~ ^[0-9a-f]{128}$ ]]; then
-            echo "Invalid SHA512: $sha512" >&2
-            exit 1
-          fi
+          [[ "$sha512" =~ ^[0-9a-f]{128}$ ]] || exit 1
+          [[ -z "$EXPECTED_SHA512" || "$sha512" == "$EXPECTED_SHA512" ]] || { echo "Archive SHA512 mismatch" >&2; exit 1; }
           echo "sha512=$sha512" >> "$GITHUB_OUTPUT"
-          echo "Source archive SHA512: $sha512"
 
-      - name: Check out vcpkg registry
+      - name: Check out shared registry
         uses: actions/checkout@v6
         with:
           ref: vcpkg-registry
@@ -135,95 +174,71 @@ jobs:
           persist-credentials: false
 
       - name: Bootstrap vcpkg
-        shell: bash
         run: build/vcpkg-version-tool/bootstrap-vcpkg.sh -disableMetrics
 
-      - name: Publish registry version
+      - name: Publish registry entry
         id: registry
         shell: bash
         env:
+          PACKAGE_NAME: ${{ steps.request.outputs.package_name }}
           VERSION: ${{ steps.metadata.outputs.version }}
-          SOURCE_SHA: ${{ steps.metadata.outputs.source_sha }}
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
           SOURCE_SHA512: ${{ steps.archive.outputs.sha512 }}
+          CHANGE_KIND: ${{ steps.request.outputs.change_kind }}
         run: |
           set -euo pipefail
-
-          mapfile -t existing_trees < <(
-            jq -r --arg version "$VERSION" \
-              '.versions[] | select(."version-string" == $version and (."port-version" // 0) == 0) | ."git-tree"' \
-              registry/versions/i-/ilic.json
-          )
-
-          if (( ${#existing_trees[@]} > 1 )); then
-            echo "Registry contains duplicate entries for ilic $VERSION" >&2
-            exit 1
+          version_file="registry/versions/i-/$PACKAGE_NAME.json"
+          if [[ "$CHANGE_KIND" == port ]]; then
+            current=$(jq -r --arg version "$VERSION" '[.versions[] | select(."version-string" == $version) | (."port-version" // 0)] | max // empty' "$version_file")
+            [[ -n "$current" ]] || { echo "Cannot revise missing $PACKAGE_NAME $VERSION" >&2; exit 1; }
+            port_version=$((current + 1))
+          else
+            port_version=0
           fi
-
+          mapfile -t existing_trees < <(jq -r --arg version "$VERSION" --argjson port "$port_version" \
+            '.versions[] | select(."version-string" == $version and (."port-version" // 0) == $port) | ."git-tree"' "$version_file")
+          (( ${#existing_trees[@]} <= 1 )) || { echo "Duplicate registry entries" >&2; exit 1; }
           if (( ${#existing_trees[@]} == 1 )); then
             tree=${existing_trees[0]}
-            git -C registry show "${tree}:vcpkg.json" > "$RUNNER_TEMP/ilic-existing-vcpkg.json"
-            git -C registry show "${tree}:portfile.cmake" > "$RUNNER_TEMP/ilic-existing-portfile.cmake"
-            jq -e --arg version "$VERSION" \
-              '.name == "ilic" and ."version-string" == $version' \
-              "$RUNNER_TEMP/ilic-existing-vcpkg.json" >/dev/null
-            grep -Fq "REF $SOURCE_SHA" "$RUNNER_TEMP/ilic-existing-portfile.cmake"
-            grep -Fq "SHA512 $SOURCE_SHA512" "$RUNNER_TEMP/ilic-existing-portfile.cmake"
-            echo "ilic $VERSION already exists immutably as git-tree $tree"
+            git -C registry show "$tree:vcpkg.json" > "$RUNNER_TEMP/existing-vcpkg.json"
+            git -C registry show "$tree:portfile.cmake" > "$RUNNER_TEMP/existing-portfile.cmake"
+            jq -e --arg name "$PACKAGE_NAME" --arg version "$VERSION" --argjson port "$port_version" \
+              '.name == $name and ."version-string" == $version and (."port-version" // 0) == $port' "$RUNNER_TEMP/existing-vcpkg.json" >/dev/null
+            grep -Fq "REF $SOURCE_SHA" "$RUNNER_TEMP/existing-portfile.cmake"
+            grep -Fq "SHA512 $SOURCE_SHA512" "$RUNNER_TEMP/existing-portfile.cmake"
+            echo "$PACKAGE_NAME $VERSION#$port_version already exists immutably"
           else
-            node source/scripts/prepare-vcpkg-registry-port.mjs \
-              --template-dir source/vcpkg/ports/ilic \
-              --output-dir registry/ports/ilic \
-              --version "$VERSION" \
-              --source-sha "$SOURCE_SHA" \
-              --sha512 "$SOURCE_SHA512"
-
-            git -C registry add ports/ilic
-            (
-              cd registry
-              "$GITHUB_WORKSPACE/build/vcpkg-version-tool/vcpkg" x-add-version \
-                --x-builtin-ports-root="$PWD/ports" \
-                --x-builtin-registry-versions-dir="$PWD/versions" \
-                ilic \
-                --skip-version-format-check \
-                --verbose
-            )
+            node controller/scripts/prepare-vcpkg-registry-port.mjs \
+              --template-dir "source/vcpkg/ports/$PACKAGE_NAME" \
+              --output-dir "registry/ports/$PACKAGE_NAME" \
+              --package-name "$PACKAGE_NAME" \
+              --version "$VERSION" --port-version "$port_version" \
+              --source-sha "$SOURCE_SHA" --sha512 "$SOURCE_SHA512"
+            cp controller/vcpkg/registry-README.md registry/README.md
+            git -C registry add "ports/$PACKAGE_NAME" README.md
+            (cd registry && "$GITHUB_WORKSPACE/build/vcpkg-version-tool/vcpkg" x-add-version \
+              --x-builtin-ports-root="$PWD/ports" \
+              --x-builtin-registry-versions-dir="$PWD/versions" \
+              "$PACKAGE_NAME" --skip-version-format-check --verbose)
             git -C registry add versions
-
-            baseline_version=$(jq -r '.default.ilic.baseline' registry/versions/baseline.json)
-            if [[ "$baseline_version" != "$VERSION" ]]; then
-              echo "Registry baseline is $baseline_version after publishing $VERSION" >&2
-              exit 1
-            fi
-
+            test "$(jq -r --arg name "$PACKAGE_NAME" '.default[$name].baseline' registry/versions/baseline.json)" = "$VERSION"
+            test "$(jq -r --arg name "$PACKAGE_NAME" '.default[$name]."port-version" // 0' registry/versions/baseline.json)" = "$port_version"
             git -C registry config user.name "github-actions[bot]"
             git -C registry config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git -C registry commit -m "publish ilic $VERSION"
+            git -C registry commit -m "publish $PACKAGE_NAME $VERSION#$port_version"
             git -C registry push origin HEAD:vcpkg-registry
           fi
+          echo "baseline=$(git -C registry rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-          registry_baseline=$(git -C registry rev-parse HEAD)
-          echo "baseline=$registry_baseline" >> "$GITHUB_OUTPUT"
-          echo "Registry baseline: $registry_baseline"
-
-      - name: Request binary-cache publication
-        shell: bash
+      - name: Request ilic binary-cache publication
+        if: steps.request.outputs.package_name == 'ilic'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.metadata.outputs.version }}
-          SOURCE_SHA: ${{ steps.metadata.outputs.source_sha }}
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
           REGISTRY_BASELINE: ${{ steps.registry.outputs.baseline }}
+        shell: bash
         run: |
-          set -euo pipefail
-          jq -n \
-            --arg version "$VERSION" \
-            --arg source_sha "$SOURCE_SHA" \
-            --arg registry_baseline "$REGISTRY_BASELINE" \
-            '{
-              event_type: "vcpkg-version-published",
-              client_payload: {
-                version: $version,
-                source_sha: $source_sha,
-                registry_baseline: $registry_baseline
-              }
-            }' |
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/dispatches" --input -
+          jq -n --arg version "$VERSION" --arg source_sha "$SOURCE_SHA" --arg registry_baseline "$REGISTRY_BASELINE" \
+            '{event_type:"vcpkg-version-published",client_payload:{version:$version,source_sha:$source_sha,registry_baseline:$registry_baseline}}' |
+            gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" --input -

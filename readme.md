@@ -10,8 +10,8 @@ On foreign libraries contained in folder /lib some license restrictions may appl
 ## Release platforms
 
 The current development line is `0.10.0-SNAPSHOT`; the native CLI, C++/C APIs
-and source npm/WASM manifests share that base version. Immutable packaged
-snapshots add a UTC timestamp and optional build ID. See
+and source npm/WASM manifests share that base version. New immutable packaged
+snapshots use `X.Y.Z-snapshot.g<12-character-source-SHA>`. See
 [Versioning](./docs/versioning.md) and the [release runbook](./docs/releasing.md).
 
 The native release workflow produces self-contained compiler archives for

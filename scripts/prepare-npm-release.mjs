@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { appendFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -15,6 +15,8 @@ export async function prepareNpmRelease({
   outputRoot = resolve(projectRoot, "build/npm-release"),
   expectedVersion,
   expectedTag,
+  sourceSha,
+  releaseManifestPath,
 } = {}) {
   projectRoot = resolve(projectRoot);
   outputRoot = resolve(outputRoot);
@@ -40,11 +42,22 @@ export async function prepareNpmRelease({
       );
     }
   }
+  if (!/^[0-9a-f]{40}$/.test(sourceSha ?? "")) {
+    throw new Error("Stable packaging requires --source-sha with a full Git SHA");
+  }
+  if (!releaseManifestPath) {
+    throw new Error("Stable packaging requires --release-manifest");
+  }
+  const releaseManifest = JSON.parse(
+    await readFile(resolve(releaseManifestPath), "utf8"),
+  );
   const staged = await stageCompilerPackages({
     projectRoot,
     outputRoot,
     targetVersion: baseVersion,
     allowedProjectDirectory: "npm-release",
+    sourceSha,
+    releaseManifest,
   });
   return { ...staged, releaseVersion: baseVersion };
 }
@@ -61,6 +74,8 @@ function parseArguments(argv) {
         "--output",
         "--expected-version",
         "--expected-tag",
+        "--source-sha",
+        "--release-manifest",
         "--github-output",
       ].includes(argument)
     ) {
@@ -71,6 +86,8 @@ function parseArguments(argv) {
       else if (argument === "--expected-version") {
         options.expectedVersion = value;
       } else if (argument === "--expected-tag") options.expectedTag = value;
+      else if (argument === "--source-sha") options.sourceSha = value;
+      else if (argument === "--release-manifest") options.releaseManifestPath = resolve(value);
       else githubOutput = value;
     } else {
       throw new Error(`Unknown argument ${argument}`);

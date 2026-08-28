@@ -390,16 +390,22 @@ jobs:
           "$RUNNER_TEMP/emsdk/emsdk" install "$emscripten_version"
           "$RUNNER_TEMP/emsdk/emsdk" activate "$emscripten_version"
       - name: Build WebAssembly package
-        env:
-          ILIC_WASM_VERSION: 0.10.0-SNAPSHOT.20260101000000
         shell: bash
         run: |
           set -euo pipefail
+          snapshot_version=$(python3 scripts/release_metadata.py version --source-sha "$GITHUB_SHA")
+          python3 scripts/release_metadata.py manifest \
+            --artifact-version "$snapshot_version" \
+            --source-sha "$GITHUB_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --published-at "2026-01-01T00:00:00Z" \
+            --toolchain "emscripten-$(tr -d '[:space:]' < .emscripten-version)" \
+            --output build/release/interlis-release.json
+          echo "ILIC_WASM_VERSION=$snapshot_version" >> "$GITHUB_ENV"
+          echo "ILIC_EXPECTED_VERSION=$snapshot_version" >> "$GITHUB_ENV"
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           ./scripts/build-wasm.sh
       - name: Test JavaScript packages
-        env:
-          ILIC_EXPECTED_VERSION: 0.10.0-SNAPSHOT.20260101000000
         run: |
           npm install --prefix packages/tools --no-save --package-lock=false ./packages/repository-core
           npm install --prefix packages/compiler-wasm --no-save --package-lock=false ./packages/repository-core ./packages/tools
@@ -409,9 +415,11 @@ jobs:
           node scripts/check-diagnostic-contract-parity.mjs .
       - name: Verify snapshot package consumers
         run: |
-          node scripts/prepare-npm-snapshot.mjs --timestamp 20260101000000
+          node scripts/prepare-npm-snapshot.mjs \
+            --source-sha "$GITHUB_SHA" \
+            --release-manifest build/release/interlis-release.json
           node scripts/test-npm-packages.mjs \
-            --expected-version 0.10.0-SNAPSHOT.20260101000000 \
+            --expected-version "$ILIC_EXPECTED_VERSION" \
             --version-kind snapshot
 
   diagnostic-quality:

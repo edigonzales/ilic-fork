@@ -12,6 +12,8 @@ import test from "node:test";
 
 import { prepareNpmRelease } from "../../scripts/prepare-npm-release.mjs";
 
+const sourceSha = "0123456789abcdef0123456789abcdef01234567";
+
 async function writeJson(path, value) {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
 }
@@ -71,6 +73,19 @@ async function createFixture(t) {
   return root;
 }
 
+async function releaseOptions(root, extra = {}) {
+  const releaseManifestPath = join(root, "interlis-release.json");
+  await writeJson(releaseManifestPath, {
+    schemaVersion: 1,
+    project: "ilic",
+    artifactVersion: "0.9.10",
+    sourceSha,
+    dependencies: {},
+    build: { githubRunId: "123", publishedAt: "2026-08-28T18:00:00Z" },
+  });
+  return { projectRoot: root, sourceSha, releaseManifestPath, ...extra };
+}
+
 test("stages all stable packages without mutating source manifests", async (t) => {
   const root = await createFixture(t);
   const sourceManifests = [
@@ -81,12 +96,11 @@ test("stages all stable packages without mutating source manifests", async (t) =
   const before = await Promise.all(
     sourceManifests.map((path) => readFile(path, "utf8")),
   );
-  const result = await prepareNpmRelease({
-    projectRoot: root,
+  const result = await prepareNpmRelease(await releaseOptions(root, {
     outputRoot: join(root, "build/npm-release"),
     expectedVersion: "0.9.10",
     expectedTag: "v0.9.10",
-  });
+  }));
   assert.equal(result.releaseVersion, "0.9.10");
   for (const directory of Object.values(result.directories)) {
     assert.equal(
@@ -127,7 +141,7 @@ test("rejects missing WASM artifacts and unsafe output roots", async (t) => {
       const root = await createFixture(subtest);
       await rm(join(root, "packages/compiler-wasm", file));
       await assert.rejects(
-        () => prepareNpmRelease({ projectRoot: root }),
+        async () => prepareNpmRelease(await releaseOptions(root)),
         new RegExp(`Missing .*${file.replace(".", "\\.")}`),
       );
     });
@@ -135,7 +149,7 @@ test("rejects missing WASM artifacts and unsafe output roots", async (t) => {
   const root = await createFixture(t);
   for (const outputRoot of [root, join(root, "packages/tools")]) {
     await assert.rejects(
-      () => prepareNpmRelease({ projectRoot: root, outputRoot }),
+      async () => prepareNpmRelease(await releaseOptions(root, { outputRoot })),
       /refusing|must use/i,
     );
   }
@@ -148,7 +162,7 @@ test("rejects an unapproved internal dependency version", async (t) => {
   manifest.dependencies["@ilic/repository-core"] = "0.9.9";
   await writeJson(path, manifest);
   await assert.rejects(
-    () => prepareNpmRelease({ projectRoot: root }),
+    async () => prepareNpmRelease(await releaseOptions(root)),
     /dependency .* does not match project version/i,
   );
 });
