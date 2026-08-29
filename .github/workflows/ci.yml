@@ -401,6 +401,8 @@ jobs:
             --published-at "2026-01-01T00:00:00Z" \
             --toolchain "emscripten-$(tr -d '[:space:]' < .emscripten-version)" \
             --output build/release/interlis-release.json
+          export ILIC_WASM_VERSION="$snapshot_version"
+          export ILIC_EXPECTED_VERSION="$snapshot_version"
           echo "ILIC_WASM_VERSION=$snapshot_version" >> "$GITHUB_ENV"
           echo "ILIC_EXPECTED_VERSION=$snapshot_version" >> "$GITHUB_ENV"
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"

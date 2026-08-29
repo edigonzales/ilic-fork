@@ -38,7 +38,7 @@ jobs:
           package-manager-cache: false
       - name: Test release and vcpkg version helpers
         run: |
-          python3 -m unittest test/release_metadata_test.py
+          python3 test/release_metadata_test.py
           node --test \
             test/release/CheckReleaseVersionTest.mjs \
             test/release/PrepareVcpkgRegistryPortTest.mjs

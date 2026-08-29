@@ -69,7 +69,7 @@ jobs:
           npm test --prefix packages/repository-core
           npm test --prefix packages/tools
           npm test --prefix packages/compiler-wasm
-          python3 -m unittest test/release_metadata_test.py
+          python3 test/release_metadata_test.py
           node --test test/npm/PrepareNpmSnapshotTest.mjs
       - name: Stage and verify immutable packages
         id: stage
