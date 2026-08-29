@@ -58,14 +58,11 @@ function sha256(bytes) {
 }
 
 function parseSnapshotVersion(version) {
-  const match = /^(\d+\.\d+\.\d+)-SNAPSHOT\.(\d{14})(?:\.(\d+))?$/.exec(version);
+  const match = /^(\d+\.\d+\.\d+)-snapshot\.g([0-9a-f]{12})$/.exec(version);
   if (!match) throw new Error(`Invalid immutable snapshot version ${version}`);
-  const timestamp = match[2];
   return {
-    baseVersion: `${match[1]}-SNAPSHOT`,
-    snapshotId: match[3] ? `${timestamp}.${match[3]}` : timestamp,
-    createdAt: `${timestamp.slice(0, 4)}-${timestamp.slice(4, 6)}-${timestamp.slice(6, 8)}T` +
-      `${timestamp.slice(8, 10)}:${timestamp.slice(10, 12)}:${timestamp.slice(12, 14)}Z`,
+    baseVersion: match[1],
+    sourceShaPrefix: match[2],
   };
 }
 
@@ -80,7 +77,7 @@ async function verifyPackList(directory, expectedName, expectedVersion, versionK
   if (versionKind === "stable") {
     assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
   } else {
-    assert.match(manifest.version, /^\d+\.\d+\.\d+-SNAPSHOT\.\d{14}(?:\.\d+)?$/);
+    assert.match(manifest.version, /^\d+\.\d+\.\d+-snapshot\.g[0-9a-f]{12}$/);
   }
   assert.equal(manifest.author, "edigonzales");
   assert.equal(manifest.license, "MIT");

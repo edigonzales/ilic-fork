@@ -1,10 +1,6 @@
 name: Release native compiler
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
   push:
     tags: ["v*"]

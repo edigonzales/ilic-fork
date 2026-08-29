@@ -1,18 +1,32 @@
 # Versionierungsvertrag
 
-Die numerische Basisversion steht zentral in `project(ilic VERSION …)` in
-`CMakeLists.txt`. Die aktuelle Entwicklungszeile ergänzt den Qualifier
-`SNAPSHOT`; C++, C-ABI, native CLI und die drei eingecheckten npm-Manifeste
-melden deshalb `0.10.0-SNAPSHOT`. `@ilic/tools` hängt exakt von derselben
-Source-Version von `@ilic/repository-core` ab.
+Die numerische Produkt- und API-Basis steht in `project(ilic VERSION …)` in
+`CMakeLists.txt`. Source-Manifeste der Entwicklungszeile melden weiterhin
+`0.10.0-SNAPSHOT`; dies ist keine veröffentlichte Paketversion.
 
-Ein konkretes Snapshot-Artefakt verwendet
-`0.10.0-SNAPSHOT.YYYYMMDDHHmmss` mit optionaler numerischer Build-ID. Ein
-Snapshot-WASM wird mit `ILIC_WASM_VERSION` gebaut, damit der Wrapper und das
-Artefakt dieselbe unveränderliche Identität tragen. Der Präfix muss weiterhin
-der CMake-Basis `0.10.0-SNAPSHOT` entsprechen. Es gibt in dieser
-Entwicklungszeile kein finales `0.10.0` und keinen Release-Tag.
+Neue unveränderliche Artefakte verwenden in npm und vcpkg dieselbe Identität:
 
-`scripts/check-release-version.mjs` prüft die stabilen Quellen und das Tag.
-`prepare-npm-snapshot.mjs` beziehungsweise `prepare-npm-release.mjs` stagen
-nur explizit erlaubte Dateien und verändern keine Quellmanifeste.
+```text
+stabil:    X.Y.Z
+Snapshot:  X.Y.Z-snapshot.g<12 Zeichen des Source-SHA>
+Beispiel:  0.10.0-snapshot.ge901af642470
+```
+
+Der vollständige 40-stellige Git-SHA, GitHub-Run-ID, Publikationszeit und die
+Toolchain stehen in `interlis-release.json`. Datum und Run-ID sind absichtlich
+kein Teil der Version. Derselbe Commit ergibt dadurch deterministisch dieselbe
+Snapshot-Version.
+
+Die drei ilic-npm-Pakete besitzen immer dieselbe Version und exakte interne
+Abhängigkeiten. `snapshot` zeigt auf den jüngsten freigegebenen Vorabstand;
+`latest` wird ausschließlich von einem stabilen `vX.Y.Z`-Tag bewegt.
+
+Snapshots werden nur über einen expliziten koordinierten Workflow-Dispatch
+publiziert. Ein erfolgreicher `main`-Build veröffentlicht nichts automatisch.
+Bestehende Zeitstempel- und kurze vcpkg-Snapshot-Versionen bleiben unverändert
+verfügbar, werden aber nicht mehr neu erzeugt. Reine Änderungen am vcpkg-Port
+verwenden `port-version`, nicht eine neue Upstream-Version.
+
+`scripts/release_metadata.py` prüft und erzeugt Version und Provenance.
+`prepare-npm-snapshot.mjs` und `prepare-npm-release.mjs` stagen nur explizit
+erlaubte Dateien und verändern keine Quellmanifeste.

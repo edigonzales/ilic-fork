@@ -37,18 +37,20 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - name: Test release and vcpkg version helpers
-        run: >-
-          node --test
-          test/release/CheckReleaseVersionTest.mjs
-          test/release/PrepareVcpkgRegistryPortTest.mjs
+        run: |
+          python3 test/release_metadata_test.py
+          node --test \
+            test/release/CheckReleaseVersionTest.mjs \
+            test/release/PrepareVcpkgRegistryPortTest.mjs
       - name: Validate release dispatch contract
         shell: bash
         run: |
           set -euo pipefail
           grep -Fq 'event_type "vcpkg-release-ready"' .github/workflows/release-native.yml
           grep -Fq 'always() && needs.publish-release.result' .github/workflows/release-native.yml
-          grep -Fq 'types: [vcpkg-release-ready]' .github/workflows/vcpkg-version-publish.yml
-          grep -Fq 'event_type: "vcpkg-version-published"' .github/workflows/vcpkg-version-publish.yml
+          grep -Fq 'types: [vcpkg-release-ready, vcpkg-port-publication-requested]' .github/workflows/vcpkg-version-publish.yml
+          grep -Fq 'group: shared-vcpkg-registry-publish' .github/workflows/vcpkg-version-publish.yml
+          grep -Fq 'Request ilic binary-cache publication' .github/workflows/vcpkg-version-publish.yml
           grep -Fq 'types: [vcpkg-version-published]' .github/workflows/vcpkg-binary-cache.yml
       - name: Render the real ilic port with synthetic immutable metadata
         shell: bash
@@ -59,12 +61,12 @@ jobs:
           node scripts/prepare-vcpkg-registry-port.mjs \
             --template-dir vcpkg/ports/ilic \
             --output-dir build/vcpkg-render-smoke/ilic \
-            --version 0.10.0-snapshot.01234567 \
+            --version 0.10.0-snapshot.g0123456789ab \
             --source-sha "$source_sha" \
             --sha512 "$sha512"
           grep -Fq "REF $source_sha" build/vcpkg-render-smoke/ilic/portfile.cmake
           grep -Fq "SHA512 $sha512" build/vcpkg-render-smoke/ilic/portfile.cmake
-          node -e 'const p=require("./build/vcpkg-render-smoke/ilic/vcpkg.json"); if (p["version-string"] !== "0.10.0-snapshot.01234567") process.exit(1)'
+          node -e 'const p=require("./build/vcpkg-render-smoke/ilic/vcpkg.json"); if (p["version-string"] !== "0.10.0-snapshot.g0123456789ab") process.exit(1)'
 
       - name: Check out registry for local smoke test
         uses: actions/checkout@v6
@@ -92,7 +94,7 @@ jobs:
           set -euo pipefail
           source_sha="$GITHUB_SHA"
           base_version=$(sed -nE 's/.*project\(ilic VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
-          version="${base_version}-snapshot.${source_sha:0:8}"
+          version="${base_version}-snapshot.g${source_sha:0:12}"
           sha512=$(printf 'a%.0s' {1..128})
 
           node scripts/prepare-vcpkg-registry-port.mjs \

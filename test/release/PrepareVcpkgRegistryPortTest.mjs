@@ -26,7 +26,7 @@ const portfile = `vcpkg_from_github(
 const manifest = `${JSON.stringify(
   {
     name: "ilic",
-    "version-string": "0.10.0-snapshot.deadbeef",
+    "version-string": "0.10.0-snapshot.gdeadbeefdead",
     description: "Native INTERLIS compiler library",
     license: "MIT",
   },
@@ -39,13 +39,13 @@ test("validates stable and immutable snapshot versions", () => {
     kind: "stable",
     version: "0.10.0",
   });
-  assert.deepEqual(validateRegistryVersion("0.10.0-snapshot.01234567", sourceSha), {
+  assert.deepEqual(validateRegistryVersion("0.10.0-snapshot.g0123456789ab", sourceSha), {
     kind: "snapshot",
-    version: "0.10.0-snapshot.01234567",
+    version: "0.10.0-snapshot.g0123456789ab",
     baseVersion: "0.10.0",
   });
   assert.throws(
-    () => validateRegistryVersion("0.10.0-snapshot.89abcdef", sourceSha),
+    () => validateRegistryVersion("0.10.0-snapshot.g89abcdef0123", sourceSha),
     /does not match source SHA/,
   );
 });
@@ -59,10 +59,10 @@ test("rewrites exactly the source revision and archive digest", () => {
 
 test("rewrites the manifest version without changing the package identity", () => {
   const rewritten = JSON.parse(
-    rewriteManifest(manifest, "0.10.0-snapshot.01234567", sourceSha),
+    rewriteManifest(manifest, "0.10.0-snapshot.g0123456789ab", sourceSha, "ilic"),
   );
   assert.equal(rewritten.name, "ilic");
-  assert.equal(rewritten["version-string"], "0.10.0-snapshot.01234567");
+  assert.equal(rewritten["version-string"], "0.10.0-snapshot.g0123456789ab");
   assert.equal(rewritten.license, "MIT");
 });
 
@@ -82,7 +82,7 @@ test("renders a registry port while preserving auxiliary files", async () => {
     await prepareRegistryPort({
       templateDir,
       outputDir,
-      version: "0.10.0-snapshot.01234567",
+      version: "0.10.0-snapshot.g0123456789ab",
       sourceSha,
       sha512,
     });

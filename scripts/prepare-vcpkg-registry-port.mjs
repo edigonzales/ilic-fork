@@ -21,17 +21,17 @@ export function validateRegistryVersion(version, sourceSha) {
     return { kind: "stable", version };
   }
 
-  const snapshot = /^(\d+\.\d+\.\d+)-snapshot\.([0-9a-f]{8})$/.exec(
+  const snapshot = /^(\d+\.\d+\.\d+)-snapshot\.g([0-9a-f]{12})$/.exec(
     version ?? "",
   );
   if (!snapshot) {
     throw new Error(
-      "vcpkg version must be X.Y.Z or X.Y.Z-snapshot.<8-character-source-sha>",
+      "vcpkg version must be X.Y.Z or X.Y.Z-snapshot.g<12-character-source-sha>",
     );
   }
-  if (snapshot[2] !== sourceSha.slice(0, 8)) {
+  if (snapshot[2] !== sourceSha.slice(0, 12)) {
     throw new Error(
-      `snapshot suffix ${snapshot[2]} does not match source SHA ${sourceSha.slice(0, 8)}`,
+      `snapshot suffix ${snapshot[2]} does not match source SHA ${sourceSha.slice(0, 12)}`,
     );
   }
   return { kind: "snapshot", version, baseVersion: snapshot[1] };
@@ -59,17 +59,22 @@ export function rewritePortfile(portfileText, sourceSha, sha512) {
   );
 }
 
-export function rewriteManifest(manifestText, version, sourceSha) {
+export function rewriteManifest(manifestText, version, sourceSha, packageName, portVersion = 0) {
   validateRegistryVersion(version, sourceSha);
   const manifest = JSON.parse(manifestText);
-  if (manifest.name !== "ilic") {
-    throw new Error(`Expected ilic port manifest, got ${String(manifest.name)}`);
+  if (packageName && manifest.name !== packageName) {
+    throw new Error(`Expected ${packageName} port manifest, got ${String(manifest.name)}`);
   }
 
   for (const field of ["version", "version-semver", "version-date"]) {
     delete manifest[field];
   }
   manifest["version-string"] = version;
+  if (!Number.isInteger(portVersion) || portVersion < 0) {
+    throw new Error("port version must be a non-negative integer");
+  }
+  if (portVersion === 0) delete manifest["port-version"];
+  else manifest["port-version"] = portVersion;
   return `${JSON.stringify(manifest, null, 2)}\n`;
 }
 
@@ -79,6 +84,8 @@ export async function prepareRegistryPort({
   version,
   sourceSha,
   sha512,
+  packageName,
+  portVersion = 0,
 }) {
   templateDir = resolve(templateDir);
   outputDir = resolve(outputDir);
@@ -96,7 +103,7 @@ export async function prepareRegistryPort({
 
   await Promise.all([
     writeFile(portfilePath, rewritePortfile(portfileText, sourceSha, sha512)),
-    writeFile(manifestPath, rewriteManifest(manifestText, version, sourceSha)),
+    writeFile(manifestPath, rewriteManifest(manifestText, version, sourceSha, packageName, portVersion)),
   ]);
 }
 
@@ -108,6 +115,8 @@ function parseArguments(argv) {
     ["--version", "version"],
     ["--source-sha", "sourceSha"],
     ["--sha512", "sha512"],
+    ["--package-name", "packageName"],
+    ["--port-version", "portVersion"],
   ]);
 
   for (let index = 0; index < argv.length; index += 2) {
@@ -120,8 +129,12 @@ function parseArguments(argv) {
     result[key] = value;
   }
 
-  for (const key of supported.values()) {
+  for (const key of ["templateDir", "outputDir", "version", "sourceSha", "sha512"]) {
     if (!result[key]) throw new Error(`Missing required argument ${key}`);
+  }
+  if (result.portVersion !== undefined) {
+    if (!/^\d+$/.test(result.portVersion)) throw new Error("portVersion must be an integer");
+    result.portVersion = Number(result.portVersion);
   }
   return result;
 }

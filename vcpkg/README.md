@@ -15,7 +15,8 @@ The `vcpkg/ports/ilic` port builds the native library package only:
 The CLI and native INTERLIS repository support are disabled because the first
 downstream target (`iox-cpp`) only needs the compiler library.
 
-The in-tree port is also the template used for registry publication. Its
+The in-tree port is an overlay/template at the last verified source revision;
+the registry baseline, not this directory, is the catalogue source of truth. Its
 checked-in source revision remains immutable so local overlay builds are
 reproducible, but published snapshot and release versions are rendered from
 this template with their own immutable source commit and archive SHA512.
@@ -43,21 +44,22 @@ The repository branch `vcpkg-registry` is a git-backed vcpkg registry. A
 consumer selects that branch with the registry `reference` field and pins an
 immutable registry commit in the `baseline` field. Packages not owned by the
 ilic registry continue to come from the pinned builtin vcpkg registry. The
-branch is the shared INTERLIS registry: the iox-cpp publisher adds the
-`iox-cpp` port beside `ilic`, so downstream projects can use one registry
+branch is the shared INTERLIS registry. Only the workflow in `ilic-fork`
+writes it; `iox-cpp` submits validated publication requests. Downstream
+projects can therefore use one registry
 configuration with `packages: ["ilic", "iox-cpp"]`.
 
 Published versions are immutable. Snapshot versions use
-`X.Y.Z-snapshot.<short-source-sha>` and stable tags `vX.Y.Z` publish the vcpkg
+`X.Y.Z-snapshot.g<12-character-source-sha>` and stable tags `vX.Y.Z` publish the vcpkg
 version `X.Y.Z`. Older entries remain in `versions/i-/ilic.json` when the
 baseline advances.
 
-`.github/workflows/vcpkg-version-publish.yml` runs only after a successful
-`Release native compiler` workflow. It:
+`.github/workflows/vcpkg-version-publish.yml` is the serialized writer for
+both native ports. It runs after an explicit coordinated release request and:
 
 1. resolves the exact released source commit and snapshot or stable version,
 2. computes the GitHub source archive SHA512,
-3. renders `ports/ilic` on the `vcpkg-registry` branch,
+3. renders `ports/ilic` or `ports/iox-cpp` on the `vcpkg-registry` branch,
 4. uses `vcpkg x-add-version` to add the new version and advance the baseline,
 5. refuses to rewrite an already published version, and
 6. dispatches binary-cache publication for that exact registry version.

@@ -213,6 +213,8 @@ export async function stageCompilerPackages({
   outputRoot,
   targetVersion,
   allowedProjectDirectory,
+  sourceSha,
+  releaseManifest,
 }) {
   projectRoot = resolve(projectRoot);
   outputRoot = validateOutputRoot(
@@ -220,8 +222,22 @@ export async function stageCompilerPackages({
     outputRoot,
     allowedProjectDirectory,
   );
-  if (!/^\d+\.\d+\.\d+(?:-SNAPSHOT\.\d{14}(?:\.\d+)?)?$/.test(targetVersion)) {
+  if (!/^\d+\.\d+\.\d+(?:-snapshot\.g[0-9a-f]{12})?$/.test(targetVersion)) {
     throw new Error(`Invalid compiler package target version ${targetVersion}`);
+  }
+  if (!/^[0-9a-f]{40}$/.test(sourceSha ?? "")) {
+    throw new Error("sourceSha must be a lowercase 40-character Git SHA");
+  }
+  const snapshot = /-snapshot\.g([0-9a-f]{12})$/.exec(targetVersion);
+  if (snapshot && snapshot[1] !== sourceSha.slice(0, 12)) {
+    throw new Error("snapshot version does not match sourceSha");
+  }
+  if (
+    !releaseManifest ||
+    releaseManifest.artifactVersion !== targetVersion ||
+    releaseManifest.sourceSha !== sourceSha
+  ) {
+    throw new Error("release manifest must match targetVersion and sourceSha");
   }
   const projectVersion = await readProjectVersion(projectRoot);
   const sourceVersion = await readProjectSourceVersion(projectRoot);
@@ -244,9 +260,18 @@ export async function stageCompilerPackages({
     }
     const stagedManifest = rewriteInternalDependencies(manifest, targetVersion);
     stagedManifest.version = targetVersion;
+    stagedManifest.gitHead = sourceSha;
+    stagedManifest.files = [...new Set([
+      ...(stagedManifest.files ?? []),
+      "interlis-release.json",
+    ])];
     await writeFile(
       resolve(destination, "package.json"),
       `${JSON.stringify(stagedManifest, null, 2)}\n`,
+    );
+    await writeFile(
+      resolve(destination, "interlis-release.json"),
+      `${JSON.stringify(releaseManifest, null, 2)}\n`,
     );
     directories[spec.id] = destination;
   }
