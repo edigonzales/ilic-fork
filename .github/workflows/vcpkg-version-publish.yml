@@ -157,13 +157,24 @@ jobs:
           [[ -z "$EXPECTED_SHA512" || "$sha512" == "$EXPECTED_SHA512" ]] || { echo "Archive SHA512 mismatch" >&2; exit 1; }
           echo "sha512=$sha512" >> "$GITHUB_OUTPUT"
 
+      - name: Create vcpkg registry publisher token
+        id: vcpkg-publisher-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.VCPKG_PUBLISHER_APP_ID }}
+          private-key: ${{ secrets.VCPKG_PUBLISHER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ilic-fork
+          permission-contents: write
+
       - name: Check out shared registry
         uses: actions/checkout@v6
         with:
           ref: vcpkg-registry
           path: registry
           fetch-depth: 0
-          token: ${{ github.token }}
+          persist-credentials: true
+          token: ${{ steps.vcpkg-publisher-token.outputs.token }}
 
       - name: Check out pinned vcpkg
         uses: actions/checkout@v6
