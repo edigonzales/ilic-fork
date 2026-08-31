@@ -1,1 +1,4 @@
-This fixture is configured against a staged `cmake --install` result. It proves that downstream C and C++ projects can consume the installed package exclusively through `find_package(ilic CONFIG REQUIRED)` and the `ilic::capi` / `ilic::core` targets.
+Diese Fixture verwendet ein bereitgestelltes `cmake --install`-Ergebnis. Sie
+weist nach, dass nachgelagerte C- und C++-Projekte das installierte Paket allein
+über `find_package(ilic CONFIG REQUIRED)` sowie die Targets `ilic::capi` und
+`ilic::core` konsumieren können.

@@ -1,12 +1,12 @@
-# Shared INTERLIS vcpkg registry
+# Gemeinsames INTERLIS-vcpkg-Registry
 
-This branch contains immutable vcpkg versions for the `ilic` and `iox-cpp`
-ports. The current catalogue state is defined by `versions/baseline.json`;
-this README deliberately does not duplicate individual version numbers.
+Dieser Branch enthält unveränderliche vcpkg-Versionen der Ports `ilic` und
+`iox-cpp`. `versions/baseline.json` definiert den aktuellen Katalogstand; diese
+README dupliziert bewusst keine einzelnen Versionsnummern.
 
-Applications must pin a full registry commit as their baseline. Historical
-entries remain immutable when the baseline advances. New snapshots use
-`X.Y.Z-snapshot.g<12-character-source-SHA>`; packaging-only corrections use
-vcpkg `port-version`.
+Anwendungen müssen ein vollständiges Registry-Commit als Baseline fixieren.
+Historische Einträge bleiben unverändert, wenn die Baseline vorrückt. Neue
+Snapshots verwenden `X.Y.Z-snapshot.g<12-stelliger-Source-SHA>`; reine
+Paketkorrekturen erhöhen die vcpkg-`port-version`.
 
-Only the serialized registry workflow in `ilic-fork` writes this branch.
+Nur der serialisierte Registry-Workflow in `ilic-fork` schreibt diesen Branch.

@@ -1,125 +1,50 @@
-# ilic - INTERLIS Compiler
-Validates [INTERLIS](https://www.interlis.ch) data models. 
-ilic can generate output in several formats (.log, .imd, .ili, .xsd, .gml) from INTERLIS 1.0, 2.3 and 2.4 input models.
-ilic is maintained by [infoGrips Ltd. Zürich](https://www.infogrips.ch).
+# ilic – INTERLIS-Compiler
 
-## License
-Source files and binaries can be copied, changed, integrated in other software (commercial or non commercial) without any license restrictions. 
-On foreign libraries contained in folder /lib some license restrictions may apply (see folder for details).
+`ilic` validiert INTERLIS-1.0-, -2.3- und -2.4-Modelle und erzeugt unter
+anderem ILI-, IMD-, XSD- und GML-Ausgaben. Der Compiler steht als CLI,
+C++-Bibliothek, C-ABI und WebAssembly-Paket zur Verfügung.
 
-## Release platforms
+Dieses Repository ist ein weiterentwickelter Fork des von
+[infoGrips](https://www.infogrips.ch/) geschaffenen und gepflegten
+Originalprojekts. Die historischen Handbücher und Entwicklernotizen unter
+[`doc/`](doc/) stammen teilweise aus diesem Ursprung. Build-, API- und
+Release-Angaben für den Fork stehen ausschliesslich unter [`docs/`](docs/).
 
-The current development line is `0.10.0-SNAPSHOT`; the native CLI, C++/C APIs
-and source npm/WASM manifests share that base version. New immutable packaged
-snapshots use `X.Y.Z-snapshot.g<12-character-source-SHA>`. See
-[Versioning](./docs/versioning.md) and the [release runbook](./docs/releasing.md).
-
-The native release workflow produces self-contained compiler archives for
-macOS ARM64, Linux x86_64 (fully static musl), and Windows x86_64. Runtime
-dependency checks are part of each release job. macOS x86_64 is not a release
-target.
-
-Public downloads are available from [GitHub Releases](https://github.com/edigonzales/ilic-fork/releases):
-
-- stable binaries: [latest release](https://github.com/edigonzales/ilic-fork/releases/latest)
-- current development snapshot: [`snapshot`](https://github.com/edigonzales/ilic-fork/releases/tag/snapshot)
-
-The stable download URLs keep working across releases:
-
-```text
-https://github.com/edigonzales/ilic-fork/releases/latest/download/ilic-macos-arm64.tar.gz
-https://github.com/edigonzales/ilic-fork/releases/latest/download/ilic-linux-x86_64.tar.gz
-https://github.com/edigonzales/ilic-fork/releases/latest/download/ilic-windows-x86_64.zip
-```
-
-Snapshot consumers can replace `latest` with `snapshot`. Snapshot assets are
-updated by manually running the native release workflow and are not intended
-for reproducible production deployments.
-
-## Installation
-In order to install ilic, extract the [.zip](https://www.infogrips.ch/products/ilic.zip) file into a directory.
-
-Current source builds and the three reproducible static-distribution modes are
-documented in [Build und Installation](./docs/build-und-installation.md).
-
-## Building on macOS
-
-To build ilic from source on macOS, the following dependencies are required:
-
-+ Xcode Command Line Tools, including Apple Clang and the C++ standard library
-+ CMake 3.20 or newer
-
-The ANTLR 4.7.1 C++ runtime is included in `lib/antlr4/include` and is compiled
-statically as part of the build. No ANTLR runtime library is required when the
-resulting `ilic` executable is run.
-
-The checked-in generated parser sources are used for a normal build, so Java is
-not required. A Java runtime or JDK is only needed when regenerating the parser
-sources from the grammars. The matching ANTLR 4.7.1 generator is included in
-`lib/antlr4/bin.zip`; do not use a different ANTLR version for this step.
-
-For example, with the CMake app installed in `/Applications/CMake.app`:
+## Schnellstart
 
 ```sh
-/Applications/CMake.app/Contents/bin/cmake -S . -B build/macos \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DBUILD_TESTING=ON
-/Applications/CMake.app/Contents/bin/cmake --build build/macos -j
-/Applications/CMake.app/Contents/bin/ctest \
-  --test-dir build/macos \
-  --output-on-failure
-build/macos/ilic -v
+cmake -S . -B build/local -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+cmake --build build/local --parallel
+ctest --test-dir build/local --output-on-failure
+build/local/ilic -silent docs/examples/models/Legacy.ili
 ```
 
-The CTest suite checks startup/version reporting, validation of a simple model,
-model lookup through `-ilidirs`, XSD output generation, semantic crash
-regressions, and `TRANSLATION OF` validation. The last command should report the
-detected platform, for example `platform=macos64` on Apple Silicon.
+Für reproduzierbare Builds und plattformspezifische Voraussetzungen siehe
+[Build und Installation](docs/build-und-installation.md).
 
-The static library `libantlr4-runtime.a` is a link-time build artifact. It is
-embedded into the `ilic` executable and is not required at runtime. The normal
-build uses only the checked-in generated parser sources and therefore does not
-require Java or an extracted ANTLR JAR.
+## Artefakte
 
-Native repository support uses statically embedded pugixml instead of libxml2.
-Normal developer builds link the system libcurl; release builds compile a
-pinned HTTP(S)-only curl and select the platform TLS backend. Repository support
-can be excluded completely with `-DILIC_ENABLE_NATIVE_REPOSITORY=OFF`.
+- Native CLI-Archive: [GitHub Releases](https://github.com/edigonzales/ilic-fork/releases)
+- JavaScript/WASM: `@ilic/repository-core`, `@ilic/tools` und
+  `@ilic/compiler-wasm` auf npm
+- Native Bibliotheken: gemeinsames vcpkg-Registry und GitHub-Packages-
+  Binary-Cache
 
-### Checking parser regeneration
+Die Beziehungen zu `iox-cpp`, `duckdb-interlis`,
+`interlis-language-tools` und `interlis-web-ide` sind in der
+[Ökosystemübersicht](docs/ecosystem.md) beschrieben. Versionen, Snapshots und
+Releases stehen im [Release-Runbook](docs/release.md).
 
-The parser sources in `source/input/parser/generated` were generated with the
-bundled ANTLR 4.7.1 generator. Parser regeneration is deliberately not part of
-the normal build: it requires Java and can change many generated source files.
+## Dokumentation
 
-To regenerate into a temporary build directory and compare the result with the
-checked-in files, run:
+Der [Dokumentationsindex](docs/README.md) führt zu CLI-, API-, WASM-,
+Repository-, Architektur- und Conformance-Dokumentation. Historische Angaben
+unter `doc/` sind Referenzmaterial und kein aktueller Build- oder
+Releasevertrag.
 
-```sh
-/Applications/CMake.app/Contents/bin/cmake --build build/macos \
-  --target check-parser-regeneration
-```
+## Lizenz
 
-The check extracts only `java/antlr-4.7.1-complete.jar` from
-`lib/antlr4/bin.zip`, writes regenerated files below
-`build/macos/parser-regeneration`, and never overwrites files in the source
-tree. A difference is reported with the affected files; use the exact bundled
-ANTLR version when a grammar change requires an intentional regeneration.
-
-`test/ili23/Roads/RoadsExgm2ien.ili` is included as a regular regression test
-for object-path resolution in graphics and views.
-
-## Documentation
-
-+ current user and developer documentation (German):
-  - start with the [documentation index](./docs/README.md)
-  - use the verified [CLI reference](./docs/cli.md) for command line options
-  - see the [native APIs](./docs/native-api.md) and [WASM SDK](./docs/wasm.md) for embedding
-  - see the [language-tooling snapshots](./docs/language-tooling-snapshots.md) for editor integrations
-  - see the [build and publication pipeline](./docs/build-und-publikationspipeline.md) for CI and the coordinated release train
-  - see [npm publication](./docs/npm-publikation.md) for stable/snapshot package builds and authentication
-+ reference material:
-  - consult the [changelog](./doc/changelog.txt) for historical changes
-  - INTERLIS manuals and legacy documentation remain in `doc/`
-
-+ historical developer notes can be found [here](./doc/dev/readme.md)
+Der ilic-Quellcode und die Binärdateien dürfen ohne Einschränkung kopiert,
+verändert und in kommerzielle oder nichtkommerzielle Software integriert
+werden. Für eingebundene Fremdbibliotheken können die jeweils dort
+aufgeführten Lizenzen gelten.

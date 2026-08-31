@@ -13,7 +13,7 @@ npm install @ilic/compiler-wasm@snapshot
 ```
 
 Die eingecheckte Source-Basis ist `0.10.0-SNAPSHOT`. Ein konkretes Paket erhält
-eine unveränderliche Version wie `0.10.0-SNAPSHOT.20260805143000`.
+eine unveränderliche Version wie `0.10.0-snapshot.g0123456789ab`.
 
 ## Kompilieren und formatieren
 
@@ -69,8 +69,9 @@ console.log(snapshot.references);
 ```
 
 Ein älteres WASM-Modul ohne `_ilic_editor_snapshot` wird standardmässig mit
-einem klaren Versionsfehler abgelehnt. Für eine bewusste Übergangsphase kann
-die reine `SyntaxSnapshot`-Projektion explizit aktiviert werden:
+einem klaren Versionsfehler abgelehnt. Für die bewusste Kompatibilität mit
+einem solchen Modul kann die reine `SyntaxSnapshot`-Projektion explizit
+aktiviert werden:
 
 ```js
 const compiler = await createCompiler({

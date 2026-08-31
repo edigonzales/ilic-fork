@@ -1,9 +1,9 @@
-# Native model consumers
+# Native Konsumenten des Metamodells
 
-`ilic::ModelCompilation` is the small native C++ API for consumers that need the
-compiled `metamodel::MetaModelStore` after compilation. It is additive; existing
-`CompilerSession`, C-ABI, and WASM callers keep their current value-based result
-contracts.
+`ilic::ModelCompilation` ist die kleine native C++-API für Konsumenten, die den
+kompilierten `metamodel::MetaModelStore` nach der Kompilation benötigen. Die API
+ist additiv; bestehende Aufrufer von `CompilerSession`, C-ABI und WASM behalten
+ihre wertbasierten Ergebnisverträge.
 
 ```cpp
 #include "ilic/ModelCompilation.h"
@@ -22,18 +22,18 @@ input.request.roots.push_back("memory:///Example.ili");
 ilic::ModelCompilation compilation(std::move(input));
 if (compilation.success()) {
    const auto &store = compilation.models();
-   // Inspect store-backed model objects while `compilation` is alive.
+   // Store-Objekte nur während der Lebensdauer von `compilation` verwenden.
 }
 ```
 
-The `ModelCompilation` object owns its `SourceManager`, compiler context, and
-metamodel store. The store and all graph pointers returned by it remain valid
-until the owning `ModelCompilation` is destroyed or move-assigned. Results and
-source URI lists are value-based. Duplicate source URIs with different content
-are rejected with `std::invalid_argument`; `models()` throws `std::logic_error`
-for failed compilations.
+Das `ModelCompilation`-Objekt besitzt seinen `SourceManager`, Compiler-Kontext
+und Metamodell-Store. Der Store und alle daraus erhaltenen Graphzeiger bleiben
+gültig, bis die besitzende `ModelCompilation` zerstört oder per Move neu
+zugewiesen wird. Ergebnisse und Source-URI-Listen sind wertbasiert. Doppelte
+Source-URIs mit unterschiedlichem Inhalt führen zu `std::invalid_argument`;
+bei fehlgeschlagener Kompilation wirft `models()` einen `std::logic_error`.
 
-Each instance owns independent state and can run concurrently with other
-instances. A single instance is not a shared mutable session. The API is
-intentionally native-only: it exposes C++ metamodel ownership and therefore is
-not added to the C-ABI or the WASM JSON surface.
+Jede Instanz besitzt unabhängigen Zustand und kann parallel zu anderen
+Instanzen laufen. Eine einzelne Instanz ist keine gemeinsam veränderbare
+Session. Die API bleibt bewusst nativ: Sie exponiert C++-Besitzverhältnisse des
+Metamodells und gehört deshalb weder zur C-ABI noch zur WASM-JSON-Oberfläche.

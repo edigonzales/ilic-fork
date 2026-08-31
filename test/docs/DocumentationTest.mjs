@@ -8,7 +8,7 @@ const retiredConformanceRepository = ["interlis","compiler","conformance"].join(
 const required = [
   "README.md","funktionsumfang.md","build-und-installation.md","cli.md","formatter.md",
   "repositories.md","diagnostik-und-logging.md","native-api.md","wasm.md","conformance.md",
-  "build-und-publikationspipeline.md","npm-publikation.md","examples/README.md"
+  "ecosystem.md","release.md","examples/README.md"
 ];
 for (const file of required) assert.ok(existsSync(join(docsRoot,file)),`missing docs/${file}`);
 
@@ -109,4 +109,10 @@ for (const path of [
 const cli = readFileSync(join(docsRoot,"cli.md"),"utf8");
 for (const actual of ["-no_auto","-no_warnings","-ident","-model_filter"])
   assert.match(cli,new RegExp(actual),`CLI reference must contain ${actual}`);
+const release = readFileSync(join(docsRoot,"release.md"),"utf8");
+assert.match(release,/X\.Y\.Z-snapshot\.g<erste 12 Zeichen/u,
+  "release.md must document the SHA-based snapshot contract");
+const ecosystem = readFileSync(join(docsRoot,"ecosystem.md"),"utf8");
+for (const claim of ["vcpkg-registry","nuget.pkg.github.com/edigonzales/index.json","x64-windows-static","duckdb-interlis"])
+  assert.ok(ecosystem.includes(claim),`ecosystem.md must document ${claim}`);
 console.log(`validated ${checkedMarkdown.length} documentation pages`);

@@ -1,10 +1,10 @@
-# Diagnostic Pipeline
+# Diagnose-Pipeline
 
 Der Diagnosefluss ist ein strukturierter Datenfluss:
 
 ```mermaid
 flowchart LR
-  P[Producer] --> B[Builder oder Adapter]
+  P[Erzeuger] --> B[Builder oder Adapter]
   B --> C[DiagnosticCandidate]
   C --> V[Katalog- und Rangeprüfung]
   V --> D[Dedup und Kaskadenregel]

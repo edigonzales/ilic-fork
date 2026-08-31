@@ -1,4 +1,4 @@
-# Metamodell-Ownership
+# Besitzverhältnisse im Metamodell
 
 `metamodel::MetaModelStore` ist der einzige Owner dynamischer
 `MMObject`-Instanzen. Er erzeugt sie mit `make<T>()` und hält sie in

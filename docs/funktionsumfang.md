@@ -120,7 +120,7 @@ aktiv durch eine Cancel-API gesetzt.
 - Das WASM-Modul enthält kein HTTP-, Dateisystem- oder Cache-Backend.
 - `@ilic/compiler-wasm` und `@ilic/tools` sind für versionierte npm-Snapshots
   vorbereitet. Ihre tatsächliche Verfügbarkeit beginnt nach dem einmaligen
-  [npm-Bootstrap](npm-publikation.md#einmaliger-bootstrap-auf-npm); stabile
+  [npm-Publikation](release.md#npm-authentisierung-und-kontrolle); stabile
   Releases und der Dist-Tag `latest` sind noch nicht eingerichtet.
 - Die CLI enthält einige historische Alias- und Argumentreihenfolge-Eigenheiten,
   die in [Bekannte CLI-Abweichungen](cli.md#bekannte-abweichungen) aufgeführt sind.

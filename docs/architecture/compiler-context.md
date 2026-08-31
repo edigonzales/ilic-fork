@@ -1,4 +1,4 @@
-# CompilerContext
+# Compiler-Kontext
 
 Die Compilerarchitektur trennt drei Lebensdauern: unveränderliche Prozessdaten, eine
 `CompilerSession` mit ihrem `SourceManager` und einen einzelnen
@@ -12,11 +12,11 @@ CompilerSession::Impl
   └── SourceManager
 
 CompilerContext (pro compile/analyze)
-  ├── borrows session SourceManager
-  ├── owns Logger and CompilationSourceStore
-  ├── owns IliFileCatalog
-  ├── owns MetaModelStore
-  └── owns MetaModelBuilder
+  ├── referenziert den SourceManager der Session
+  ├── besitzt Logger und CompilationSourceStore
+  ├── besitzt IliFileCatalog
+  ├── besitzt MetaModelStore
+  └── besitzt MetaModelBuilder
 ```
 
 Untergeordnete Parser, Checker und Generatoren erhalten konkrete Referenzen auf

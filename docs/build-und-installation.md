@@ -197,7 +197,7 @@ node scripts/test-npm-packages.mjs
 ```
 
 Details zu Versionierung, OIDC und Veröffentlichung stehen unter
-[npm-Publikation](npm-publikation.md).
+[Release-Runbook](release.md).
 
 ## Testgruppen
 

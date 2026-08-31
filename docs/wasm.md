@@ -1,6 +1,6 @@
 # WebAssembly, Worker und LSP
 
-[Dokumentationsindex](README.md) · [Build](build-und-installation.md) · [Repositories](repositories.md) · [npm](npm-publikation.md)
+[Dokumentationsindex](README.md) · [Build](build-und-installation.md) · [Repositories](repositories.md) · [Release](release.md)
 
 `@ilic/compiler-wasm` bindet dieselbe C-ABI ein, die auch nativ verfügbar ist.
 Compilersemantik, Formatter und JSON-Vertrag sind daher nicht in JavaScript
@@ -34,7 +34,7 @@ npm install @ilic/compiler-wasm@snapshot
 Im Checkout werden die lokalen Dateien direkt importiert. Reproduzierbare
 lokale Tarballs entstehen über `scripts/prepare-npm-snapshot.mjs` und
 `scripts/test-npm-packages.mjs`; Details stehen unter
-[npm-Publikation](npm-publikation.md).
+[Release-Runbook](release.md).
 
 ## Erste Session
 
