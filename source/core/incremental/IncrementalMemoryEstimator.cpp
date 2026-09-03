@@ -57,6 +57,41 @@ std::size_t diagramBytes(const DiagramProjection &value) noexcept
 
 std::size_t documentationBytes(const DocumentationProjection &value) noexcept
 {
+   const auto rowBytes = [](const DocumentationRow &row) noexcept {
+      return stringBytes(row.name) + stringBytes(row.cardinality)
+         + stringBytes(row.type) + stringBytes(row.description) + stringBytes(row.range);
+   };
+   const auto roleBytes = [](const DocumentationRole &role) noexcept {
+      return stringBytes(role.name) + stringBytes(role.cardinality)
+         + stringBytes(role.type) + stringBytes(role.description);
+   };
+   const auto uniqueBytes = [](const DocumentationUnique &unique) noexcept {
+      std::size_t bytes = stringBytes(unique.scope) + stringBytes(unique.prefix)
+         + stringBytes(unique.where) + stringBytes(unique.origin)
+         + stringBytes(unique.inheritedFrom)
+         + unique.elements.capacity() * sizeof(std::string);
+      for (const auto &element : unique.elements) bytes += stringBytes(element);
+      return bytes;
+   };
+   const auto viewableBytes = [&](const DocumentationViewable &viewable) noexcept {
+      std::size_t bytes = stringBytes(viewable.name) + stringBytes(viewable.kind)
+         + stringBytes(viewable.documentation)
+         + viewable.rows.capacity() * sizeof(DocumentationRow)
+         + viewable.roles.capacity() * sizeof(DocumentationRole)
+         + viewable.uniqueness.capacity() * sizeof(DocumentationUnique);
+      for (const auto &row : viewable.rows) bytes += rowBytes(row);
+      for (const auto &role : viewable.roles) bytes += roleBytes(role);
+      for (const auto &unique : viewable.uniqueness) bytes += uniqueBytes(unique);
+      return bytes;
+   };
+   const auto enumerationBytes = [](const DocumentationEnumeration &enumeration) noexcept {
+      std::size_t bytes = stringBytes(enumeration.name) + stringBytes(enumeration.documentation)
+         + enumeration.entries.capacity() * sizeof(DocumentationEnumerationEntry);
+      for (const auto &entry : enumeration.entries)
+         bytes += stringBytes(entry.value) + stringBytes(entry.documentation)
+            + stringBytes(entry.displayName);
+      return bytes;
+   };
    std::size_t bytes = sizeof(value) + stringBytes(value.title)
       + value.sections.capacity() * sizeof(DocumentationSection)
       + value.models.capacity() * sizeof(DocumentationModel);
@@ -73,16 +108,11 @@ std::size_t documentationBytes(const DocumentationProjection &value) noexcept
          bytes += stringBytes(topic.name) + stringBytes(topic.documentation)
             + topic.viewables.capacity() * sizeof(DocumentationViewable)
             + topic.enumerations.capacity() * sizeof(DocumentationEnumeration);
+         for (const auto &viewable : topic.viewables) bytes += viewableBytes(viewable);
+         for (const auto &enumeration : topic.enumerations) bytes += enumerationBytes(enumeration);
       }
-      for (const auto &viewable : model.viewables) {
-         bytes += stringBytes(viewable.name) + stringBytes(viewable.kind)
-            + stringBytes(viewable.documentation)
-            + viewable.rows.capacity() * sizeof(DocumentationRow);
-      }
-      for (const auto &enumeration : model.enumerations) {
-         bytes += stringBytes(enumeration.name) + stringBytes(enumeration.documentation)
-            + enumeration.entries.capacity() * sizeof(DocumentationEnumerationEntry);
-      }
+      for (const auto &viewable : model.viewables) bytes += viewableBytes(viewable);
+      for (const auto &enumeration : model.enumerations) bytes += enumerationBytes(enumeration);
    }
    return bytes;
 }

@@ -204,14 +204,23 @@ export interface DocumentationSection {
   id: string; title: string; kind: string; text: string; level: number;
 }
 export interface DocumentationRow {
+  name: string; cardinality: string; type: string; description?: string; range?: string;
+}
+export interface DocumentationRole {
   name: string; cardinality: string; type: string; description?: string;
 }
+export interface DocumentationUnique {
+  scope: "global" | "local"; perBasket: boolean; prefix?: string;
+  elements: string[]; where?: string; origin: "direct" | "inherited";
+  inheritedFrom?: string;
+}
 export interface DocumentationViewable {
-  name: string; kind: "class" | "structure" | "view";
+  name: string; kind: "class" | "structure" | "view" | "association";
   isAbstract: boolean; documentation?: string; rows: DocumentationRow[];
+  roles?: DocumentationRole[]; uniqueness?: DocumentationUnique[];
 }
 export interface DocumentationEnumerationEntry {
-  value: string; documentation?: string;
+  value: string; documentation?: string; displayName?: string;
 }
 export interface DocumentationEnumeration {
   name: string; documentation?: string; entries: DocumentationEnumerationEntry[];

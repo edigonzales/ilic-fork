@@ -45,6 +45,98 @@ DOCX werden deshalb in TypeScript erzeugt. Ein Language Service kann den letzten
 erfolgreichen Snapshot als sichtbar veralteten Navigations-/Diagrammstand
 weiterverwenden.
 
+### Dokumentationsprojektion v1
+
+Die Dokumentationsprojektion ist bewusst additiv und stellt die für mehrere
+Darstellungen benötigte Semantik bereit. Die vollständige Struktur ist im
+[versionierten JSON-Schema](../schemas/semantic-snapshot-v1.schema.json)
+beschrieben. Die folgenden Felder sind für DOCX- und HTML-Export relevant:
+
+| Objekt | Feld | Bedeutung |
+| --- | --- | --- |
+| `documentation` | `title`, `sections`, `models` | Projektion der Dokumentationsabschnitte und Modelle |
+| `DocumentationModel` | `title`, `shortDescription` | Modell-Metadaten aus den dokumentierten Metaattributen |
+| `DocumentationViewable` | `kind` | `class`, `structure`, `view` oder `association`; Associations sind eigene Viewables |
+| `DocumentationRow` | `range` | normalisierte Darstellung von Text- und Numeric-Wertebereichen; optional |
+| `DocumentationEnumerationEntry` | `displayName` | Anzeigename aus `ili2db.dispName`; optional, `value` bleibt der Enumerationswert |
+| `DocumentationViewable` | `roles` | Rollen einer Association mit Name, Kardinalität, Zieltyp und Dokumentation |
+| `DocumentationViewable` | `uniqueness` | stabile Liste direkter und geerbter UNIQUE-Definitionen |
+
+Eine `DocumentationUnique` enthält `scope`
+(`global` oder `local`), `perBasket`,
+den optionalen lokalen `prefix`, die geordneten
+Schlüsselpfade `elements`, die optionale
+`where`-Bedingung sowie `origin`
+(`direct` oder `inherited`). Bei geerbten
+Definitionen bezeichnet `inheritedFrom` die Basisklasse.
+UNIQUE-Definitionen werden von der ältesten Basisklasse zur abgeleiteten
+Klasse gesammelt; eine zyklische Vererbung darf die Projektion nicht endlos
+laufen lassen.
+
+Pfade und Bedingungen werden deterministisch als INTERLIS-Text dargestellt.
+Wenn ein Compilerobjekt nicht verlustfrei darstellbar ist, liefert die
+Projektion einen stabilen Fallback-Text. Ein solcher Fallback ist ein
+fachlicher Wert und kein Grund, den gesamten Snapshot oder Export abzubrechen.
+Die bestehenden Navigationszeilen an Klassen bleiben neben den eigenständigen
+Association-Viewables erhalten.
+
+Die neuen Felder ändern weder `schemaVersion` noch
+`abiVersion`: Beide bleiben bei `1`. Konsumenten
+müssen die neuen Felder ignorieren können und optionale Felder weiterhin als
+fehlend behandeln; Produzenten dürfen die Felder in Snapshot-v1-Ergebnissen
+ergänzen. Die JSON-Schema-Version ist unabhängig von der nativen ABI-Version.
+`@ilic/docx` konsumiert diese Projektion und ist für Seitenformat,
+Tabellenbreiten und die konkrete Darstellung zuständig.
+
+Ein minimales Beispiel der neuen Dokumentationsfelder:
+
+~~~json
+{
+  "schemaVersion": 1,
+  "abiVersion": 1,
+  "kind": "semantic",
+  "documentation": {
+    "title": "Beispiel",
+    "sections": [],
+    "models": [{
+      "name": "Example",
+      "uri": "memory:///Example.ili",
+      "title": "Beispielmodell",
+      "shortDescription": "Kurzbeschreibung",
+      "topics": [{
+        "name": "Data",
+        "documentation": "Fachdaten",
+        "viewables": [{
+          "name": "Link",
+          "kind": "association",
+          "isAbstract": false,
+          "documentation": "Verknüpfung",
+          "rows": [],
+          "roles": [{
+            "name": "source",
+            "cardinality": "1",
+            "type": "Source",
+            "description": "Quellobjekt"
+          }],
+          "uniqueness": [{
+            "scope": "global",
+            "perBasket": false,
+            "prefix": "",
+            "elements": ["source", "target"],
+            "where": "",
+            "origin": "direct",
+            "inheritedFrom": ""
+          }]
+        }],
+        "enumerations": []
+      }],
+      "viewables": [],
+      "enumerations": []
+    }]
+  }
+}
+~~~
+
 ## Versionierung und Kompatibilität
 
 Die Snapshot-Schemas beginnen bei Version `1`. Konsumenten müssen unbekannte

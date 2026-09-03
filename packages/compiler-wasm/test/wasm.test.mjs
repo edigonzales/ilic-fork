@@ -109,6 +109,7 @@ END WasmModel.
         cardinality: "0..1",
         type: "Text",
         description: "",
+        range: "TEXT",
       },
     );
 

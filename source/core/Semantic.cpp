@@ -5,6 +5,7 @@
 #include "../metamodel/SemanticChecker.h"
 
 #include <algorithm>
+#include <cctype>
 #include <functional>
 #include <map>
 #include <set>
@@ -68,6 +69,8 @@ void enumValues(metamodel::EnumType *type,std::vector<std::string> &values)
    visit(type->TopNode,"");
 }
 
+std::string metaAttributeValue(metamodel::MetaElement *element,const std::string &name);
+
 void documentationInlineEnumValues(metamodel::EnumNode *node,
    const std::string &prefix,std::vector<std::string> &values)
 {
@@ -75,9 +78,239 @@ void documentationInlineEnumValues(metamodel::EnumNode *node,
    for (auto *child : node->Node) {
       if (child == nullptr) continue;
       const std::string value = join(prefix,child->Name);
-      if (child->Node.empty() && !value.empty()) values.push_back(value);
+      if (child->Node.empty() && !value.empty()) {
+         const std::string displayName = metaAttributeValue(child,"ili2db.dispName");
+         values.push_back(displayName.empty() ? value : value + " (" + displayName + ")");
+      }
       documentationInlineEnumValues(child,value,values);
    }
+}
+
+std::string metaAttributeValue(metamodel::MetaElement *element,const std::string &name)
+{
+   if (element == nullptr) return "";
+   for (auto *attribute : element->MetaAttribute) {
+      if (attribute != nullptr && attribute->Name == name)
+         return attribute->Value;
+   }
+   return "";
+}
+
+std::string trim(const std::string &value)
+{
+   std::size_t begin = 0;
+   while (begin < value.size() && std::isspace(static_cast<unsigned char>(value[begin]))) ++begin;
+   std::size_t end = value.size();
+   while (end > begin && std::isspace(static_cast<unsigned char>(value[end - 1]))) --end;
+   return value.substr(begin,end - begin);
+}
+
+std::string normalizePath(const std::string &value)
+{
+   std::string result;
+   std::size_t begin = 0;
+   while (begin <= value.size()) {
+      const std::size_t end = value.find("->",begin);
+      const std::string part = trim(value.substr(begin,end == std::string::npos ? end : end - begin));
+      if (!part.empty()) {
+         if (!result.empty()) result += "->";
+         result += part;
+      }
+      if (end == std::string::npos) break;
+      begin = end + 2;
+   }
+   return result;
+}
+
+std::vector<std::string> splitTrimmed(const std::string &value,char separator)
+{
+   std::vector<std::string> result;
+   std::size_t begin = 0;
+   while (begin <= value.size()) {
+      const std::size_t end = value.find(separator,begin);
+      const std::string part = trim(value.substr(begin,end == std::string::npos ? end : end - begin));
+      if (!part.empty()) result.push_back(part);
+      if (end == std::string::npos) break;
+      begin = end + 1;
+   }
+   return result;
+}
+
+metamodel::Type *rangeType(metamodel::Type *type)
+{
+   if (type == nullptr) return nullptr;
+   if (auto *multi = dynamic_cast<metamodel::MultiValue *>(type))
+      return rangeType(multi->BaseType);
+
+   std::set<metamodel::Type *> visited;
+   auto *current = type;
+   while (current != nullptr && visited.insert(current).second) {
+      if (dynamic_cast<metamodel::TextType *>(current) != nullptr ||
+          dynamic_cast<metamodel::NumType *>(current) != nullptr)
+         return current;
+      current = dynamic_cast<metamodel::Type *>(current->Super);
+   }
+   return nullptr;
+}
+
+std::string documentationRange(metamodel::Type *type)
+{
+   auto *real = rangeType(type);
+   if (auto *text = dynamic_cast<metamodel::TextType *>(real)) {
+      std::string result;
+      switch (text->Kind) {
+         case metamodel::TextType::MText: result = "MTEXT"; break;
+         case metamodel::TextType::Text: result = "TEXT"; break;
+         case metamodel::TextType::NameVal: result = "NAME"; break;
+         case metamodel::TextType::Uri: result = "URI"; break;
+      }
+      if (text->MaxLength > 0) result += "*" + std::to_string(text->MaxLength);
+      return result;
+   }
+   if (auto *numeric = dynamic_cast<metamodel::NumType *>(real)) {
+      if (numeric->Min.empty() && numeric->Max.empty()) return "";
+      return numeric->Min + ".." + numeric->Max;
+   }
+   return "";
+}
+
+std::string documentationPath(metamodel::PathOrInspFactor *path)
+{
+   if (path == nullptr) return "[Pfad nicht darstellbar]";
+   const std::string parsed = normalizePath(path->_path);
+   if (!parsed.empty()) return parsed;
+
+   std::string result;
+   for (auto *element : path->PathEls) {
+      if (element == nullptr || element->Ref == nullptr || element->Ref->Name.empty()) continue;
+      if (!result.empty()) result += "->";
+      result += element->Ref->Name;
+   }
+   return result.empty() ? "[Pfad nicht darstellbar]" : result;
+}
+
+std::string documentationExpression(metamodel::Expression *expression)
+{
+   if (expression == nullptr) return "[Bedingung nicht darstellbar]";
+   if (auto *constant = dynamic_cast<metamodel::Constant *>(expression)) {
+      if (constant->Kind == metamodel::Constant::Text)
+         return "\"" + constant->Value + "\"";
+      if (constant->Kind == metamodel::Constant::Enumeration)
+         return "#" + constant->Value;
+      return constant->Value;
+   }
+   if (auto *path = dynamic_cast<metamodel::PathOrInspFactor *>(expression))
+      return documentationPath(path);
+   if (auto *call = dynamic_cast<metamodel::FunctionCall *>(expression)) {
+      std::string result = call->Function == nullptr ? "FUNCTION" : call->Function->Name;
+      result += "(";
+      bool first = true;
+      for (auto *argument : call->Arguments) {
+         if (!first) result += ", ";
+         result += argument == nullptr || argument->Expression == nullptr
+            ? "[Argument nicht darstellbar]" : documentationExpression(argument->Expression);
+         first = false;
+      }
+      return result + ")";
+   }
+   if (auto *parameter = dynamic_cast<metamodel::RuntimeParamRef *>(expression))
+      return "PARAMETER " + (parameter->RuntimeParam == nullptr ? "???" : parameter->RuntimeParam->Name);
+   if (auto *classConstant = dynamic_cast<metamodel::ClassConst *>(expression))
+      return ">" + (classConstant->Class == nullptr ? "???" : metamodel::get_path(classConstant->Class));
+   if (auto *attributeConstant = dynamic_cast<metamodel::AttributeConst *>(expression))
+      return ">>" + (attributeConstant->Attribute == nullptr ? "???" : attributeConstant->Attribute->Name);
+   if (auto *unit = dynamic_cast<metamodel::UnitRef *>(expression))
+      return unit->Unit == nullptr ? "[Einheit nicht darstellbar]" : metamodel::get_path(unit->Unit);
+   if (auto *unitFunction = dynamic_cast<metamodel::UnitFunction *>(expression))
+      return unitFunction->getClass();
+   if (auto *unary = dynamic_cast<metamodel::UnaryExpr *>(expression)) {
+      const std::string prefix = unary->Operation == metamodel::UnaryExpr::Not ? "NOT(" :
+         unary->Operation == metamodel::UnaryExpr::Defined ? "DEFINED(" : "";
+      const std::string value = documentationExpression(unary->SubExpression);
+      return prefix.empty() ? value : prefix + value + ")";
+   }
+   if (auto *compound = dynamic_cast<metamodel::CompoundExpr *>(expression)) {
+      std::string operation;
+      switch (compound->Operation) {
+         case metamodel::CompoundExpr_OperationType::Implication: operation = " -> "; break;
+         case metamodel::CompoundExpr_OperationType::And: operation = " AND "; break;
+         case metamodel::CompoundExpr_OperationType::Or: operation = " OR "; break;
+         case metamodel::CompoundExpr_OperationType::Plus: operation = " + "; break;
+         case metamodel::CompoundExpr_OperationType::Minus: operation = " - "; break;
+         case metamodel::CompoundExpr_OperationType::Mult: operation = " * "; break;
+         case metamodel::CompoundExpr_OperationType::Div: operation = " / "; break;
+         case metamodel::CompoundExpr_OperationType::Relation_Equal: operation = " == "; break;
+         case metamodel::CompoundExpr_OperationType::Relation_NotEqual: operation = " != "; break;
+         case metamodel::CompoundExpr_OperationType::Relation_LessOrEqual: operation = " <= "; break;
+         case metamodel::CompoundExpr_OperationType::Relation_GreaterOrEqual: operation = " >= "; break;
+         case metamodel::CompoundExpr_OperationType::Relation_Less: operation = " < "; break;
+         case metamodel::CompoundExpr_OperationType::Relation_Greater: operation = " > "; break;
+      }
+      std::string result;
+      bool first = true;
+      for (auto *part : compound->SubExpressions) {
+         if (!first) result += operation;
+         result += documentationExpression(part);
+         first = false;
+      }
+      return result.empty() ? "[Bedingung nicht darstellbar]" : result;
+   }
+   return "[Bedingung nicht darstellbar]";
+}
+
+void appendUniqueDefinition(DocumentationUnique &result,metamodel::UniqueConstraint *constraint)
+{
+   if (constraint == nullptr) return;
+   if (constraint->Kind == metamodel::UniqueConstraint::LocalU) {
+      const std::string value = constraint->UniqueDef.empty() || *constraint->UniqueDef.begin() == nullptr
+         ? "" : (*constraint->UniqueDef.begin())->_path;
+      const std::size_t separator = value.find(':');
+      if (separator == std::string::npos) {
+         result.elements = splitTrimmed(value,',');
+      }
+      else {
+         result.prefix = normalizePath(value.substr(0,separator));
+         result.elements = splitTrimmed(value.substr(separator + 1),',');
+      }
+      return;
+   }
+   for (auto *path : constraint->UniqueDef)
+      result.elements.push_back(documentationPath(path));
+}
+
+std::vector<DocumentationUnique> documentationUniqueness(metamodel::Class *viewable)
+{
+   std::vector<DocumentationUnique> result;
+   if (viewable == nullptr) return result;
+
+   std::vector<metamodel::Class *> inheritance;
+   std::set<metamodel::Class *> visited;
+   auto *current = viewable;
+   while (current != nullptr && visited.insert(current).second) {
+      inheritance.insert(inheritance.begin(),current);
+      current = dynamic_cast<metamodel::Class *>(current->Super);
+   }
+
+   for (auto *source : inheritance) {
+      if (source == nullptr) continue;
+      for (auto *constraint : source->Constraints) {
+         auto *unique = dynamic_cast<metamodel::UniqueConstraint *>(constraint);
+         if (unique == nullptr) continue;
+         DocumentationUnique entry;
+         entry.scope = unique->Kind == metamodel::UniqueConstraint::LocalU ? "local" : "global";
+         entry.perBasket = unique->PerBasket;
+         entry.origin = source == viewable ? "direct" : "inherited";
+         if (source != viewable) entry.inheritedFrom = metamodel::get_path(source);
+         appendUniqueDefinition(entry,unique);
+         for (auto *where : unique->Where) {
+            const std::string value = documentationExpression(where);
+            if (!entry.where.empty()) entry.where += " AND ";
+            entry.where += value;
+         }
+         result.push_back(std::move(entry));
+      }
+   }
+   return result;
 }
 
 std::string documentation(metamodel::MetaElement *element)
@@ -258,8 +491,13 @@ void appendDocumentationEnumEntries(
       if (child == nullptr) continue;
       const std::string value = join(prefix,child->Name);
       const bool hasChildren = !child->Node.empty();
-      if (!hasChildren || includeIntermediate)
-         entries.push_back({value,documentation(child)});
+      if (!hasChildren || includeIntermediate) {
+         DocumentationEnumerationEntry entry;
+         entry.value = value;
+         entry.documentation = documentation(child);
+         entry.displayName = metaAttributeValue(child,"ili2db.dispName");
+         entries.push_back(std::move(entry));
+      }
       appendDocumentationEnumEntries(entries,child,value,includeIntermediate);
    }
 }
@@ -306,6 +544,7 @@ DocumentationViewable documentationViewable(metamodel::Class *viewable,
       row.cardinality = cardinality(metamodel::attributeCardinality(attribute->Type));
       row.type = documentationTypeName(attribute->Type);
       row.description = documentation(attribute);
+      row.range = documentationRange(attribute->Type);
       std::vector<std::string> inlineValues;
       inlineEnumerationValues(attribute->Type,inlineValues);
       if (!inlineValues.empty()) {
@@ -316,6 +555,16 @@ DocumentationViewable documentationViewable(metamodel::Class *viewable,
          }
       }
       result.rows.push_back(std::move(row));
+   }
+
+   for (auto *role : viewable->Role) {
+      if (role == nullptr) continue;
+      DocumentationRole documentationRole;
+      documentationRole.name = role->Name.empty() ? "role" : role->Name;
+      documentationRole.cardinality = cardinality(metamodel::effectiveRoleCardinality(role));
+      documentationRole.type = role->_baseclass == nullptr ? "Reference" : role->_baseclass->Name;
+      documentationRole.description = documentation(role);
+      result.roles.push_back(std::move(documentationRole));
    }
 
    std::sort(result.rows.begin(), result.rows.end(), [](const auto &left, const auto &right) {
@@ -343,6 +592,7 @@ DocumentationViewable documentationViewable(metamodel::Class *viewable,
          addRole(right,left);
       }
    }
+   result.uniqueness = documentationUniqueness(viewable);
    return result;
 }
 
@@ -352,7 +602,7 @@ std::vector<DocumentationViewable> documentationViewables(metamodel::Package *sc
    if (scope == nullptr) return result;
    for (auto *element : scope->Element) {
       auto *viewable = dynamic_cast<metamodel::Class *>(element);
-      if (viewable == nullptr || viewable->Kind == metamodel::Class::Association)
+      if (viewable == nullptr)
          continue;
       result.push_back(documentationViewable(viewable,scope));
    }

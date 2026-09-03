@@ -95,6 +95,9 @@ END AbiModel.
    ILIC_REQUIRE(combined.find("\"cardinality\":\"0..1\"") != std::string::npos);
    ILIC_REQUIRE(combined.find("\"declaringType\":\"\"") != std::string::npos);
    ILIC_REQUIRE(combined.find("\"inlineEnumValues\":[]") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"range\":\"TEXT\"") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"roles\":[]") != std::string::npos);
+   ILIC_REQUIRE(combined.find("\"uniqueness\":[]") != std::string::npos);
    ILIC_REQUIRE(combined.find("\"operations\":[]") != std::string::npos);
    ILIC_REQUIRE(combined.find("\"stereotypes\":") != std::string::npos);
    ILIC_REQUIRE(combined.find("\"syntax\":[{") != std::string::npos);

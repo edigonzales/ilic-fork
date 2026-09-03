@@ -130,10 +130,24 @@ Value documentationViewable(const DocumentationViewable &viewable)
    Value::Array rows;
    for (const auto &row : viewable.rows)
       rows.push_back(Value::Object{{"name",row.name},{"cardinality",row.cardinality},
-         {"type",row.type},{"description",row.description}});
+         {"type",row.type},{"range",row.range},{"description",row.description}});
+   Value::Array roles;
+   for (const auto &role : viewable.roles)
+      roles.push_back(Value::Object{{"name",role.name},{"cardinality",role.cardinality},
+         {"type",role.type},{"description",role.description}});
+   Value::Array uniqueness;
+   for (const auto &unique : viewable.uniqueness) {
+      Value::Array elements;
+      for (const auto &element : unique.elements) elements.emplace_back(element);
+      uniqueness.push_back(Value::Object{{"scope",unique.scope},{"perBasket",unique.perBasket},
+         {"prefix",unique.prefix},{"elements",std::move(elements)},
+         {"where",unique.where},{"origin",unique.origin},
+         {"inheritedFrom",unique.inheritedFrom}});
+   }
    return Value::Object{{"name",viewable.name},{"kind",viewable.kind},
       {"isAbstract",viewable.isAbstract},{"documentation",viewable.documentation},
-      {"rows",std::move(rows)}};
+      {"rows",std::move(rows)},{"roles",std::move(roles)},
+      {"uniqueness",std::move(uniqueness)}};
 }
 
 Value documentationEnumeration(const DocumentationEnumeration &enumeration)
@@ -141,7 +155,7 @@ Value documentationEnumeration(const DocumentationEnumeration &enumeration)
    Value::Array entries;
    for (const auto &entry : enumeration.entries)
       entries.push_back(Value::Object{{"value",entry.value},
-         {"documentation",entry.documentation}});
+         {"displayName",entry.displayName},{"documentation",entry.documentation}});
    return Value::Object{{"name",enumeration.name},
       {"documentation",enumeration.documentation},{"entries",std::move(entries)}};
 }

@@ -183,6 +183,12 @@ Resultat hat `kind: "editor"` und enthält `recovered` sowie `complete`.
 
 `ilic_abi_version()` liefert derzeit `1`. ABI-Version und JSON-`schemaVersion`
 werden unabhängig voneinander versioniert.
+Additive JSON-Felder, einschliesslich der Felder der
+Semantic-Dokumentationsprojektion, ändern die ABI nicht. Der aktuelle
+Snapshot-Vertrag ist im
+[Snapshot-Dokument](language-tooling-snapshots.md) und im
+[Semantic-v1-Schema](../schemas/semantic-snapshot-v1.schema.json)
+versioniert beschrieben.
 
 ## Compilation Request JSON v1
 

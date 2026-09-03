@@ -88,6 +88,24 @@ struct DocumentationRow {
    std::string cardinality;
    std::string type;
    std::string description;
+   std::string range;
+};
+
+struct DocumentationRole {
+   std::string name;
+   std::string cardinality;
+   std::string type;
+   std::string description;
+};
+
+struct DocumentationUnique {
+   std::string scope;
+   bool perBasket = false;
+   std::string prefix;
+   std::vector<std::string> elements;
+   std::string where;
+   std::string origin;
+   std::string inheritedFrom;
 };
 
 struct DocumentationViewable {
@@ -96,11 +114,14 @@ struct DocumentationViewable {
    bool isAbstract = false;
    std::string documentation;
    std::vector<DocumentationRow> rows;
+   std::vector<DocumentationRole> roles;
+   std::vector<DocumentationUnique> uniqueness;
 };
 
 struct DocumentationEnumerationEntry {
    std::string value;
    std::string documentation;
+   std::string displayName;
 };
 
 struct DocumentationEnumeration {

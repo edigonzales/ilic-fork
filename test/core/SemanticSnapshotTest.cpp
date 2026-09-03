@@ -133,11 +133,22 @@ END Semantic.
       }));
    ILIC_REQUIRE(std::any_of(itemDocumentation->rows.begin(),itemDocumentation->rows.end(),
       [](const auto &row) {
-         return row.name == "Code" && row.description == "";
+         return row.name == "Code" && row.description == "" && row.range == "TEXT*20";
+      }));
+   const auto linkDocumentation = std::find_if(
+      documentationModel.topics.front().viewables.begin(),
+      documentationModel.topics.front().viewables.end(),
+      [](const auto &viewable) { return viewable.name == "Link"; });
+   ILIC_REQUIRE(linkDocumentation != documentationModel.topics.front().viewables.end());
+   ILIC_REQUIRE(linkDocumentation->kind == "association");
+   ILIC_REQUIRE(linkDocumentation->roles.size() == 2);
+   ILIC_REQUIRE(std::any_of(linkDocumentation->roles.begin(),linkDocumentation->roles.end(),
+      [](const auto &role) {
+         return role.name == "left" && role.cardinality == "1" && role.type == "Item";
       }));
    ILIC_REQUIRE(std::none_of(documentationModel.topics.front().viewables.begin(),
       documentationModel.topics.front().viewables.end(),
-      [](const auto &viewable) { return viewable.name == "Link"; }));
+      [](const auto &viewable) { return viewable.name == "Missing"; }));
    const auto baseDocumentation = std::find_if(
       documentationModel.topics.front().viewables.begin(),
       documentationModel.topics.front().viewables.end(),
@@ -147,6 +158,118 @@ END Semantic.
       [](const auto &row) {
          return row.name == "Name" && row.description == "Base name documentation";
       }));
+
+   ilic::CompilerSession documentationSession;
+   const std::string documentationUri = "memory:///DocTest.ili";
+   documentationSession.putSource(documentationUri,R"ili(INTERLIS 2.4;
+!!@ title="Model Title"
+!!@ shortDescription="Model short description"
+MODEL DocTest (en)
+AT "https://example.invalid/DocTest.ili"
+VERSION "2024-01-01" =
+  TOPIC DocTopic =
+    DOMAIN RoofColor = (
+      !!@ ili2db.dispName=Rot
+      rot (
+        !!@ ili2db.dispName=Hellrot
+        hell, dunkel
+      ),
+      blau
+    );
+    DOMAIN AllRoofColors = ALL OF RoofColor;
+    STRUCTURE Address =
+      Street : MANDATORY TEXT*50;
+    END Address;
+    CLASS UniqueBase =
+      BaseCode : TEXT*10;
+    UNIQUE BaseCode;
+    END UniqueBase;
+    CLASS UniqueChild EXTENDS UniqueBase =
+      ChildName : TEXT*10;
+    UNIQUE (BASKET) ChildName;
+    END UniqueChild;
+    CLASS Building =
+      Name : MANDATORY TEXT*20;
+      Score : 0..10;
+      Address : Address;
+      RoofColor : RoofColor;
+      Status : (
+        !!@ ili2db.dispName=Geplant
+        geplant,
+        beschlossen_verfuegt,
+        abgerissen
+      );
+    UNIQUE (LOCAL) Address : Street;
+    UNIQUE Name;
+    UNIQUE Name, Score;
+    UNIQUE WHERE Score == 0 : Name, Score;
+    END Building;
+    ASSOCIATION BuildingLink =
+      /** Left role documentation */
+      Left -- {0..*} Building;
+      /** Right role documentation */
+      Right -- {0..*} Building;
+      /** Link code documentation */
+      LinkCode : TEXT*5;
+    UNIQUE Left->Name, Right->Score;
+    END BuildingLink;
+  END DocTopic;
+END DocTest.
+)ili",1);
+   ilic::CompilationRequest documentationRequest;
+   documentationRequest.roots = {documentationUri};
+   const ilic::SemanticSnapshot documentationSnapshot =
+      documentationSession.analyze(documentationRequest);
+   ILIC_REQUIRE(documentationSnapshot.success);
+   ILIC_REQUIRE(documentationSnapshot.documentation.models.size() == 1);
+   const auto &richModel = documentationSnapshot.documentation.models.front();
+   ILIC_REQUIRE(richModel.title == "Model Title");
+   ILIC_REQUIRE(richModel.shortDescription == "Model short description");
+   ILIC_REQUIRE(richModel.topics.size() == 1);
+   const auto &richTopic = richModel.topics.front();
+   const auto richBuilding = std::find_if(richTopic.viewables.begin(),richTopic.viewables.end(),
+      [](const auto &viewable) { return viewable.name == "Building"; });
+   ILIC_REQUIRE(richBuilding != richTopic.viewables.end());
+   const auto scoreRow = std::find_if(richBuilding->rows.begin(),richBuilding->rows.end(),
+      [](const auto &row) { return row.name == "Score"; });
+   ILIC_REQUIRE(scoreRow != richBuilding->rows.end());
+   ILIC_REQUIRE(scoreRow->range == "0..10");
+   const auto statusRow = std::find_if(richBuilding->rows.begin(),richBuilding->rows.end(),
+      [](const auto &row) { return row.name == "Status"; });
+   ILIC_REQUIRE(statusRow != richBuilding->rows.end());
+   ILIC_REQUIRE(statusRow->description ==
+      "geplant (Geplant), beschlossen_verfuegt, abgerissen");
+   ILIC_REQUIRE(richBuilding->uniqueness.size() == 4);
+   ILIC_REQUIRE(richBuilding->uniqueness.front().scope == "local");
+   ILIC_REQUIRE(richBuilding->uniqueness.front().prefix == "Address");
+   ILIC_REQUIRE(richBuilding->uniqueness.front().elements == std::vector<std::string>{"Street"});
+   ILIC_REQUIRE(richBuilding->uniqueness.front().origin == "direct");
+   const auto richAssociation = std::find_if(richTopic.viewables.begin(),richTopic.viewables.end(),
+      [](const auto &viewable) { return viewable.name == "BuildingLink"; });
+   ILIC_REQUIRE(richAssociation != richTopic.viewables.end());
+   ILIC_REQUIRE(richAssociation->kind == "association");
+   ILIC_REQUIRE(richAssociation->roles.size() == 2);
+   ILIC_REQUIRE(std::any_of(richAssociation->roles.begin(),richAssociation->roles.end(),
+      [](const auto &role) {
+         return role.name == "Left" && role.type == "Building" &&
+            role.description == "Left role documentation";
+      }));
+   ILIC_REQUIRE(richAssociation->rows.size() == 1);
+   ILIC_REQUIRE(richAssociation->rows.front().range == "TEXT*5");
+   ILIC_REQUIRE(richAssociation->uniqueness.size() == 1);
+   const auto allRoofColors = std::find_if(richTopic.enumerations.begin(),richTopic.enumerations.end(),
+      [](const auto &enumeration) { return enumeration.name == "AllRoofColors"; });
+   ILIC_REQUIRE(allRoofColors != richTopic.enumerations.end());
+   ILIC_REQUIRE(allRoofColors->entries.size() == 4);
+   ILIC_REQUIRE(allRoofColors->entries.front().value == "rot");
+   ILIC_REQUIRE(allRoofColors->entries.front().displayName == "Rot");
+   const auto richChild = std::find_if(richTopic.viewables.begin(),richTopic.viewables.end(),
+      [](const auto &viewable) { return viewable.name == "UniqueChild"; });
+   ILIC_REQUIRE(richChild != richTopic.viewables.end());
+   ILIC_REQUIRE(richChild->uniqueness.size() == 2);
+   ILIC_REQUIRE(richChild->uniqueness.front().origin == "inherited");
+   ILIC_REQUIRE(richChild->uniqueness.front().inheritedFrom == "DocTest.DocTopic.UniqueBase");
+   ILIC_REQUIRE(richChild->uniqueness.back().perBasket);
 
    ilic::CompilerSession extendedSession;
    const std::string extendedUri = "memory:///Extended.ili";
