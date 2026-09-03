@@ -1,7 +1,7 @@
 {
   "default": {
     "ilic": {
-      "baseline": "0.10.0-snapshot.e901af64",
+      "baseline": "0.10.0-snapshot.gc601f1c9d88e",
       "port-version": 0
     },
     "iox-cpp": {

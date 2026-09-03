@@ -1,13 +1,12 @@
-# INTERLIS vcpkg registry
+# Gemeinsames INTERLIS-vcpkg-Registry
 
-This branch is a Git-backed vcpkg registry for native INTERLIS packages.
+Dieser Branch enthält unveränderliche vcpkg-Versionen der Ports `ilic` und
+`iox-cpp`. `versions/baseline.json` definiert den aktuellen Katalogstand; diese
+README dupliziert bewusst keine einzelnen Versionsnummern.
 
-Current package:
+Anwendungen müssen ein vollständiges Registry-Commit als Baseline fixieren.
+Historische Einträge bleiben unverändert, wenn die Baseline vorrückt. Neue
+Snapshots verwenden `X.Y.Z-snapshot.g<12-stelliger-Source-SHA>`; reine
+Paketkorrekturen erhöhen die vcpkg-`port-version`.
 
-- `ilic` `0.10.0-snapshot.bb284a67`
-
-The initial ilic port is library-only and exposes `ilic::core` and `ilic::capi`.
-It supports `x64-linux`, `arm64-osx`, and `x64-windows` and is licensed under MIT.
-
-Consumers should reference this repository as a Git registry and pin a specific
-registry baseline commit in `vcpkg-configuration.json`.
+Nur der serialisierte Registry-Workflow in `ilic-fork` schreibt diesen Branch.
